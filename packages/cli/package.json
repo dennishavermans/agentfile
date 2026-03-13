@@ -1,0 +1,44 @@
+{
+  "name": "@agentfile/cli",
+  "version": "0.1.0",
+  "description": "CLI for agentfile — init, sync, and validate AI agent contracts",
+  "type": "module",
+  "bin": {
+    "agentfile": "./dist/bin.js"
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build":     "tsc",
+    "typecheck": "tsc --noEmit",
+    "test":      "vitest run",
+    "dev":       "tsx src/bin.ts"
+  },
+  "keywords": ["ai", "agents", "cli", "rules", "claude", "copilot", "cursor", "agentfile"],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url":  "https://github.com/dennishavermans/agentfile"
+  },
+  "homepage": "https://github.com/dennishavermans/agentfile#readme",
+  "bugs": {
+    "url": "https://github.com/dennishavermans/agentfile/issues"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@types/node":  "^20.0.0",
+    "@agentfile/core": "^0.1.0",
+    "chalk":        "^5.3.0",
+    "commander":    "^12.0.0",
+    "enquirer":     "^2.4.1"
+  },
+  "devDependencies": {
+    "tsx":        "^4.7.0",
+    "typescript": "^5.3.0",
+    "vitest":     "^4.1.0"
+  }
+}

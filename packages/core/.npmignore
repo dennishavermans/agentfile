@@ -1,0 +1,12 @@
+# Source — only dist ships
+src/
+__tests__/
+
+# Config files
+tsconfig.json
+jest.config.js
+vitest.config.js
+
+# Dev artifacts
+*.map
+node_modules/

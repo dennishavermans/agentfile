@@ -1,0 +1,12 @@
+node_modules/
+dist/
+*.tsbuildinfo
+
+# agentfile generated files
+.ai-agents
+CLAUDE.md
+.github/copilot-instructions.md
+.cursor/
+.windsurfrules
+ai.override.yaml
+packages/*/dist/
