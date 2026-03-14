@@ -86,7 +86,7 @@ CLAUDE.md               ← gitignored, generated per-developer
 ## Getting started
 
 ```bash
-npx agentfile init
+npx @agentfile/cli init
 ```
 
 That's it. The `init` command walks you through your project name, stack, and which agents your team uses — then scaffolds everything.
@@ -94,7 +94,7 @@ That's it. The `init` command walks you through your project name, stack, and wh
 After init, generate your personal agent files:
 
 ```bash
-npx agentfile sync
+npx @agentfile/cli sync
 ```
 
 ---
@@ -299,10 +299,10 @@ That's the entire process. No generator changes, no config edits, no registry up
 
 ```yaml
 - name: Validate contract schema
-  run: npx agentfile validate
+  run: npx @agentfile/cli validate
 
 - name: Dry-run generation
-  run: npx agentfile sync --dry-run
+  run: npx @agentfile/cli sync --dry-run
 ```
 
 The dry-run renders all templates without writing files — catching broken templates and invalid contracts before they reach developers.

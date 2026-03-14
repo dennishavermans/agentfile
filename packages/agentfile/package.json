@@ -1,0 +1,29 @@
+{
+  "name": "agentfile",
+  "version": "0.1.2",
+  "description": "One contract. Every AI agent. Zero clutter.",
+  "type": "module",
+  "bin": {
+    "agentfile": "./bin.js"
+  },
+  "files": ["bin.js"],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dennishavermans/agentfile"
+  },
+  "homepage": "https://github.com/dennishavermans/agentfile#readme",
+  "bugs": {
+    "url": "https://github.com/dennishavermans/agentfile/issues"
+  },
+  "keywords": ["ai", "agents", "cli", "rules", "claude", "copilot", "cursor", "agentfile"],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@agentfile/cli": "^0.1.1"
+  }
+}

@@ -1,16 +1,17 @@
 {
-  "name": "agentfile",
+  "name": "agentfile-monorepo",
   "private": true,
   "workspaces": [
     "packages/*"
   ],
   "scripts": {
-    "build":        "npm run build -w packages/core && npm run build -w packages/cli",
-    "test":         "npm run test --workspaces --if-present",
-    "typecheck":    "npm run typecheck --workspaces --if-present",
-    "publish:core": "npm run build -w packages/core && npm publish --workspace packages/core",
-    "publish:cli":  "npm run build -w packages/cli  && npm publish --workspace packages/cli",
-    "publish:all":  "npm run publish:core && npm run publish:cli"
+    "build":             "npm run build -w packages/core && npm run build -w packages/cli",
+    "test":              "npm run test --workspaces --if-present",
+    "typecheck":         "npm run typecheck --workspaces --if-present",
+    "publish:core":      "npm run build -w packages/core && npm publish --workspace packages/core",
+    "publish:cli":       "npm run build -w packages/cli  && npm publish --workspace packages/cli",
+    "publish:wrapper":   "npm publish --workspace packages/agentfile",
+    "publish:all":       "npm run publish:core && npm run publish:cli && npm run publish:wrapper"
   },
   "engines": {
     "node": ">=18.0.0"

@@ -1,7 +1,7 @@
 /**
- * @agentfile/core
+ * @unifai/core
  *
- * Core engine for agentfile — schema validation, loading, rendering, and generation.
+ * Core engine for unifai — schema validation, loading, rendering, and generation.
  * This package is framework-agnostic and has no CLI concerns.
  *
  * Primary entry points:
