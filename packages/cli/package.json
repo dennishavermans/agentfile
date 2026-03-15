@@ -1,13 +1,14 @@
 {
   "name": "@agentfile/cli",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "CLI for agentfile — init, sync, and validate AI agent contracts",
   "type": "module",
   "bin": {
     "agentfile": "./dist/bin.js"
   },
   "files": [
-    "dist"
+    "dist",
+    "README.md"
   ],
   "scripts": {
     "build": "tsc",
