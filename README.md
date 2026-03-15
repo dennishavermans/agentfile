@@ -53,17 +53,17 @@ skills:
 Then run one command:
 
 ```bash
-agentfile sync
+npx @agentfile/cli sync
 ```
 
 And every agent gets the right file in the right format:
 
 ```
-✔ claude  → CLAUDE.md
-✔ copilot → .github/copilot-instructions.md
-✔ cursor  → .cursor/rules/main.mdc
+✔ claude     → CLAUDE.md
+✔ copilot    → .github/copilot-instructions.md
+✔ cursor     → .cursor/rules/main.mdc
 ✔ cursor:skill:create-component → .cursor/rules/skills/create-component.mdc
-✔ agents-md → AGENTS.md
+✔ agents-md  → AGENTS.md
 ```
 
 Each agent receives its rules in its own native format — Claude gets readable markdown, Cursor gets structured `.mdc` with frontmatter, Copilot gets compact inline context. The contract is the same. The output adapts.
@@ -79,6 +79,7 @@ ai/agents/              ← agent templates, committed once
 CLAUDE.md               ← gitignored, generated per-developer
 .cursor/rules/main.mdc  ← gitignored, generated per-developer
 .github/copilot-instructions.md  ← gitignored, generated per-developer
+AGENTS.md               ← gitignored, generated per-developer
 ```
 
 ---
@@ -89,7 +90,7 @@ CLAUDE.md               ← gitignored, generated per-developer
 npx @agentfile/cli init
 ```
 
-That's it. The `init` command walks you through your project name, stack, and which agents your team uses — then scaffolds everything.
+The `init` command walks you through your project name, stack, and which agents your team uses — then scaffolds everything.
 
 After init, generate your personal agent files:
 
@@ -122,18 +123,18 @@ Add to `package.json`:
 
 ## Commands
 
-### `agentfile init`
+### `npx @agentfile/cli init`
 Interactive setup. Scaffolds `ai/contract.yaml`, agent templates, `.ai-agents.example`, and a CI workflow. Safe to run in existing projects — never overwrites existing files.
 
-### `agentfile sync`
+### `npx @agentfile/cli sync`
 Reads your personal `.ai-agents` file and generates the corresponding instruction files.
 
 ```bash
-agentfile sync             # generate files
-agentfile sync --dry-run   # render without writing — used in CI
+npx @agentfile/cli sync             # generate files
+npx @agentfile/cli sync --dry-run   # render without writing — used in CI
 ```
 
-### `agentfile validate`
+### `npx @agentfile/cli validate`
 Validates `ai/contract.yaml` against the schema. Fast, exits 0 or 1. Designed for CI.
 
 ---
@@ -191,7 +192,7 @@ A committed `.ai-agents.example` documents the available options for new joiners
 Skills define shared workflows that every agent understands. Define them once — each agent receives them in its own format.
 
 ```yaml
-version: 2
+version: 1
 
 project:
   name: My Project
@@ -224,7 +225,20 @@ Each agent receives skills in its native format:
 | Claude | Appended to `CLAUDE.md` as markdown sections |
 | Cursor | One `.mdc` file per skill in `.cursor/rules/skills/` |
 | Copilot | Compact inline bullets in `copilot-instructions.md` |
-| AGENTS.md | Full markdown — universal fallback |
+| AGENTS.md | Full markdown — also read natively by Codex and Windsurf |
+
+---
+
+## Supported agents
+
+| Agent | Generated file |
+|---|---|
+| `claude` | `CLAUDE.md` |
+| `copilot` | `.github/copilot-instructions.md` |
+| `cursor` | `.cursor/rules/main.mdc` + one `.mdc` per skill |
+| `agents-md` | `AGENTS.md` — read natively by Codex and Windsurf |
+
+Adding a new agent requires only a new folder in `ai/agents/`. No generator changes, no config edits.
 
 ---
 
@@ -241,7 +255,7 @@ blocks:
       All API calls go through /lib/api — never call fetch directly.
 ```
 
-Run `agentfile sync` from that directory and the override is injected automatically.
+Run `npx @agentfile/cli sync` from that directory and the override is injected automatically.
 
 ---
 
@@ -273,9 +287,10 @@ ${rules.coding}
 
 ## Architecture
 ${rules.architecture}
-```
 
-That's the entire process. No generator changes, no config edits, no registry updates.
+## Skills
+${skills}
+```
 
 ---
 
@@ -289,6 +304,7 @@ That's the entire process. No generator changes, no config edits, no registry up
 | `${rules.architecture}` | Architecture rules as markdown bullets |
 | `${rules.testing}` | Testing rules as markdown bullets |
 | `${rules.naming}` | Naming rules as markdown bullets |
+| `${skills}` | Skills rendered in agent-native format |
 | `${override}` | Injected override blocks (if any) |
 
 ---
@@ -320,6 +336,7 @@ CLAUDE.md
 .github/copilot-instructions.md
 .cursor/
 .windsurfrules
+AGENTS.md
 ai.override.yaml
 ```
 
@@ -355,8 +372,8 @@ for (const r of result.results) {
 
 | Package | Description |
 |---|---|
-| [`@agentfile/core`](./packages/core) | Core engine — schema, loader, renderer, generator |
-| [`@agentfile/cli`](./packages/cli) | CLI — `init`, `sync`, `validate` commands |
+| [`@agentfile/core`](https://www.npmjs.com/package/@agentfile/core) | Core engine — schema, loader, renderer, generator |
+| [`@agentfile/cli`](https://www.npmjs.com/package/@agentfile/cli) | CLI — `init`, `sync`, `validate` commands |
 
 ---
 
