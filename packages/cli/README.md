@@ -13,6 +13,12 @@ npx @agentfile/cli init
 Walks you through setup and scaffolds everything — `ai/contract.yaml`, agent templates, `.ai-agents.example`, and a CI workflow.
 
 ```bash
+npx @agentfile/cli watch
+```
+
+Watches `ai/` for changes and automatically re-runs sync. Runs an initial sync on start. No more running sync manually after every contract change.
+
+```bash
 npx @agentfile/cli sync
 ```
 

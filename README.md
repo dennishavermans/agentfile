@@ -126,6 +126,15 @@ Add to `package.json`:
 ### `npx @agentfile/cli init`
 Interactive setup. Scaffolds `ai/contract.yaml`, agent templates, `.ai-agents.example`, and a CI workflow. Safe to run in existing projects — never overwrites existing files.
 
+### `npx @agentfile/cli watch`
+Watches `ai/` for changes and automatically re-runs sync. Runs an initial sync on start.
+
+```bash
+npx @agentfile/cli watch
+```
+
+Solves the problem of manually running sync after every contract change.
+
 ### `npx @agentfile/cli sync`
 Reads your personal `.ai-agents` file and generates the corresponding instruction files.
 
