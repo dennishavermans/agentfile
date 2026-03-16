@@ -4,6 +4,7 @@ import { Command } from 'commander'
 import { initCommand }     from './commands/init.js'
 import { syncCommand }     from './commands/sync.js'
 import { validateCommand } from './commands/validate.js'
+import { watchCommand }    from './commands/watch.js'
 
 const program = new Command()
 
@@ -27,5 +28,10 @@ program
   .command('validate')
   .description('Validate ai/contract.yaml schema (used in CI)')
   .action(validateCommand)
+
+program
+  .command('watch')
+  .description('Watch ai/ for changes and sync automatically')
+  .action(watchCommand)
 
 program.parse()

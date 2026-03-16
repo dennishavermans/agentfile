@@ -1,6 +1,6 @@
 {
   "name": "@agentfile/cli",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "CLI for agentfile — init, sync, and validate AI agent contracts",
   "type": "module",
   "bin": {
