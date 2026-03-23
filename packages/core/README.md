@@ -1,6 +1,6 @@
 # @agentfile/core
 
-Core engine for [agentfile](https://github.com/dennishavermans/agentfile) — schema validation, YAML loading, template rendering, and file generation.
+Core engine for [agentfile](https://github.com/dennishavermans/agentfile) — schema validation, YAML loading, template rendering, file generation, manifest ownership tracking, drift detection, and backup utilities.
 
 Use this package if you want to integrate agentfile into your own tooling or build scripts.
 
@@ -24,6 +24,21 @@ for (const r of result.results) {
   if (r.status === 'error')   console.error(r.error.message)
   if (r.status === 'skipped') console.warn(r.reason)
 }
+```
+
+Manifest and backup APIs are also available:
+
+```typescript
+import {
+  readManifest,
+  writeManifest,
+  buildManifest,
+  detectDrift,
+  captureBackup,
+  writeBackup,
+  readBackup,
+  restoreBackup,
+} from '@agentfile/core'
 ```
 
 ## API
@@ -58,6 +73,24 @@ Pure template rendering — no I/O.
 renderTemplate(template: string, ctx: RenderContext, skillsFormat?: SkillsFormat)
 // returns: string
 ```
+
+### Manifest helpers
+
+Track generated-file ownership and detect drift:
+
+- `readManifest(root)`
+- `writeManifest(root, manifest)`
+- `buildManifest(ownedFiles, previous)`
+- `detectDrift(root, manifest)`
+- `staleFiles(previous, current)`
+
+Backup and restore generated files:
+
+- `captureBackup(root, paths)`
+- `writeBackup(root, entries, tag)`
+- `readBackup(root, tag)`
+- `restoreBackup(root, entries)`
+- `listBackups(root)`
 
 ## Benchmark
 

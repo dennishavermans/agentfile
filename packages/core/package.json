@@ -1,6 +1,6 @@
 {
   "name": "@agentfile/core",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Core engine for agentfile — schema validation, loading, rendering, and generation",
   "type": "module",
   "main": "./dist/index.js",

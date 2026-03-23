@@ -2,7 +2,7 @@
 
 > One contract. Every AI agent. Zero clutter.
 
-CLI for [agentfile](https://github.com/dennishavermans/agentfile) — scaffold, generate and validate AI agent instruction files from a single `contract.yaml`.
+CLI for [agentfile](https://github.com/dennishavermans/agentfile) — scaffold, migrate, generate, validate, diff, clean, and rollback AI agent instruction files from a single `contract.yaml`.
 
 ## Usage
 
@@ -29,6 +29,37 @@ npx @agentfile/cli validate
 ```
 
 Validates `ai/contract.yaml` against the schema. Exits 0 or 1. Designed for CI.
+
+```bash
+npx @agentfile/cli migrate --from .github/copilot-instructions.md --from CLAUDE.md
+```
+
+Imports existing instruction files into a draft `ai/contract.yaml`.
+
+```bash
+npx @agentfile/cli migrate --from CLAUDE.md --replace-policy archive
+npx @agentfile/cli migrate --from CLAUDE.md --targets claude,copilot
+```
+
+```bash
+npx @agentfile/cli diff
+```
+
+Checks generated files against `.agentfile-manifest.json`; exits non-zero when drift is found.
+
+```bash
+npx @agentfile/cli clean --dry-run
+npx @agentfile/cli clean
+```
+
+Removes generated files and updates manifest ownership records.
+
+```bash
+npx @agentfile/cli rollback --list
+npx @agentfile/cli rollback --tag migrate-1700000000000
+```
+
+Restores files from `.agentfile-backup/`.
 
 ## What it generates
 

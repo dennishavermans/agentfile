@@ -8,8 +8,21 @@ This is the convenience wrapper package. It re-exports the full CLI from [`@agen
 
 ```bash
 npx @agentfile/agentfile init
+npx @agentfile/agentfile migrate --from CLAUDE.md
 npx @agentfile/agentfile sync
+npx @agentfile/agentfile diff
 ```
+
+Available commands mirror `@agentfile/cli`:
+
+- `init`
+- `migrate`
+- `sync`
+- `validate`
+- `watch`
+- `diff`
+- `clean`
+- `rollback`
 
 ## Documentation
 

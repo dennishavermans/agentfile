@@ -132,6 +132,23 @@ Add to `package.json`:
 ### `npx @agentfile/cli init`
 Interactive setup. Scaffolds `ai/contract.yaml`, agent templates, `.ai-agents.example`, and a CI workflow. Safe to run in existing projects — never overwrites existing files.
 
+### `npx @agentfile/cli migrate`
+Imports existing instruction files and creates a draft `ai/contract.yaml`.
+
+```bash
+npx @agentfile/cli migrate --from .github/copilot-instructions.md --from CLAUDE.md
+npx @agentfile/cli migrate --from CLAUDE.md --replace-policy archive
+npx @agentfile/cli migrate --from CLAUDE.md --targets claude,copilot
+```
+
+Key options:
+
+- `--replace-policy keep|archive|delete`
+- `--targets <ides>`
+- `--exclude <ides>`
+- `--dry-run`
+- `--output <path>`
+
 ### `npx @agentfile/cli watch`
 Watches `ai/` for changes and automatically re-runs sync. Runs an initial sync on start.
 
@@ -151,6 +168,30 @@ npx @agentfile/cli sync --dry-run   # render without writing — used in CI
 
 ### `npx @agentfile/cli validate`
 Validates `ai/contract.yaml` against the schema. Fast, exits 0 or 1. Designed for CI.
+
+### `npx @agentfile/cli diff`
+Checks generated files against `.agentfile-manifest.json` and exits non-zero when drift is detected.
+
+```bash
+npx @agentfile/cli diff
+npx @agentfile/cli diff --files CLAUDE.md,.github/copilot-instructions.md
+```
+
+### `npx @agentfile/cli clean`
+Removes generated files that can be regenerated and updates manifest ownership records.
+
+```bash
+npx @agentfile/cli clean --dry-run
+npx @agentfile/cli clean
+```
+
+### `npx @agentfile/cli rollback`
+Restores files from `.agentfile-backup/`.
+
+```bash
+npx @agentfile/cli rollback --list
+npx @agentfile/cli rollback --tag migrate-1700000000000
+```
 
 ---
 
@@ -353,6 +394,8 @@ CLAUDE.md
 .windsurfrules
 AGENTS.md
 ai.override.yaml
+.agentfile-manifest.json
+.agentfile-backup/
 ```
 
 ---
@@ -388,7 +431,7 @@ for (const r of result.results) {
 | Package | Description |
 |---|---|
 | [`@agentfile/agentfile`](https://www.npmjs.com/package/@agentfile/agentfile) | Convenience wrapper — re-exports the full CLI |
-| [`@agentfile/cli`](https://www.npmjs.com/package/@agentfile/cli) | CLI — `init`, `sync`, `validate`, `watch` commands |
+| [`@agentfile/cli`](https://www.npmjs.com/package/@agentfile/cli) | CLI — `init`, `migrate`, `sync`, `validate`, `watch`, `diff`, `clean`, `rollback` |
 | [`@agentfile/core`](https://www.npmjs.com/package/@agentfile/core) | Core engine — schema, loader, renderer, generator |
 
 ---
@@ -401,6 +444,29 @@ agentfile is in early development. Issues and PRs welcome.
 2. `npm install` from the root
 3. `npm run build` to build all packages
 4. `npm test` to run all tests
+
+---
+
+## Release process
+
+For a normal release:
+
+1. Update versions in all package manifests (`packages/core`, `packages/cli`, `packages/agentfile`)
+2. Update `CHANGELOG.md`
+3. Build and test from repo root:
+
+```bash
+npm run build --workspaces
+npm run test
+```
+
+4. Publish packages from root:
+
+```bash
+npm run publish:all
+```
+
+Recommended order remains `core` -> `cli` -> `agentfile` (already encoded in `publish:all`).
 
 ---
 

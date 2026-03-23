@@ -1,6 +1,6 @@
 {
   "name": "@agentfile/agentfile",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "One contract. Every AI agent. Zero clutter.",
   "type": "module",
   "bin": {
@@ -41,7 +41,7 @@
     "access": "public"
   },
   "dependencies": {
-    "@agentfile/cli": "^0.2.0"
+    "@agentfile/cli": "^0.3.0"
   },
   "devDependencies": {
     "@types/node": "^25.5.0",

@@ -1,4 +1,10 @@
-import type { Contract, Override, Skill } from "./schema.js";
+import type {
+  Contract,
+  Override,
+  Skill,
+  Artifact,
+  DocReference,
+} from "./schema.js";
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -106,6 +112,102 @@ export function renderSkillCopilot(skill: Skill): string {
   return `- **${skill.name}**: ${skill.description}.${context} Steps: ${steps}.`;
 }
 
+// ─── Artifact Token Builder ───────────────────────────────────────────────
+// Converts an Artifact's fields + open metadata into a flat token map
+// that renderArtifactTemplate can inject into per-IDE artifact templates.
+
+function stringifyMetadataValue(value: unknown): string {
+  if (value === null || value === undefined) return "";
+  if (Array.isArray(value)) return value.map(String).join(", ");
+  if (typeof value === "object") return JSON.stringify(value);
+  return String(value);
+}
+
+/**
+ * Builds a token map for a single artifact. Available tokens:
+ *   ${name}            — artifact name
+ *   ${type}            — artifact type
+ *   ${description}     — artifact description
+ *   ${body}            — content from content_file (or empty)
+ *   ${metadata.<key>}  — any metadata key, stringified
+ */
+export function buildArtifactTokens(
+  artifact: Artifact,
+  body: string,
+): Record<string, string> {
+  const tokens: Record<string, string> = {
+    name: artifact.name,
+    type: artifact.type,
+    description: artifact.description,
+    body,
+  };
+
+  for (const [key, value] of Object.entries(artifact.metadata)) {
+    tokens[`metadata.${key}`] = stringifyMetadataValue(value);
+  }
+
+  return tokens;
+}
+
+/**
+ * Builds a combined token map for all artifacts of a given type.
+ * Used when artifact_templates[type].aggregate === true.
+ * Exposes ${artifacts_json} as a JSON array for JSON-format templates.
+ */
+export function buildAggregateArtifactTokens(
+  artifacts: Artifact[],
+  bodies: Map<string, string>,
+): Record<string, string> {
+  const jsonEntries = artifacts.map((a) => ({
+    name: a.name,
+    type: a.type,
+    description: a.description,
+    body: bodies.get(a.name) ?? "",
+    metadata: a.metadata,
+  }));
+
+  return {
+    artifacts_json: JSON.stringify(jsonEntries, null, 2),
+    artifacts_count: String(artifacts.length),
+  };
+}
+
+/**
+ * Renders an artifact template string using a flat token map.
+ * Uses the same ${token} syntax as the main renderTemplate, but operates
+ * on an arbitrary token map rather than a contract-derived RenderContext.
+ */
+export function renderArtifactTemplate(
+  template: string,
+  tokens: Record<string, string>,
+): string {
+  const pattern = new RegExp(
+    `\\$\\{(${Object.keys(tokens).map(escapeRegExp).join("|")})\\}`,
+    "g",
+  );
+
+  return (
+    template
+      .replace(pattern, (_match, token: string) => tokens[token] ?? _match)
+      .trim() + "\n"
+  );
+}
+
+// ─── Docs Token Builder ───────────────────────────────────────────────────
+
+/**
+ * Builds a token→path map for docs[] entries so templates can use
+ * ${docs.<token>} to reference team document paths.
+ */
+export function buildDocsTokens(docs: DocReference[]): Record<string, string> {
+  const tokens: Record<string, string> = {};
+  for (const doc of docs) {
+    const key = `docs.${doc.token ?? doc.name}`;
+    tokens[key] = doc.file;
+  }
+  return tokens;
+}
+
 // ─── Skills Block Renderers ────────────────────────────────────────────────
 
 function renderSkillsMarkdown(skills: Skill[]): string {
@@ -137,7 +239,7 @@ function buildTokenMap(
   ctx: RenderContext,
   skillsFormat: SkillsFormat,
 ): Record<string, string> {
-  const { project, rules, skills } = ctx.contract;
+  const { project, rules, skills, docs } = ctx.contract;
 
   const renderSkills = () => {
     switch (skillsFormat) {
@@ -159,7 +261,52 @@ function buildTokenMap(
     "rules.naming": renderList(rules.naming),
     skills: renderSkills(),
     override: renderOverrideBlocks(ctx.override),
+    ...buildDocsTokens(docs),
   };
+}
+
+// ─── Preserve Zones ───────────────────────────────────────────────────────
+
+const PRESERVE_OPEN = /<!--\s*agentfile:preserve\s+id="([^"]+)"\s*-->/g;
+const PRESERVE_BLOCK =
+  /<!--\s*agentfile:preserve\s+id="([^"]+)"\s*-->([\s\S]*?)<!--\s*agentfile:end-preserve\s*-->/g;
+
+/**
+ * Scans an already-rendered on-disk file and returns a Map of
+ * preserve-zone id → literal content string for every zone found.
+ *
+ * Call this on the existing file before re-rendering; then pass the
+ * returned Map to `renderTemplate` so the preserved content survives sync.
+ */
+export function extractPreservedZones(content: string): Map<string, string> {
+  const zones = new Map<string, string>();
+  PRESERVE_BLOCK.lastIndex = 0;
+  let match: RegExpExecArray | null;
+  while ((match = PRESERVE_BLOCK.exec(content)) !== null) {
+    zones.set(match[1], match[2]);
+  }
+  return zones;
+}
+
+/**
+ * Re-injects preserved zone content into a freshly rendered string.
+ * For each `<!-- agentfile:preserve id="X" --> ... <!-- agentfile:end-preserve -->`
+ * pair found in `rendered`, the inner content is replaced by `zones.get(X)` when
+ * a matching zone exists. When no match exists the template default is kept.
+ */
+function applyPreservedZones(
+  rendered: string,
+  zones: Map<string, string>,
+): string {
+  PRESERVE_BLOCK.lastIndex = 0;
+  return rendered.replace(
+    /<!--\s*agentfile:preserve\s+id="([^"]+)"\s*-->([\s\S]*?)<!--\s*agentfile:end-preserve\s*-->/g,
+    (_match, id: string, templateDefault: string) => {
+      const preserved = zones.get(id);
+      const inner = preserved !== undefined ? preserved : templateDefault;
+      return `<!-- agentfile:preserve id="${id}" -->${inner}<!-- agentfile:end-preserve -->`;
+    },
+  );
 }
 
 // ─── Renderer ─────────────────────────────────────────────────────────────
@@ -167,11 +314,15 @@ function buildTokenMap(
 /**
  * Renders a template string using a RenderContext.
  * skillsFormat controls how skills are rendered for a given agent.
+ * preservedZones should be the result of extractPreservedZones() called on the
+ * existing on-disk file (if any) — zones are re-injected verbatim so that
+ * IDE-native config inside the file is not lost on sync.
  */
 export function renderTemplate(
   template: string,
   ctx: RenderContext,
   skillsFormat: SkillsFormat = "markdown",
+  preservedZones: Map<string, string> = new Map(),
 ): string {
   const tokens = buildTokenMap(ctx, skillsFormat);
 
@@ -180,10 +331,14 @@ export function renderTemplate(
     "g",
   );
 
-  const output = template.replace(
+  let output = template.replace(
     tokenPattern,
     (_match, token: string) => tokens[token] ?? _match,
   );
+
+  if (preservedZones.size > 0) {
+    output = applyPreservedZones(output, preservedZones);
+  }
 
   return output.trim() + "\n";
 }

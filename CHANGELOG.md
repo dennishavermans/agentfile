@@ -7,6 +7,28 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.3.0] — 2026-03-23
+
+### Added
+- `migrate` command to import existing instruction files into `ai/contract.yaml`
+- Migration source filtering with `--targets` and `--exclude`
+- Migration replace policies with `--replace-policy keep|archive|delete`
+- Migration backups before write and source replacement
+- `clean` command for generated-file cleanup workflows
+- `diff` command for manifest drift detection (CI-friendly non-zero exit on drift)
+- `rollback` command to restore from `.agentfile-backup/`
+- Manifest system (`.agentfile-manifest.json`) for ownership and drift tracking
+- Generated-file marker support in renderer output
+- Core manifest APIs in `@agentfile/core` (`readManifest`, `buildManifest`, `detectDrift`, backup helpers)
+
+### Changed
+- `migrate` internals refactored into modular files (`parser`, `merge`, `yaml`, `filter`, `types`) for maintainability
+- `sync` now writes/updates manifest data and reports stale generated files
+- Version bumps:
+- `@agentfile/core` `0.3.0`
+- `@agentfile/cli` `0.3.0`
+- `@agentfile/agentfile` `0.3.0`
+
 ## [0.2.0] — 2026-03-23
 
 ### Added

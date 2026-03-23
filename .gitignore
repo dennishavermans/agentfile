@@ -10,4 +10,6 @@ CLAUDE.md
 .cursor/
 .windsurfrules
 ai.override.yaml
+.agentfile-manifest.json
+.agentfile-backup/
 packages/*/dist/

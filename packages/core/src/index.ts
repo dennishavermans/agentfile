@@ -11,12 +11,22 @@
  */
 
 // ─── Generation API ────────────────────────────────────────────────────────
-export { generate, validateContract }         from './generator.js'
-export type { GenerateOptions, ValidateOptions } from './generator.js'
+export { generate, validateContract } from "./generator.js";
+export type { GenerateOptions, ValidateOptions } from "./generator.js";
 
 // ─── Rendering API ─────────────────────────────────────────────────────────
-export { renderTemplate, renderSkillMarkdown, renderSkillMdc, renderSkillCopilot } from './renderer.js'
-export type { RenderContext, SkillsFormat }   from './renderer.js'
+export {
+  renderTemplate,
+  renderSkillMarkdown,
+  renderSkillMdc,
+  renderSkillCopilot,
+  extractPreservedZones,
+  buildArtifactTokens,
+  buildAggregateArtifactTokens,
+  renderArtifactTemplate,
+  buildDocsTokens,
+} from "./renderer.js";
+export type { RenderContext, SkillsFormat } from "./renderer.js";
 
 // ─── Loading API ───────────────────────────────────────────────────────────
 export {
@@ -27,25 +37,59 @@ export {
   resolveAgent,
   discoverAgents,
   resolveAgentSelection,
-  ValidationError
-}                                             from './loader.js'
+  ValidationError,
+} from "./loader.js";
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 export type {
   Skill,
+  Artifact,
+  ArtifactTemplate,
+  DocReference,
   Contract,
   AgentConfig,
   Override,
   ResolvedAgent,
   AgentResult,
   GenerateResult,
-  AgentSelection
-}                                             from './schema.js'
+  AgentSelection,
+} from "./schema.js";
 
 // ─── Schemas (for consumers that want to validate custom inputs) ────────────
 export {
   ContractSchema,
   AgentConfigSchema,
   OverrideSchema,
-  SkillSchema
-}                                             from './schema.js'
+  SkillSchema,
+  ArtifactSchema,
+  ArtifactTemplateSchema,
+  DocReferenceSchema,
+} from "./schema.js";
+
+// ─── Manifest API ──────────────────────────────────────────────────────────
+export {
+  readManifest,
+  writeManifest,
+  buildManifest,
+  hashContent,
+  generatedMarker,
+  hasGeneratedMarker,
+  addMarker,
+  ownedPaths,
+  preservedPaths,
+  detectDrift,
+  staleFiles,
+  captureBackup,
+  writeBackup,
+  readBackup,
+  restoreBackup,
+  listBackups,
+  MANIFEST_FILE,
+  BACKUP_DIR,
+} from "./manifest.js";
+export type {
+  Manifest,
+  ManifestEntry,
+  FileOwnership,
+  BackupEntry,
+} from "./manifest.js";
