@@ -1,9 +1,0 @@
-# Source — only dist ships
-src/
-__tests__/
-
-# Config files
-tsconfig.json
-
-# Dev artifacts
-node_modules/

@@ -1,8 +1,9 @@
 {
   "name": "@agentfile/cli",
-  "version": "0.1.6",
+  "version": "0.2.0",
   "description": "CLI for agentfile — init, sync, and validate AI agent contracts",
   "type": "module",
+  "main": "./dist/bin.js",
   "bin": {
     "agentfile": "./dist/bin.js"
   },
@@ -11,7 +12,8 @@
     "README.md"
   ],
   "scripts": {
-    "build": "tsc",
+    "clean": "rm -rf dist",
+    "build": "npm run clean && tsc",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "dev": "tsx src/bin.ts"
@@ -36,21 +38,21 @@
     "url": "https://github.com/dennishavermans/agentfile/issues"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=24.0.0"
   },
   "publishConfig": {
     "access": "public"
   },
   "dependencies": {
-    "@types/node": "^20.0.0",
-    "@agentfile/core": "^0.1.0",
-    "chalk": "^5.3.0",
-    "commander": "^12.0.0",
+    "@agentfile/core": "^0.2.0",
+    "chalk": "^5.6.2",
+    "commander": "^14.0.3",
     "enquirer": "^2.4.1"
   },
   "devDependencies": {
-    "tsx": "^4.7.0",
-    "typescript": "^5.3.0",
+    "@types/node": "^25.5.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
     "vitest": "^4.1.0"
   }
 }

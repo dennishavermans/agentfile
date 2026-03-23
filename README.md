@@ -105,6 +105,12 @@ npx @agentfile/cli sync
 For teams that want `agentfile` as a project dependency:
 
 ```bash
+npm install --save-dev @agentfile/agentfile
+```
+
+Or use the scoped CLI package directly:
+
+```bash
 npm install --save-dev @agentfile/cli
 ```
 
@@ -381,8 +387,9 @@ for (const r of result.results) {
 
 | Package | Description |
 |---|---|
+| [`@agentfile/agentfile`](https://www.npmjs.com/package/@agentfile/agentfile) | Convenience wrapper — re-exports the full CLI |
+| [`@agentfile/cli`](https://www.npmjs.com/package/@agentfile/cli) | CLI — `init`, `sync`, `validate`, `watch` commands |
 | [`@agentfile/core`](https://www.npmjs.com/package/@agentfile/core) | Core engine — schema, loader, renderer, generator |
-| [`@agentfile/cli`](https://www.npmjs.com/package/@agentfile/cli) | CLI — `init`, `sync`, `validate` commands |
 
 ---
 

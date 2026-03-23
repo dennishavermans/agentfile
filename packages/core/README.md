@@ -59,6 +59,14 @@ renderTemplate(template: string, ctx: RenderContext, skillsFormat?: SkillsFormat
 // returns: string
 ```
 
+## Benchmark
+
+Use the built-in benchmark to measure template rendering and dry-run generation performance against a larger synthetic contract:
+
+```bash
+npm run bench -w packages/core
+```
+
 ## Links
 
 - [Full documentation](https://github.com/dennishavermans/agentfile)

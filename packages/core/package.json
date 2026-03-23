@@ -1,6 +1,6 @@
 {
   "name": "@agentfile/core",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Core engine for agentfile — schema validation, loading, rendering, and generation",
   "type": "module",
   "main": "./dist/index.js",
@@ -8,38 +8,52 @@
   "exports": {
     ".": {
       "import": "./dist/index.js",
-      "types":  "./dist/index.d.ts"
+      "types": "./dist/index.d.ts"
     }
   },
-  "files": ["dist", "README.md"],
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "scripts": {
-    "build":     "tsc",
+    "bench": "tsx benchmarks/core.bench.ts",
+    "clean": "rm -rf dist",
+    "build": "npm run clean && tsc",
     "typecheck": "tsc --noEmit",
-    "test":      "vitest run"
+    "test": "vitest run"
   },
-  "keywords": ["ai", "agents", "rules", "claude", "copilot", "cursor", "agentfile"],
+  "keywords": [
+    "ai",
+    "agents",
+    "rules",
+    "claude",
+    "copilot",
+    "cursor",
+    "agentfile"
+  ],
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url":  "https://github.com/dennishavermans/agentfile"
+    "url": "https://github.com/dennishavermans/agentfile"
   },
   "homepage": "https://github.com/dennishavermans/agentfile#readme",
   "bugs": {
     "url": "https://github.com/dennishavermans/agentfile/issues"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=24.0.0"
   },
   "publishConfig": {
     "access": "public"
   },
   "dependencies": {
-    "@types/node": "^20.0.0",
-    "yaml":        "^2.3.4",
-    "zod":         "^3.22.4"
+    "yaml": "^2.8.3",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
-    "typescript": "^5.3.0",
-    "vitest":     "^4.1.0"
+    "@types/node": "^25.5.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.0"
   }
 }

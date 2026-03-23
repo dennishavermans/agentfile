@@ -4,6 +4,7 @@ dist/
 
 # agentfile generated files
 .ai-agents
+AGENTS.md
 CLAUDE.md
 .github/copilot-instructions.md
 .cursor/

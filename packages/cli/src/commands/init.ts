@@ -1,12 +1,12 @@
 /// <reference types="node" />
-import { existsSync, mkdirSync, writeFileSync } from 'fs'
-import { join } from 'path'
-import { logger } from '../logger.js'
+import { existsSync, mkdirSync, writeFileSync } from "fs";
+import { join } from "path";
+import { logger } from "../logger.js";
 
 // ─── Scaffolding Templates ─────────────────────────────────────────────────
 
 function contractYaml(name: string, stack: string[]): string {
-  const stackList = stack.map(s => `    - ${s}`).join('\n')
+  const stackList = stack.map((s) => `    - ${s}`).join("\n");
   return `version: 1
 
 project:
@@ -46,7 +46,7 @@ skills:
     examples:
       - input: "example input"
         output: "example output"
-`
+`;
 }
 
 const claudeTemplate = `# Project Instructions
@@ -73,7 +73,7 @@ const claudeTemplate = `# Project Instructions
 \${rules.naming}
 \${skills}
 \${override}
-`
+`;
 
 const copilotTemplate = `# Copilot Instructions
 
@@ -97,7 +97,7 @@ Stack: \${project.stack.join(', ')}
 \${rules.naming}
 \${skills}
 \${override}
-`
+`;
 
 const cursorTemplate = `---
 description: \${project.name} — global coding rules
@@ -125,7 +125,7 @@ Stack: \${project.stack.join(', ')}
 
 \${rules.naming}
 \${override}
-`
+`;
 
 const agentsMdTemplate = `# AGENTS.md
 
@@ -154,7 +154,7 @@ const agentsMdTemplate = `# AGENTS.md
 \${rules.naming}
 \${skills}
 \${override}
-`
+`;
 
 const agentsExample = `# Copy this file to .ai-agents (no extension) and list the agents you use.
 # This file is gitignored — it is yours, not the team's.
@@ -164,7 +164,7 @@ const agentsExample = `# Copy this file to .ai-agents (no extension) and list th
 #   copilot
 #   cursor
 #   agents-md
-`
+`;
 
 const gitignoreAdditions = `
 # agentfile — AI agent personal config and generated files
@@ -174,7 +174,7 @@ CLAUDE.md
 .cursor/
 .windsurfrules
 ai.override.yaml
-`
+`;
 
 const ciWorkflow = `name: Validate AI Contract
 
@@ -196,118 +196,151 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
           cache: 'npm'
       - run: npm ci
       - name: Validate contract schema
         run: npx agentfile validate
       - name: Dry-run generation
         run: npx agentfile sync --dry-run
-`
+`;
 
 // ─── File Writer ───────────────────────────────────────────────────────────
 
 function writeIfMissing(path: string, content: string, label: string) {
   if (existsSync(path)) {
-    logger.warn(`${label} already exists — skipped`)
-    return
+    logger.warn(`${label} already exists — skipped`);
+    return;
   }
-  writeFileSync(path, content, 'utf-8')
-  logger.success(`Created ${label}`)
+  writeFileSync(path, content, "utf-8");
+  logger.success(`Created ${label}`);
 }
 
 // ─── Init Command ──────────────────────────────────────────────────────────
 
 export async function initCommand() {
-  logger.title('agentfile init')
+  logger.title("agentfile init");
 
   // Dynamic import — enquirer is CJS-compat but we import at runtime only
-  const { default: Enquirer } = await import('enquirer')
-  const enquirer = new Enquirer()
+  const { default: Enquirer } = await import("enquirer");
+  const enquirer = new Enquirer();
 
-  const answers = await enquirer.prompt([
+  const answers = (await enquirer.prompt([
     {
-      type:    'input',
-      name:    'name',
-      message: 'Project name?',
-      initial: 'My Project'
+      type: "input",
+      name: "name",
+      message: "Project name?",
+      initial: "My Project",
     },
     {
-      type:    'list',
-      name:    'stack',
-      message: 'Tech stack? (comma-separated)',
-      initial: 'typescript, node'
+      type: "list",
+      name: "stack",
+      message: "Tech stack? (comma-separated)",
+      initial: "typescript, node",
     },
     {
-      type:    'multiselect',
-      name:    'agents',
-      message: 'Which agents does your team use?',
-      choices: ['claude', 'copilot', 'cursor', 'agents-md']
-    }
-  ]) as { name: string; stack: string[]; agents: string[] }
+      type: "multiselect",
+      name: "agents",
+      message: "Which agents does your team use?",
+      choices: ["claude", "copilot", "cursor", "agents-md"],
+    },
+  ])) as { name: string; stack: string[]; agents: string[] };
 
-  const root = process.cwd()
+  const root = process.cwd();
 
-  console.log()
+  console.log();
 
   // ai/ directory and contract
-  mkdirSync(join(root, 'ai', 'agents', 'claude'),     { recursive: true })
-  mkdirSync(join(root, 'ai', 'agents', 'copilot'),    { recursive: true })
-  mkdirSync(join(root, 'ai', 'agents', 'cursor'),     { recursive: true })
-  mkdirSync(join(root, 'ai', 'agents', 'agents-md'),  { recursive: true })
-  mkdirSync(join(root, '.github', 'workflows'),        { recursive: true })
+  mkdirSync(join(root, "ai", "agents", "claude"), { recursive: true });
+  mkdirSync(join(root, "ai", "agents", "copilot"), { recursive: true });
+  mkdirSync(join(root, "ai", "agents", "cursor"), { recursive: true });
+  mkdirSync(join(root, "ai", "agents", "agents-md"), { recursive: true });
+  mkdirSync(join(root, ".github", "workflows"), { recursive: true });
 
   writeIfMissing(
-    join(root, 'ai', 'contract.yaml'),
+    join(root, "ai", "contract.yaml"),
     contractYaml(answers.name, answers.stack),
-    'ai/contract.yaml'
-  )
+    "ai/contract.yaml",
+  );
 
   // Agent configs
-  const agentConfigs: Record<string, { name: string; output: string; description: string }> = {
-    claude:     { name: 'Claude',         output: 'CLAUDE.md',                        description: 'Anthropic Claude instruction file' },
-    copilot:    { name: 'GitHub Copilot', output: '.github/copilot-instructions.md',  description: 'GitHub Copilot workspace instruction file' },
-    cursor:     { name: 'Cursor',         output: '.cursor/rules/main.mdc',           description: 'Cursor AI rules file' },
-    'agents-md': { name: 'AGENTS.md',    output: 'AGENTS.md',                        description: 'Universal agent instruction file' }
-  }
+  const agentConfigs: Record<
+    string,
+    { name: string; output: string; description: string }
+  > = {
+    claude: {
+      name: "Claude",
+      output: "CLAUDE.md",
+      description: "Anthropic Claude instruction file",
+    },
+    copilot: {
+      name: "GitHub Copilot",
+      output: ".github/copilot-instructions.md",
+      description: "GitHub Copilot workspace instruction file",
+    },
+    cursor: {
+      name: "Cursor",
+      output: ".cursor/rules/main.mdc",
+      description: "Cursor AI rules file",
+    },
+    "agents-md": {
+      name: "AGENTS.md",
+      output: "AGENTS.md",
+      description: "Universal agent instruction file",
+    },
+  };
 
   const templates: Record<string, string> = {
-    claude:     claudeTemplate,
-    copilot:    copilotTemplate,
-    cursor:     cursorTemplate,
-    'agents-md': agentsMdTemplate
-  }
+    claude: claudeTemplate,
+    copilot: copilotTemplate,
+    cursor: cursorTemplate,
+    "agents-md": agentsMdTemplate,
+  };
 
   for (const [agent, config] of Object.entries(agentConfigs)) {
-    const dir = join(root, 'ai', 'agents', agent)
-    const configYaml = `name: ${config.name}\noutput: ${config.output}\ndescription: ${config.description}\n`
-    writeIfMissing(join(dir, 'config.yaml'),  configYaml,        `ai/agents/${agent}/config.yaml`)
-    writeIfMissing(join(dir, 'template.md'),  templates[agent],  `ai/agents/${agent}/template.md`)
+    const dir = join(root, "ai", "agents", agent);
+    const configYaml = `name: ${config.name}\noutput: ${config.output}\ndescription: ${config.description}\n`;
+    writeIfMissing(
+      join(dir, "config.yaml"),
+      configYaml,
+      `ai/agents/${agent}/config.yaml`,
+    );
+    writeIfMissing(
+      join(dir, "template.md"),
+      templates[agent],
+      `ai/agents/${agent}/template.md`,
+    );
   }
 
   // .ai-agents.example
-  writeIfMissing(join(root, '.ai-agents.example'), agentsExample, '.ai-agents.example')
+  writeIfMissing(
+    join(root, ".ai-agents.example"),
+    agentsExample,
+    ".ai-agents.example",
+  );
 
   // .ai-agents for this developer
   if (answers.agents.length) {
     writeIfMissing(
-      join(root, '.ai-agents'),
-      answers.agents.join('\n') + '\n',
-      '.ai-agents (your personal agent selection)'
-    )
+      join(root, ".ai-agents"),
+      answers.agents.join("\n") + "\n",
+      ".ai-agents (your personal agent selection)",
+    );
   }
 
   // CI workflow
   writeIfMissing(
-    join(root, '.github', 'workflows', 'ai-contract.yml'),
+    join(root, ".github", "workflows", "ai-contract.yml"),
     ciWorkflow,
-    '.github/workflows/ai-contract.yml'
-  )
+    ".github/workflows/ai-contract.yml",
+  );
 
   // .gitignore hint
-  console.log()
-  logger.info('Add the following to your .gitignore:')
-  console.log(gitignoreAdditions)
+  console.log();
+  logger.info("Add the following to your .gitignore:");
+  console.log(gitignoreAdditions);
 
-  logger.success('Done! Run `npx agentfile sync` to generate your agent files.\n')
+  logger.success(
+    "Done! Run `npx agentfile sync` to generate your agent files.\n",
+  );
 }

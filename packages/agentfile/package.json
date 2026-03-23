@@ -1,12 +1,20 @@
 {
-  "name": "agentfile",
-  "version": "0.1.2",
+  "name": "@agentfile/agentfile",
+  "version": "0.2.0",
   "description": "One contract. Every AI agent. Zero clutter.",
   "type": "module",
   "bin": {
-    "agentfile": "./bin.js"
+    "agentfile": "./dist/bin.js"
   },
-  "files": ["bin.js"],
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "clean": "rm -rf dist",
+    "build": "npm run clean && tsc",
+    "typecheck": "tsc --noEmit"
+  },
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -16,14 +24,27 @@
   "bugs": {
     "url": "https://github.com/dennishavermans/agentfile/issues"
   },
-  "keywords": ["ai", "agents", "cli", "rules", "claude", "copilot", "cursor", "agentfile"],
+  "keywords": [
+    "ai",
+    "agents",
+    "cli",
+    "rules",
+    "claude",
+    "copilot",
+    "cursor",
+    "agentfile"
+  ],
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=24.0.0"
   },
   "publishConfig": {
     "access": "public"
   },
   "dependencies": {
-    "@agentfile/cli": "^0.1.1"
+    "@agentfile/cli": "^0.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "typescript": "^5.9.3"
   }
 }
