@@ -13,3 +13,4 @@ ai.override.yaml
 .agentfile-manifest.json
 .agentfile-backup/
 packages/*/dist/
+packages/extension/*.vsix

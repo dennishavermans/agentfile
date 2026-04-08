@@ -16,3 +16,4 @@ tsconfig.json
 
 # Node modules (bundled via esbuild, not needed at runtime)
 node_modules/
+*.vsix
