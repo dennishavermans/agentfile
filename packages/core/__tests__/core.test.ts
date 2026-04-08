@@ -1,30 +1,24 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
+import type { Artifact, Contract, Override, RenderContext, Skill } from "../src/index.ts";
 import {
-  renderTemplate,
+  buildAggregateArtifactTokens,
+  buildArtifactTokens,
+  buildDocsTokens,
+  extractPreservedZones,
+  renderArtifactTemplate,
+  renderSkillCopilot,
   renderSkillMarkdown,
   renderSkillMdc,
-  renderSkillCopilot,
-  extractPreservedZones,
-  buildArtifactTokens,
-  buildAggregateArtifactTokens,
-  renderArtifactTemplate,
-  buildDocsTokens,
+  renderTemplate,
 } from "../src/renderer.ts";
 import {
-  ContractSchema,
-  SkillSchema,
-  OverrideSchema,
   ArtifactSchema,
   ArtifactTemplateSchema,
+  ContractSchema,
   DocReferenceSchema,
+  OverrideSchema,
+  SkillSchema,
 } from "../src/schema.ts";
-import type {
-  Contract,
-  Skill,
-  Override,
-  Artifact,
-  RenderContext,
-} from "../src/index.ts";
 
 // ─── Fixtures ──────────────────────────────────────────────────────────────
 
@@ -52,9 +46,7 @@ const baseSkill: Skill = SkillSchema.parse({
   context: ["Components live in /src/components/"],
   steps: ["Create component file", "Create test file", "Export from index"],
   expected_output: "A typed component with tests",
-  examples: [
-    { input: "create UserCard", output: "UserCard.tsx, UserCard.test.tsx" },
-  ],
+  examples: [{ input: "create UserCard", output: "UserCard.tsx, UserCard.test.tsx" }],
 });
 
 const ctx: RenderContext = { contract: baseContract, override: null };
@@ -63,21 +55,15 @@ const ctx: RenderContext = { contract: baseContract, override: null };
 
 describe("renderTemplate", () => {
   it("replaces project.name token", () => {
-    expect(renderTemplate("Project: ${project.name}", ctx)).toBe(
-      "Project: Test Project\n",
-    );
+    expect(renderTemplate("Project: ${project.name}", ctx)).toBe("Project: Test Project\n");
   });
 
   it("replaces project.stack token", () => {
-    expect(renderTemplate("Stack: ${project.stack.join(', ')}", ctx)).toBe(
-      "Stack: typescript, react\n",
-    );
+    expect(renderTemplate("Stack: ${project.stack.join(', ')}", ctx)).toBe("Stack: typescript, react\n");
   });
 
   it("renders a rule list as markdown bullets", () => {
-    expect(renderTemplate("${rules.coding}", ctx)).toBe(
-      "- Prefer small functions\n",
-    );
+    expect(renderTemplate("${rules.coding}", ctx)).toBe("- Prefer small functions\n");
   });
 
   it("renders empty rule category as placeholder", () => {
@@ -88,9 +74,7 @@ describe("renderTemplate", () => {
       },
       override: null,
     };
-    expect(renderTemplate("${rules.coding}", emptyCtx)).toBe(
-      "_None defined._\n",
-    );
+    expect(renderTemplate("${rules.coding}", emptyCtx)).toBe("_None defined._\n");
   });
 
   it("renders skills section in markdown format", () => {
@@ -134,15 +118,11 @@ describe("renderSkillMarkdown", () => {
   });
 
   it("renders description", () => {
-    expect(renderSkillMarkdown(baseSkill)).toContain(
-      "Creates a React component with tests",
-    );
+    expect(renderSkillMarkdown(baseSkill)).toContain("Creates a React component with tests");
   });
 
   it("renders context as bullets", () => {
-    expect(renderSkillMarkdown(baseSkill)).toContain(
-      "- Components live in /src/components/",
-    );
+    expect(renderSkillMarkdown(baseSkill)).toContain("- Components live in /src/components/");
   });
 
   it("renders steps as numbered list", () => {
@@ -152,9 +132,7 @@ describe("renderSkillMarkdown", () => {
   });
 
   it("renders expected output", () => {
-    expect(renderSkillMarkdown(baseSkill)).toContain(
-      "A typed component with tests",
-    );
+    expect(renderSkillMarkdown(baseSkill)).toContain("A typed component with tests");
   });
 
   it("renders examples", () => {
@@ -174,9 +152,7 @@ describe("renderSkillMdc", () => {
   });
 
   it("includes description in frontmatter", () => {
-    expect(renderSkillMdc(baseSkill)).toContain(
-      "description: Creates a React component with tests",
-    );
+    expect(renderSkillMdc(baseSkill)).toContain("description: Creates a React component with tests");
   });
 
   it("renders steps as numbered list", () => {
@@ -339,9 +315,7 @@ describe("renderTemplate — preserve zones", () => {
 
   it("renders preserve markers with empty inner content on first sync (no zones)", () => {
     const result = renderTemplate(template, ctx);
-    expect(result).toContain(
-      '<!-- agentfile:preserve id="ide-registration" -->',
-    );
+    expect(result).toContain('<!-- agentfile:preserve id="ide-registration" -->');
     expect(result).toContain("<!-- agentfile:end-preserve -->");
   });
 
@@ -354,9 +328,7 @@ describe("renderTemplate — preserve zones", () => {
   });
 
   it("refreshes generated content while keeping preserved zone intact", () => {
-    const zones = new Map([
-      ["ide-registration", "\n<agents>custom</agents>\n"],
-    ]);
+    const zones = new Map([["ide-registration", "\n<agents>custom</agents>\n"]]);
     const result = renderTemplate(template, ctx, "markdown", zones);
     // Generated rule is refreshed
     expect(result).toContain("- Prefer small functions");
@@ -372,12 +344,7 @@ describe("renderTemplate — preserve zones", () => {
     ].join("\n");
 
     // Empty zones map — nothing to re-inject
-    const result = renderTemplate(
-      templateWithDefault,
-      ctx,
-      "markdown",
-      new Map(),
-    );
+    const result = renderTemplate(templateWithDefault, ctx, "markdown", new Map());
     expect(result).toContain("default content here");
   });
 
@@ -398,12 +365,7 @@ describe("renderTemplate — preserve zones", () => {
   });
 
   it("round-trips: extracting zones from a rendered file and re-rendering produces identical output", () => {
-    const zones = new Map([
-      [
-        "ide-registration",
-        "\n<agents><agent><name>dev</name></agent></agents>\n",
-      ],
-    ]);
+    const zones = new Map([["ide-registration", "\n<agents><agent><name>dev</name></agent></agents>\n"]]);
     const firstRender = renderTemplate(template, ctx, "markdown", zones);
     const extracted = extractPreservedZones(firstRender);
     const secondRender = renderTemplate(template, ctx, "markdown", extracted);
@@ -458,9 +420,7 @@ describe("ArtifactSchema", () => {
   });
 
   it("accepts any string as type (not an enum)", () => {
-    expect(() =>
-      ArtifactSchema.parse({ name: "x", type: "custom-widget" }),
-    ).not.toThrow();
+    expect(() => ArtifactSchema.parse({ name: "x", type: "custom-widget" })).not.toThrow();
   });
 });
 
@@ -494,9 +454,7 @@ describe("ArtifactTemplateSchema", () => {
   });
 
   it("rejects missing output_pattern", () => {
-    expect(() =>
-      ArtifactTemplateSchema.parse({ template: "agent.md" }),
-    ).toThrow();
+    expect(() => ArtifactTemplateSchema.parse({ template: "agent.md" })).toThrow();
   });
 
   it("rejects missing template", () => {
@@ -568,11 +526,7 @@ describe("ContractSchema — artifacts & docs", () => {
       ],
     });
     expect(contract.artifacts).toHaveLength(3);
-    expect(contract.artifacts.map((a: Artifact) => a.type)).toEqual([
-      "agent",
-      "command",
-      "mcp-server",
-    ]);
+    expect(contract.artifacts.map((a: Artifact) => a.type)).toEqual(["agent", "command", "mcp-server"]);
   });
 });
 
@@ -608,9 +562,7 @@ describe("buildArtifactTokens", () => {
     const simple = ArtifactSchema.parse({ name: "x", type: "y" });
     const tokens = buildArtifactTokens(simple, "body");
     expect(tokens.name).toBe("x");
-    expect(
-      Object.keys(tokens).filter((k) => k.startsWith("metadata.")),
-    ).toEqual([]);
+    expect(Object.keys(tokens).filter((k) => k.startsWith("metadata."))).toEqual([]);
   });
 
   it("stringifies object metadata as JSON", () => {
@@ -765,10 +717,7 @@ describe("renderTemplate — docs token injection", () => {
       contract: contractWithDocs,
       override: null,
     };
-    const result = renderTemplate(
-      "Refer to ${docs.DOD} for acceptance criteria.",
-      docsCtx,
-    );
+    const result = renderTemplate("Refer to ${docs.DOD} for acceptance criteria.", docsCtx);
     expect(result).toContain(".definitions/DEFINITION_OF_DONE.md");
     expect(result).not.toContain("${docs.DOD}");
   });

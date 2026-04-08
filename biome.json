@@ -1,0 +1,59 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.4.10/schema.json",
+  "files": {
+    "includes": [
+      "packages/*/src/**/*.ts",
+      "packages/ui/app/src/**/*.{ts,tsx}",
+      "packages/ui/server.ts",
+      "packages/*/vitest.config.ts",
+      "packages/*/__tests__/**/*.ts",
+      "packages/ui/vite.config.ts",
+      "!**/dist",
+      "!**/*.d.ts"
+    ]
+  },
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 120,
+    "lineEnding": "lf"
+  },
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "double",
+      "trailingCommas": "all",
+      "semicolons": "always",
+      "arrowParentheses": "always",
+      "bracketSpacing": true
+    }
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "recommended": true,
+      "correctness": {
+        "noUnusedVariables": "error",
+        "noUnusedImports": "error"
+      },
+      "style": {
+        "useConst": "error",
+        "useTemplate": "error",
+        "noNonNullAssertion": "warn",
+        "useImportType": "warn"
+      },
+      "suspicious": {
+        "noExplicitAny": "warn",
+        "noTemplateCurlyInString": "off"
+      }
+    }
+  },
+  "assist": {
+    "enabled": true,
+    "actions": {
+      "source": {
+        "organizeImports": "on"
+      }
+    }
+  }
+}

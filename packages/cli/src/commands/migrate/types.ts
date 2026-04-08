@@ -49,11 +49,7 @@ export interface MigrateOptions {
   exclude?: string[];
 }
 
-export type MigrateClassification =
-  | "imported"
-  | "preserved"
-  | "skipped"
-  | "unsupported";
+export type MigrateClassification = "imported" | "preserved" | "skipped" | "unsupported";
 
 export interface MigrateReportEntry {
   path: string;

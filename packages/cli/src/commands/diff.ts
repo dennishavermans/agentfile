@@ -1,12 +1,8 @@
 /// <reference types="node" />
-import { existsSync, readFileSync } from "fs";
+
+import { existsSync } from "node:fs";
+import { detectDrift, MANIFEST_FILE, ownedPaths, readManifest } from "@agentfile/core";
 import { join } from "path";
-import {
-  readManifest,
-  detectDrift,
-  ownedPaths,
-  MANIFEST_FILE,
-} from "@agentfile/core";
 import { logger } from "../logger.js";
 
 export interface DiffOptions {
@@ -26,9 +22,7 @@ export async function diffCommand(options: DiffOptions = {}): Promise<void> {
     return;
   }
 
-  const pathsToCheck = options.files?.length
-    ? options.files
-    : ownedPaths(manifest);
+  const pathsToCheck = options.files?.length ? options.files : ownedPaths(manifest);
 
   if (!pathsToCheck.length) {
     logger.success("No owned files to check.");
@@ -78,9 +72,7 @@ export async function diffCommand(options: DiffOptions = {}): Promise<void> {
   console.log();
 
   if (drifted.length) {
-    logger.warn(
-      `${drifted.length} file(s) have drifted. Run \`agentfile sync\` to regenerate.`,
-    );
+    logger.warn(`${drifted.length} file(s) have drifted. Run \`agentfile sync\` to regenerate.`);
     process.exit(1);
     return;
   }

@@ -1,2 +1,2 @@
 #!/usr/bin/env node
-import '@agentfile/cli';
+import "@agentfile/cli";

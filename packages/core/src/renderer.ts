@@ -1,10 +1,4 @@
-import type {
-  Contract,
-  Override,
-  Skill,
-  Artifact,
-  DocReference,
-} from "./schema.js";
+import type { Artifact, Contract, DocReference, Override, Skill } from "./schema.js";
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -16,16 +10,12 @@ export interface RenderContext {
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
 function renderList(items: string[]): string {
-  return items.length
-    ? items.map((item) => `- ${item}`).join("\n")
-    : "_None defined._";
+  return items.length ? items.map((item) => `- ${item}`).join("\n") : "_None defined._";
 }
 
 function renderOverrideBlocks(override: Override | null): string {
   if (!override?.blocks?.length) return "";
-  return override.blocks
-    .map((block) => `\n## ${block.section}\n\n${block.content.trim()}`)
-    .join("\n");
+  return override.blocks.map((block) => `\n## ${block.section}\n\n${block.content.trim()}`).join("\n");
 }
 
 // ─── Skill Renderers ───────────────────────────────────────────────────────
@@ -39,12 +29,16 @@ export function renderSkillMarkdown(skill: Skill): string {
 
   if (skill.context.length) {
     lines.push("**Context**");
-    skill.context.forEach((c) => lines.push(`- ${c}`));
+    for (const c of skill.context) {
+      lines.push(`- ${c}`);
+    }
     lines.push("");
   }
 
   lines.push("**Steps**");
-  skill.steps.forEach((s, i) => lines.push(`${i + 1}. ${s}`));
+  for (let i = 0; i < skill.steps.length; i++) {
+    lines.push(`${i + 1}. ${skill.steps[i]}`);
+  }
   lines.push("");
 
   if (skill.expected_output) {
@@ -78,12 +72,16 @@ export function renderSkillMdc(skill: Skill): string {
 
   if (skill.context.length) {
     lines.push("## Context");
-    skill.context.forEach((c) => lines.push(`- ${c}`));
+    for (const c of skill.context) {
+      lines.push(`- ${c}`);
+    }
     lines.push("");
   }
 
   lines.push("## Steps");
-  skill.steps.forEach((s, i) => lines.push(`${i + 1}. ${s}`));
+  for (let i = 0; i < skill.steps.length; i++) {
+    lines.push(`${i + 1}. ${skill.steps[i]}`);
+  }
   lines.push("");
 
   if (skill.expected_output) {
@@ -101,14 +99,12 @@ export function renderSkillMdc(skill: Skill): string {
     });
   }
 
-  return lines.join("\n").trim() + "\n";
+  return `${lines.join("\n").trim()}\n`;
 }
 
 export function renderSkillCopilot(skill: Skill): string {
   const steps = skill.steps.join("; ");
-  const context = skill.context.length
-    ? ` Context: ${skill.context.join(", ")}.`
-    : "";
+  const context = skill.context.length ? ` Context: ${skill.context.join(", ")}.` : "";
   return `- **${skill.name}**: ${skill.description}.${context} Steps: ${steps}.`;
 }
 
@@ -131,10 +127,7 @@ function stringifyMetadataValue(value: unknown): string {
  *   ${body}            — content from content_file (or empty)
  *   ${metadata.<key>}  — any metadata key, stringified
  */
-export function buildArtifactTokens(
-  artifact: Artifact,
-  body: string,
-): Record<string, string> {
+export function buildArtifactTokens(artifact: Artifact, body: string): Record<string, string> {
   const tokens: Record<string, string> = {
     name: artifact.name,
     type: artifact.type,
@@ -177,20 +170,10 @@ export function buildAggregateArtifactTokens(
  * Uses the same ${token} syntax as the main renderTemplate, but operates
  * on an arbitrary token map rather than a contract-derived RenderContext.
  */
-export function renderArtifactTemplate(
-  template: string,
-  tokens: Record<string, string>,
-): string {
-  const pattern = new RegExp(
-    `\\$\\{(${Object.keys(tokens).map(escapeRegExp).join("|")})\\}`,
-    "g",
-  );
+export function renderArtifactTemplate(template: string, tokens: Record<string, string>): string {
+  const pattern = new RegExp(`\\$\\{(${Object.keys(tokens).map(escapeRegExp).join("|")})\\}`, "g");
 
-  return (
-    template
-      .replace(pattern, (_match, token: string) => tokens[token] ?? _match)
-      .trim() + "\n"
-  );
+  return `${template.replace(pattern, (_match, token: string) => tokens[token] ?? _match).trim()}\n`;
 }
 
 // ─── Docs Token Builder ───────────────────────────────────────────────────
@@ -212,19 +195,17 @@ export function buildDocsTokens(docs: DocReference[]): Record<string, string> {
 
 function renderSkillsMarkdown(skills: Skill[]): string {
   if (!skills.length) return "";
-  return "\n## Skills\n\n" + skills.map(renderSkillMarkdown).join("\n");
+  return `\n## Skills\n\n${skills.map(renderSkillMarkdown).join("\n")}`;
 }
 
 function renderSkillsCopilot(skills: Skill[]): string {
   if (!skills.length) return "";
-  return (
-    "\n## Available Workflows\n\n" + skills.map(renderSkillCopilot).join("\n")
-  );
+  return `\n## Available Workflows\n\n${skills.map(renderSkillCopilot).join("\n")}`;
 }
 
 function renderSkillsAgentsMd(skills: Skill[]): string {
   if (!skills.length) return "";
-  return "\n## Skills\n\n" + skills.map(renderSkillMarkdown).join("\n");
+  return `\n## Skills\n\n${skills.map(renderSkillMarkdown).join("\n")}`;
 }
 
 // ─── Token Map ─────────────────────────────────────────────────────────────
@@ -235,10 +216,7 @@ function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-function buildTokenMap(
-  ctx: RenderContext,
-  skillsFormat: SkillsFormat,
-): Record<string, string> {
+function buildTokenMap(ctx: RenderContext, skillsFormat: SkillsFormat): Record<string, string> {
   const { project, rules, skills, docs } = ctx.contract;
 
   const renderSkills = () => {
@@ -267,9 +245,7 @@ function buildTokenMap(
 
 // ─── Preserve Zones ───────────────────────────────────────────────────────
 
-const PRESERVE_OPEN = /<!--\s*agentfile:preserve\s+id="([^"]+)"\s*-->/g;
-const PRESERVE_BLOCK =
-  /<!--\s*agentfile:preserve\s+id="([^"]+)"\s*-->([\s\S]*?)<!--\s*agentfile:end-preserve\s*-->/g;
+const PRESERVE_BLOCK = /<!--\s*agentfile:preserve\s+id="([^"]+)"\s*-->([\s\S]*?)<!--\s*agentfile:end-preserve\s*-->/g;
 
 /**
  * Scans an already-rendered on-disk file and returns a Map of
@@ -281,9 +257,10 @@ const PRESERVE_BLOCK =
 export function extractPreservedZones(content: string): Map<string, string> {
   const zones = new Map<string, string>();
   PRESERVE_BLOCK.lastIndex = 0;
-  let match: RegExpExecArray | null;
-  while ((match = PRESERVE_BLOCK.exec(content)) !== null) {
+  let match = PRESERVE_BLOCK.exec(content);
+  while (match !== null) {
     zones.set(match[1], match[2]);
+    match = PRESERVE_BLOCK.exec(content);
   }
   return zones;
 }
@@ -294,10 +271,7 @@ export function extractPreservedZones(content: string): Map<string, string> {
  * pair found in `rendered`, the inner content is replaced by `zones.get(X)` when
  * a matching zone exists. When no match exists the template default is kept.
  */
-function applyPreservedZones(
-  rendered: string,
-  zones: Map<string, string>,
-): string {
+function applyPreservedZones(rendered: string, zones: Map<string, string>): string {
   PRESERVE_BLOCK.lastIndex = 0;
   return rendered.replace(
     /<!--\s*agentfile:preserve\s+id="([^"]+)"\s*-->([\s\S]*?)<!--\s*agentfile:end-preserve\s*-->/g,
@@ -326,19 +300,13 @@ export function renderTemplate(
 ): string {
   const tokens = buildTokenMap(ctx, skillsFormat);
 
-  const tokenPattern = new RegExp(
-    `\\$\\{(${Object.keys(tokens).map(escapeRegExp).join("|")})\\}`,
-    "g",
-  );
+  const tokenPattern = new RegExp(`\\$\\{(${Object.keys(tokens).map(escapeRegExp).join("|")})\\}`, "g");
 
-  let output = template.replace(
-    tokenPattern,
-    (_match, token: string) => tokens[token] ?? _match,
-  );
+  let output = template.replace(tokenPattern, (_match, token: string) => tokens[token] ?? _match);
 
   if (preservedZones.size > 0) {
     output = applyPreservedZones(output, preservedZones);
   }
 
-  return output.trim() + "\n";
+  return `${output.trim()}\n`;
 }

@@ -6,16 +6,28 @@
   ],
   "scripts": {
     "bench": "npm run bench -w packages/core",
-    "clean": "rm -rf packages/core/dist packages/cli/dist packages/agentfile/dist",
-    "build": "npm run build -w packages/core && npm run build -w packages/cli && npm run build -w packages/agentfile",
+    "clean": "rm -rf packages/core/dist packages/cli/dist packages/agentfile/dist packages/ui/dist packages/extension/dist",
+    "build": "npm run build -w packages/core && npm run build -w packages/ui && npm run build -w packages/cli && npm run build -w packages/agentfile && npm run build -w packages/extension",
     "test": "npm run test --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "biome check",
+    "lint:fix": "biome check --write",
+    "format": "biome format --write",
     "publish:core": "npm run build -w packages/core && npm publish --workspace packages/core",
     "publish:cli": "npm run build -w packages/cli  && npm publish --workspace packages/cli",
     "publish:wrapper": "npm run build -w packages/agentfile && npm publish --workspace packages/agentfile",
-    "publish:all": "npm run publish:core && npm run publish:cli && npm run publish:wrapper"
+    "publish:ui": "npm run build -w packages/ui && npm publish --workspace packages/ui --tag beta",
+    "publish:extension": "npm run build -w packages/extension && npm run publish:marketplace -w packages/extension",
+    "package:extension": "npm run package -w packages/extension",
+    "publish:all": "npm run publish:core && npm run publish:cli && npm run publish:wrapper && npm run publish:ui"
   },
   "engines": {
     "node": ">=24.0.0"
+  },
+  "dependencies": {
+    "typescript": "^6.0.2"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.4.10"
   }
 }

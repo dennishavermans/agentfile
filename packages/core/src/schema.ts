@@ -70,9 +70,7 @@ export const ContractSchema = z.object({
   }),
   project: z.object({
     name: z.string().min(1, "project.name must not be empty"),
-    stack: z
-      .array(z.string())
-      .min(1, "project.stack must contain at least one entry"),
+    stack: z.array(z.string()).min(1, "project.stack must contain at least one entry"),
   }),
   rules: z
     .object({
@@ -87,9 +85,7 @@ export const ContractSchema = z.object({
       testing: [],
       naming: [],
     })),
-  skills: z
-    .array(SkillSchema)
-    .min(1, "contract must define at least one skill"),
+  skills: z.array(SkillSchema).min(1, "contract must define at least one skill"),
   /**
    * Named entities that generate per-IDE output files.
    * Each artifact has a `type` that maps to an `artifact_templates` entry
@@ -133,10 +129,7 @@ export const AgentConfigSchema = z.object({
    * When no entry exists for a given artifact type, that type is skipped
    * for this IDE.
    */
-  artifact_templates: z
-    .record(z.string(), ArtifactTemplateSchema)
-    .optional()
-    .default({}),
+  artifact_templates: z.record(z.string(), ArtifactTemplateSchema).optional().default({}),
 });
 
 // ─── Override ──────────────────────────────────────────────────────────────

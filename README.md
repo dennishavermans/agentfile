@@ -125,6 +125,8 @@ Add to `package.json`:
 }
 ```
 
+> **Requires Node.js >=24.0.0.**
+
 ---
 
 ## Commands
@@ -191,6 +193,15 @@ Restores files from `.agentfile-backup/`.
 ```bash
 npx @agentfile/cli rollback --list
 npx @agentfile/cli rollback --tag migrate-1700000000000
+```
+
+### `npx @agentfile/cli ui`
+Starts a local dashboard in your browser for inspecting your contract, previewing generated files, and monitoring drift.
+
+```bash
+npx @agentfile/cli ui                        # open dashboard on default port 4311
+npx @agentfile/cli ui --port 3000            # custom port
+npx @agentfile/cli ui --root ./packages/app  # inspect a specific directory
 ```
 
 ---
@@ -431,8 +442,10 @@ for (const r of result.results) {
 | Package | Description |
 |---|---|
 | [`@agentfile/agentfile`](https://www.npmjs.com/package/@agentfile/agentfile) | Convenience wrapper — re-exports the full CLI |
-| [`@agentfile/cli`](https://www.npmjs.com/package/@agentfile/cli) | CLI — `init`, `migrate`, `sync`, `validate`, `watch`, `diff`, `clean`, `rollback` |
+| [`@agentfile/cli`](https://www.npmjs.com/package/@agentfile/cli) | CLI — `init`, `migrate`, `sync`, `validate`, `watch`, `diff`, `clean`, `rollback`, `ui` |
 | [`@agentfile/core`](https://www.npmjs.com/package/@agentfile/core) | Core engine — schema, loader, renderer, generator |
+| [`@agentfile/ui`](https://www.npmjs.com/package/@agentfile/ui) | Local dashboard — interactive UI for managing the contract and inspecting generated files (**beta**, install with `@beta` tag) |
+| [VS Code extension](https://marketplace.visualstudio.com/items?itemName=agentfile.agentfile) | Sidebar, commands, and diagnostics directly in VS Code (**beta**, shows Preview badge on Marketplace) |
 
 ---
 
@@ -449,24 +462,41 @@ agentfile is in early development. Issues and PRs welcome.
 
 ## Release process
 
-For a normal release:
+### npm packages
 
-1. Update versions in all package manifests (`packages/core`, `packages/cli`, `packages/agentfile`)
+1. Update versions in all package manifests (`packages/core`, `packages/cli`, `packages/agentfile`, `packages/ui`)
 2. Update `CHANGELOG.md`
 3. Build and test from repo root:
 
 ```bash
-npm run build --workspaces
+npm run build
 npm run test
 ```
 
-4. Publish packages from root:
+4. Publish all npm packages:
 
 ```bash
 npm run publish:all
 ```
 
-Recommended order remains `core` -> `cli` -> `agentfile` (already encoded in `publish:all`).
+Recommended order is `core` → `cli` → `agentfile` → `ui` (already encoded in `publish:all`).
+
+### VS Code extension
+
+The extension is published separately to the VS Code Marketplace and Open VSX Registry:
+
+```bash
+# Build and package the .vsix
+npm run package:extension
+
+# Publish to VS Code Marketplace (requires VSCE_PAT env var)
+npm run publish:extension
+
+# Publish to Open VSX Registry (requires OVSX_PAT env var)
+cd packages/extension && npx ovsx publish *.vsix
+```
+
+The extension version is managed independently in `packages/extension/package.json`.
 
 ---
 

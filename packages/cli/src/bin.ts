@@ -1,21 +1,22 @@
 #!/usr/bin/env node
 /// <reference types="node" />
 import { Command } from "commander";
-import { initCommand } from "./commands/init.js";
-import { migrateCommand } from "./commands/migrate.js";
-import { syncCommand } from "./commands/sync.js";
-import { validateCommand } from "./commands/validate.js";
-import { watchCommand } from "./commands/watch.js";
 import { cleanCommand } from "./commands/clean.js";
 import { diffCommand } from "./commands/diff.js";
+import { initCommand } from "./commands/init.js";
+import { migrateCommand } from "./commands/migrate.js";
 import { rollbackCommand } from "./commands/rollback.js";
+import { syncCommand } from "./commands/sync.js";
+import { uiCommand } from "./commands/ui.js";
+import { validateCommand } from "./commands/validate.js";
+import { watchCommand } from "./commands/watch.js";
 
 const program = new Command();
 
 program
   .name("agentfile")
   .description("Unified AI agent contract manager")
-  .version("0.3.0");
+  .version("0.4.0");
 
 program
   .command("init")
@@ -114,6 +115,23 @@ program
   .option("--list", "List available backups without restoring")
   .action((options: { tag?: string; list?: boolean }) =>
     rollbackCommand(options),
+  );
+
+program
+  .command("ui")
+  .description("Start the local agentfile dashboard")
+  .option("--dev", "Run UI in development mode")
+  .option("--port <port>", "Port for the local dashboard", "4311")
+  .option(
+    "--root <path>",
+    "Project folder to inspect instead of the current working directory",
+  )
+  .action((options: { dev?: boolean; port: string; root?: string }) =>
+    uiCommand({
+      dev: options.dev,
+      port: Number(options.port),
+      root: options.root,
+    }),
   );
 
 program.parse();

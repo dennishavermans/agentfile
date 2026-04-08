@@ -1,0 +1,18 @@
+# Files and folders excluded from the .vsix package
+
+.gitignore
+.npmignore
+*.vsix
+
+# Source — compiled output in dist/ is what ships
+src/
+esbuild.mjs
+tsconfig.json
+
+# Tests and tooling
+**/__tests__/
+**/*.test.ts
+**/*.spec.ts
+
+# Node modules (bundled via esbuild, not needed at runtime)
+node_modules/

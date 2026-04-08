@@ -1,13 +1,13 @@
-import { defineConfig } from 'vitest/config'
-import { resolve } from 'path'
+import { resolve } from "path";
+import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   resolve: {
     alias: {
-      '@agentfile/core': resolve(__dirname, '../core/src/index.ts')
-    }
+      "@agentfile/core": resolve(__dirname, "../core/src/index.ts"),
+    },
   },
   test: {
-    environment: 'node'
-  }
-})
+    environment: "node",
+  },
+});

@@ -1,39 +1,29 @@
 /// <reference types="node" />
-import {
-  existsSync,
-  mkdirSync,
-  renameSync,
-  unlinkSync,
-  writeFileSync,
-} from "fs";
-import { dirname, join, resolve } from "path";
-import { captureBackup, writeBackup } from "@agentfile/core";
-import { logger } from "../logger.js";
-import { parseAgentFile } from "./migrate/parser.js";
-import { mergeFiles } from "./migrate/merge.js";
-import { buildContractYaml } from "./migrate/yaml.js";
-import { filterSourcesByTarget } from "./migrate/filter.js";
-import type {
-  MigrateOptions,
-  MigrateReportEntry,
-  ReplacePolicy,
-  ParsedFile,
-} from "./migrate/types.js";
 
+import { captureBackup, writeBackup } from "@agentfile/core";
+import { existsSync, mkdirSync, renameSync, unlinkSync, writeFileSync } from "fs";
+import { dirname, join, relative, resolve } from "path";
+import { logger } from "../logger.js";
+import { filterSourcesByTarget } from "./migrate/filter.js";
+import { mergeFiles } from "./migrate/merge.js";
+import { parseAgentFile } from "./migrate/parser.js";
+import type { MigrateOptions, MigrateReportEntry, ParsedFile, ReplacePolicy } from "./migrate/types.js";
+import { buildContractYaml } from "./migrate/yaml.js";
+
+export { mergeFiles } from "./migrate/merge.js";
+
+export { parseAgentFile } from "./migrate/parser.js";
 export type {
+  MergeResult,
   MigrateClassification,
   MigrateOptions,
   MigrateReportEntry,
-  MergeResult,
   ParsedFile,
   ParsedRules,
   ParsedSkill,
   ReplacePolicy,
   RuleCategory,
 } from "./migrate/types.js";
-
-export { parseAgentFile } from "./migrate/parser.js";
-export { mergeFiles } from "./migrate/merge.js";
 
 function resolveSourcePaths(sources: string[], root: string): string[] {
   const resolved: string[] = [];
@@ -102,9 +92,7 @@ function printMigrationReport(report: MigrateReportEntry[]): void {
 
   const imported = report.filter((entry) => entry.classification === "imported");
   const skipped = report.filter((entry) => entry.classification === "skipped");
-  const unsupported = report.filter(
-    (entry) => entry.classification === "unsupported",
-  );
+  const unsupported = report.filter((entry) => entry.classification === "unsupported");
 
   if (imported.length) {
     logger.success(`  Imported (${imported.length}):`);
@@ -119,20 +107,13 @@ function printMigrationReport(report: MigrateReportEntry[]): void {
   if (unsupported.length) {
     logger.warn(`  Unsupported (${unsupported.length}):`);
     for (const entry of unsupported) logger.warn(`    ${entry.path} — ${entry.reason}`);
-    logger.info(
-      "  Review unsupported sections and add any missing rules to ai/contract.yaml manually.",
-    );
+    logger.info("  Review unsupported sections and add any missing rules to ai/contract.yaml manually.");
   }
 }
 
-function backupSourcesAndContract(
-  root: string,
-  sourcePaths: string[],
-  contractPath: string,
-  tag: string,
-): void {
-  const backupPaths = sourcePaths.map((absolutePath) => absolutePath.replace(root + "/", ""));
-  const contractRelativePath = contractPath.replace(root + "/", "");
+function backupSourcesAndContract(root: string, sourcePaths: string[], contractPath: string, tag: string): void {
+  const backupPaths = sourcePaths.map((absolutePath) => relative(root, absolutePath));
+  const contractRelativePath = relative(root, contractPath);
   if (existsSync(contractPath)) backupPaths.push(contractRelativePath);
 
   const backupEntries = captureBackup(root, backupPaths);
@@ -142,19 +123,14 @@ function backupSourcesAndContract(
   }
 }
 
-function applyReplacePolicy(
-  policy: ReplacePolicy,
-  root: string,
-  sourcePaths: string[],
-  tag: string,
-): void {
+function applyReplacePolicy(policy: ReplacePolicy, root: string, sourcePaths: string[], tag: string): void {
   if (policy === "keep") return;
 
   console.log();
   logger.title(`Applying replace policy: ${policy}`);
 
   for (const absolutePath of sourcePaths) {
-    const relativePath = absolutePath.replace(root + "/", "");
+    const relativePath = relative(root, absolutePath);
 
     if (policy === "archive") {
       const archiveDestination = join(root, ".agentfile-backup", tag, relativePath);
@@ -170,14 +146,7 @@ function applyReplacePolicy(
 }
 
 export async function migrateCommand(options: MigrateOptions): Promise<void> {
-  const {
-    from: sources,
-    dryRun = false,
-    output: outputPath,
-    replacePolicy = "keep",
-    targets,
-    exclude,
-  } = options;
+  const { from: sources, dryRun = false, output: outputPath, replacePolicy = "keep", targets, exclude } = options;
 
   logger.title("agentfile migrate");
 
@@ -190,12 +159,7 @@ export async function migrateCommand(options: MigrateOptions): Promise<void> {
   const root = process.cwd();
   const resolvedSources = resolveSourcePaths(sources, root);
 
-  const { filteredSources, report } = filterSourcesByTarget(
-    resolvedSources,
-    root,
-    targets,
-    exclude,
-  );
+  const { filteredSources, report } = filterSourcesByTarget(resolvedSources, root, targets, exclude);
 
   for (const entry of report.filter((item) => item.classification === "skipped")) {
     logger.warn(`Skipped: ${entry.path} (${entry.reason})`);
@@ -217,9 +181,7 @@ export async function migrateCommand(options: MigrateOptions): Promise<void> {
     );
     logger.info(`  skills: ${parsedFile.skills.length}`);
     if (parsedFile.unrecognized.length) {
-      logger.warn(
-        `  unrecognized sections: ${parsedFile.unrecognized.map((u) => `"${u.heading}"`).join(", ")}`,
-      );
+      logger.warn(`  unrecognized sections: ${parsedFile.unrecognized.map((u) => `"${u.heading}"`).join(", ")}`);
     }
     console.log();
   }
@@ -272,9 +234,7 @@ export async function migrateCommand(options: MigrateOptions): Promise<void> {
     merged.rules.naming.length;
 
   console.log();
-  logger.success(
-    `Extracted ${totalRules} rules across 4 categories, ${merged.skills.length} skill(s).`,
-  );
+  logger.success(`Extracted ${totalRules} rules across 4 categories, ${merged.skills.length} skill(s).`);
 
   for (const parsedFile of parsed) {
     for (const section of parsedFile.unrecognized) {
@@ -295,9 +255,7 @@ export async function migrateCommand(options: MigrateOptions): Promise<void> {
     logger.info("  2. Run `agentfile validate` to confirm the schema is valid");
     logger.info("  3. Run `agentfile sync` to generate agent instruction files");
     if (replacePolicy === "keep") {
-      logger.info(
-        "  4. Optionally re-run with --replace-policy archive|delete to clean up source files",
-      );
+      logger.info("  4. Optionally re-run with --replace-policy archive|delete to clean up source files");
     }
   }
 }

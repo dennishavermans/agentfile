@@ -257,17 +257,10 @@ export async function initCommand() {
   mkdirSync(join(root, "ai", "agents", "agents-md"), { recursive: true });
   mkdirSync(join(root, ".github", "workflows"), { recursive: true });
 
-  writeIfMissing(
-    join(root, "ai", "contract.yaml"),
-    contractYaml(answers.name, answers.stack),
-    "ai/contract.yaml",
-  );
+  writeIfMissing(join(root, "ai", "contract.yaml"), contractYaml(answers.name, answers.stack), "ai/contract.yaml");
 
   // Agent configs
-  const agentConfigs: Record<
-    string,
-    { name: string; output: string; description: string }
-  > = {
+  const agentConfigs: Record<string, { name: string; output: string; description: string }> = {
     claude: {
       name: "Claude",
       output: "CLAUDE.md",
@@ -300,30 +293,18 @@ export async function initCommand() {
   for (const [agent, config] of Object.entries(agentConfigs)) {
     const dir = join(root, "ai", "agents", agent);
     const configYaml = `name: ${config.name}\noutput: ${config.output}\ndescription: ${config.description}\n`;
-    writeIfMissing(
-      join(dir, "config.yaml"),
-      configYaml,
-      `ai/agents/${agent}/config.yaml`,
-    );
-    writeIfMissing(
-      join(dir, "template.md"),
-      templates[agent],
-      `ai/agents/${agent}/template.md`,
-    );
+    writeIfMissing(join(dir, "config.yaml"), configYaml, `ai/agents/${agent}/config.yaml`);
+    writeIfMissing(join(dir, "template.md"), templates[agent], `ai/agents/${agent}/template.md`);
   }
 
   // .ai-agents.example
-  writeIfMissing(
-    join(root, ".ai-agents.example"),
-    agentsExample,
-    ".ai-agents.example",
-  );
+  writeIfMissing(join(root, ".ai-agents.example"), agentsExample, ".ai-agents.example");
 
   // .ai-agents for this developer
   if (answers.agents.length) {
     writeIfMissing(
       join(root, ".ai-agents"),
-      answers.agents.join("\n") + "\n",
+      `${answers.agents.join("\n")}\n`,
       ".ai-agents (your personal agent selection)",
     );
   }
@@ -340,7 +321,5 @@ export async function initCommand() {
   logger.info("Add the following to your .gitignore:");
   console.log(gitignoreAdditions);
 
-  logger.success(
-    "Done! Run `npx agentfile sync` to generate your agent files.\n",
-  );
+  logger.success("Done! Run `npx agentfile sync` to generate your agent files.\n");
 }

@@ -10,86 +10,81 @@
  *   renderTemplate()   — pure template rendering
  */
 
+export type { GenerateOptions, ValidateOptions } from "./generator.js";
 // ─── Generation API ────────────────────────────────────────────────────────
 export { generate, validateContract } from "./generator.js";
-export type { GenerateOptions, ValidateOptions } from "./generator.js";
-
-// ─── Rendering API ─────────────────────────────────────────────────────────
-export {
-  renderTemplate,
-  renderSkillMarkdown,
-  renderSkillMdc,
-  renderSkillCopilot,
-  extractPreservedZones,
-  buildArtifactTokens,
-  buildAggregateArtifactTokens,
-  renderArtifactTemplate,
-  buildDocsTokens,
-} from "./renderer.js";
-export type { RenderContext, SkillsFormat } from "./renderer.js";
-
 // ─── Loading API ───────────────────────────────────────────────────────────
 export {
-  loadContract,
-  loadOverride,
+  discoverAgents,
   loadAgentConfig,
   loadAgentTemplate,
+  loadContract,
+  loadOverride,
   resolveAgent,
-  discoverAgents,
   resolveAgentSelection,
   ValidationError,
 } from "./loader.js";
-
-// ─── Types ─────────────────────────────────────────────────────────────────
 export type {
-  Skill,
-  Artifact,
-  ArtifactTemplate,
-  DocReference,
-  Contract,
-  AgentConfig,
-  Override,
-  ResolvedAgent,
-  AgentResult,
-  GenerateResult,
-  AgentSelection,
-} from "./schema.js";
-
-// ─── Schemas (for consumers that want to validate custom inputs) ────────────
-export {
-  ContractSchema,
-  AgentConfigSchema,
-  OverrideSchema,
-  SkillSchema,
-  ArtifactSchema,
-  ArtifactTemplateSchema,
-  DocReferenceSchema,
-} from "./schema.js";
-
-// ─── Manifest API ──────────────────────────────────────────────────────────
-export {
-  readManifest,
-  writeManifest,
-  buildManifest,
-  hashContent,
-  generatedMarker,
-  hasGeneratedMarker,
-  addMarker,
-  ownedPaths,
-  preservedPaths,
-  detectDrift,
-  staleFiles,
-  captureBackup,
-  writeBackup,
-  readBackup,
-  restoreBackup,
-  listBackups,
-  MANIFEST_FILE,
-  BACKUP_DIR,
-} from "./manifest.js";
-export type {
+  BackupEntry,
+  FileOwnership,
   Manifest,
   ManifestEntry,
-  FileOwnership,
-  BackupEntry,
 } from "./manifest.js";
+// ─── Manifest API ──────────────────────────────────────────────────────────
+export {
+  addMarker,
+  BACKUP_DIR,
+  buildManifest,
+  captureBackup,
+  detectDrift,
+  generatedMarker,
+  hasGeneratedMarker,
+  hashContent,
+  listBackups,
+  MANIFEST_FILE,
+  ownedPaths,
+  preservedPaths,
+  readBackup,
+  readManifest,
+  restoreBackup,
+  staleFiles,
+  writeBackup,
+  writeManifest,
+} from "./manifest.js";
+export type { RenderContext, SkillsFormat } from "./renderer.js";
+// ─── Rendering API ─────────────────────────────────────────────────────────
+export {
+  buildAggregateArtifactTokens,
+  buildArtifactTokens,
+  buildDocsTokens,
+  extractPreservedZones,
+  renderArtifactTemplate,
+  renderSkillCopilot,
+  renderSkillMarkdown,
+  renderSkillMdc,
+  renderTemplate,
+} from "./renderer.js";
+// ─── Types ─────────────────────────────────────────────────────────────────
+export type {
+  AgentConfig,
+  AgentResult,
+  AgentSelection,
+  Artifact,
+  ArtifactTemplate,
+  Contract,
+  DocReference,
+  GenerateResult,
+  Override,
+  ResolvedAgent,
+  Skill,
+} from "./schema.js";
+// ─── Schemas (for consumers that want to validate custom inputs) ────────────
+export {
+  AgentConfigSchema,
+  ArtifactSchema,
+  ArtifactTemplateSchema,
+  ContractSchema,
+  DocReferenceSchema,
+  OverrideSchema,
+  SkillSchema,
+} from "./schema.js";

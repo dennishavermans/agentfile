@@ -159,9 +159,7 @@ describe("parseAgentFile", () => {
     const { parseAgentFile } = await import("../src/commands/migrate.js");
 
     const result = parseAgentFile(path);
-    expect(result.rules.architecture).toContain(
-      "Follow feature-based folder structure",
-    );
+    expect(result.rules.architecture).toContain("Follow feature-based folder structure");
     expect(result.rules.architecture).toContain("Avoid cross-feature imports");
   });
 
@@ -170,9 +168,7 @@ describe("parseAgentFile", () => {
     const { parseAgentFile } = await import("../src/commands/migrate.js");
 
     const result = parseAgentFile(path);
-    expect(result.rules.testing).toContain(
-      "Write tests with React Native Testing Library",
-    );
+    expect(result.rules.testing).toContain("Write tests with React Native Testing Library");
     expect(result.rules.testing).toContain("Use testID for element queries");
   });
 
@@ -217,9 +213,7 @@ describe("parseAgentFile", () => {
     const { parseAgentFile } = await import("../src/commands/migrate.js");
 
     const result = parseAgentFile(path);
-    expect(result.skills[0].expected_output).toContain(
-      "React Native component",
-    );
+    expect(result.skills[0].expected_output).toContain("React Native component");
   });
 
   it("handles a file with no recognizable project metadata without crashing", async () => {
@@ -245,37 +239,30 @@ describe("mergeFiles", () => {
   it("deduplicates identical rules across files", async () => {
     const p1 = writeFixture("A.md", CLAUDE_MD);
     const p2 = writeFixture("B.md", COPILOT_MD);
-    const { parseAgentFile, mergeFiles } =
-      await import("../src/commands/migrate.js");
+    const { parseAgentFile, mergeFiles } = await import("../src/commands/migrate.js");
 
     const merged = mergeFiles([parseAgentFile(p1), parseAgentFile(p2)]);
 
     // "Follow feature-based folder structure" appears in both
-    const architectureMatches = merged.rules.architecture.filter(
-      (r) => r === "Follow feature-based folder structure",
-    );
+    const architectureMatches = merged.rules.architecture.filter((r) => r === "Follow feature-based folder structure");
     expect(architectureMatches).toHaveLength(1);
   });
 
   it("includes unique rules from both files", async () => {
     const p1 = writeFixture("A.md", CLAUDE_MD);
     const p2 = writeFixture("B.md", COPILOT_MD);
-    const { parseAgentFile, mergeFiles } =
-      await import("../src/commands/migrate.js");
+    const { parseAgentFile, mergeFiles } = await import("../src/commands/migrate.js");
 
     const merged = mergeFiles([parseAgentFile(p1), parseAgentFile(p2)]);
 
     expect(merged.rules.coding).toContain("Prefer const over let"); // from CLAUDE
-    expect(merged.rules.coding).toContain(
-      "React Compiler handles memoization automatically",
-    ); // from COPILOT
+    expect(merged.rules.coding).toContain("React Compiler handles memoization automatically"); // from COPILOT
   });
 
   it("merges skills from multiple files by name", async () => {
     const p1 = writeFixture("A.md", CLAUDE_MD);
     const p2 = writeFixture("B.md", COPILOT_MD);
-    const { parseAgentFile, mergeFiles } =
-      await import("../src/commands/migrate.js");
+    const { parseAgentFile, mergeFiles } = await import("../src/commands/migrate.js");
 
     const merged = mergeFiles([parseAgentFile(p1), parseAgentFile(p2)]);
 
@@ -289,14 +276,11 @@ describe("mergeFiles", () => {
     const dup = CLAUDE_MD;
     const p1 = writeFixture("A.md", dup);
     const p2 = writeFixture("B.md", dup);
-    const { parseAgentFile, mergeFiles } =
-      await import("../src/commands/migrate.js");
+    const { parseAgentFile, mergeFiles } = await import("../src/commands/migrate.js");
 
     const merged = mergeFiles([parseAgentFile(p1), parseAgentFile(p2)]);
 
-    const count = merged.skills.filter(
-      (s) => s.name === "implement-feature-component",
-    ).length;
+    const count = merged.skills.filter((s) => s.name === "implement-feature-component").length;
     expect(count).toBe(1);
   });
 
@@ -307,8 +291,7 @@ describe("mergeFiles", () => {
     );
     const p1 = writeFixture("A.md", CLAUDE_MD);
     const p2 = writeFixture("B.md", alt);
-    const { parseAgentFile, mergeFiles } =
-      await import("../src/commands/migrate.js");
+    const { parseAgentFile, mergeFiles } = await import("../src/commands/migrate.js");
 
     const merged = mergeFiles([parseAgentFile(p1), parseAgentFile(p2)]);
 
@@ -400,17 +383,13 @@ describe("migrateCommand", () => {
 
     const content = readResult("ai/contract.yaml");
     expect(content).toContain("Prefer const over let");
-    expect(content).toContain(
-      "React Compiler handles memoization automatically",
-    );
+    expect(content).toContain("React Compiler handles memoization automatically");
   });
 
   it("exits with an error when a --from file does not exist", async () => {
     const { migrateCommand } = await import("../src/commands/migrate.js");
 
-    const exitSpy = vi
-      .spyOn(process, "exit")
-      .mockImplementation((() => {}) as never);
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation((() => {}) as never);
 
     await migrateCommand({ from: ["/nonexistent/file.md"] });
 
@@ -420,9 +399,7 @@ describe("migrateCommand", () => {
   it("exits with an error when no --from files are provided", async () => {
     const { migrateCommand } = await import("../src/commands/migrate.js");
 
-    const exitSpy = vi
-      .spyOn(process, "exit")
-      .mockImplementation((() => {}) as never);
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation((() => {}) as never);
 
     await migrateCommand({ from: [] });
 
@@ -447,10 +424,7 @@ describe("migrate --targets / --exclude", () => {
   it("filters sources by --targets", async () => {
     // .github path → detected as copilot
     mkdirSync(join(TEST_DIR, ".github"), { recursive: true });
-    const copilotFile = writeFixture(
-      ".github/copilot-instructions.md",
-      COPILOT_MD,
-    );
+    const copilotFile = writeFixture(".github/copilot-instructions.md", COPILOT_MD);
     // .claude path → detected as claude
     mkdirSync(join(TEST_DIR, ".claude"), { recursive: true });
     const claudeFile = writeFixture(".claude/CLAUDE.md", CLAUDE_MD);
@@ -464,19 +438,14 @@ describe("migrate --targets / --exclude", () => {
 
     const content = readResult("ai/contract.yaml");
     // Copilot-only rule should be present
-    expect(content).toContain(
-      "React Compiler handles memoization automatically",
-    );
+    expect(content).toContain("React Compiler handles memoization automatically");
     // Claude-only rule (not in copilot) should be absent
     expect(content).not.toContain("No class components");
   });
 
   it("filters sources by --exclude", async () => {
     mkdirSync(join(TEST_DIR, ".github"), { recursive: true });
-    const copilotFile = writeFixture(
-      ".github/copilot-instructions.md",
-      COPILOT_MD,
-    );
+    const copilotFile = writeFixture(".github/copilot-instructions.md", COPILOT_MD);
     mkdirSync(join(TEST_DIR, ".claude"), { recursive: true });
     const claudeFile = writeFixture(".claude/CLAUDE.md", CLAUDE_MD);
 
@@ -491,22 +460,15 @@ describe("migrate --targets / --exclude", () => {
     // Claude-only rule should be present
     expect(content).toContain("No class components");
     // Copilot-only rule should be absent
-    expect(content).not.toContain(
-      "React Compiler handles memoization automatically",
-    );
+    expect(content).not.toContain("React Compiler handles memoization automatically");
   });
 
   it("exits when all sources are filtered out", async () => {
     mkdirSync(join(TEST_DIR, ".github"), { recursive: true });
-    const copilotFile = writeFixture(
-      ".github/copilot-instructions.md",
-      COPILOT_MD,
-    );
+    const copilotFile = writeFixture(".github/copilot-instructions.md", COPILOT_MD);
 
     const { migrateCommand } = await import("../src/commands/migrate.js");
-    const exitSpy = vi
-      .spyOn(process, "exit")
-      .mockImplementation((() => {}) as never);
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation((() => {}) as never);
 
     await migrateCommand({
       from: [copilotFile],

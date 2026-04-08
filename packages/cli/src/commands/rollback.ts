@@ -1,10 +1,5 @@
 /// <reference types="node" />
-import {
-  listBackups,
-  readBackup,
-  restoreBackup,
-  BACKUP_DIR,
-} from "@agentfile/core";
+import { BACKUP_DIR, listBackups, readBackup, restoreBackup } from "@agentfile/core";
 import { logger } from "../logger.js";
 
 export interface RollbackOptions {
@@ -14,9 +9,7 @@ export interface RollbackOptions {
   list?: boolean;
 }
 
-export async function rollbackCommand(
-  options: RollbackOptions = {},
-): Promise<void> {
+export async function rollbackCommand(options: RollbackOptions = {}): Promise<void> {
   const root = process.cwd();
 
   logger.title("agentfile rollback");
@@ -81,8 +74,6 @@ export async function rollbackCommand(
 
   console.log();
   logger.success(`Rollback complete. ${restored.length} file(s) restored.`);
-  logger.info(
-    "Run `agentfile sync` to regenerate if you want to switch back to managed output.",
-  );
+  logger.info("Run `agentfile sync` to regenerate if you want to switch back to managed output.");
   console.log();
 }

@@ -7,6 +7,28 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.4.0] — 2026-04-08
+
+### Added
+- `ui` command (`npx @agentfile/cli ui`) — starts a local dashboard in your browser for inspecting the contract, previewing generated files, and monitoring drift
+- `@agentfile/ui@0.1.0-beta.0` — Express + React application backing the `ui` command (beta, install with `npm install @agentfile/ui@beta`)
+- VS Code extension `agentfile.agentfile@0.1.0` — sidebar overview, contract validation, sync/migrate/init/diff/clean/rollback commands, stale-file diagnostics (beta, marked Preview on the Marketplace)
+- Biome for consistent linting and formatting across all packages (`npm run lint`, `npm run lint:fix`, `npm run format`)
+
+### Changed
+- Minimum Node.js version raised to **24.0.0** across all packages
+- TypeScript upgraded to **6.x** across all packages
+- Express upgraded to **5.x** in `@agentfile/ui` (breaking: wildcard routes use `/{*splat}` syntax)
+- Vite upgraded to **8.x** in `@agentfile/ui`
+- `diff` upgraded to **8.x** in `@agentfile/ui` (package now ships its own TypeScript declarations; `@types/diff` removed)
+- All other dependencies updated to their latest releases
+- **Version bumps:** `@agentfile/core` `0.4.0`, `@agentfile/cli` `0.4.0`, `@agentfile/agentfile` `0.4.0`
+
+### Fixed
+- Consistent double-quote and semicolon style applied across `@agentfile/core` source files
+- `migrate` and `filter` commands use `path.relative()` instead of string replace for cross-platform path handling
+- Unused imports and variables removed throughout the codebase
+
 ## [0.3.0] — 2026-03-23
 
 ### Added

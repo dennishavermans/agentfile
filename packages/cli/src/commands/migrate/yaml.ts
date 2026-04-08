@@ -3,7 +3,7 @@ import type { ParsedRules, ParsedSkill, RuleCategory } from "./types.js";
 function yamlStr(value: string): string {
   if (!value.trim()) return "''";
 
-  if (/[:#\[\]{}&*?|<>=!%@`,]/.test(value) || value.includes("\n")) {
+  if (/[:#[\]{}&*?|<>=!%@`,]/.test(value) || value.includes("\n")) {
     return `"${value.replace(/"/g, '\\"')}"`;
   }
 
@@ -13,7 +13,7 @@ function yamlStr(value: string): string {
 function yamlList(items: string[], indent: number): string {
   const padding = " ".repeat(indent);
   if (!items.length) return `${padding}[]\n`;
-  return items.map((item) => `${padding}- ${yamlStr(item)}`).join("\n") + "\n";
+  return `${items.map((item) => `${padding}- ${yamlStr(item)}`).join("\n")}\n`;
 }
 
 function serializeSkill(skill: ParsedSkill, indent: number): string {

@@ -6,15 +6,10 @@
  * what agentfile owns, preserves, and knows about. It's the foundation for
  * clean, diff, rollback, and CI enforcement.
  */
-import {
-  existsSync,
-  readFileSync,
-  writeFileSync,
-  mkdirSync,
-  readdirSync,
-} from "fs";
-import { dirname, join, relative } from "path";
+
 import { createHash } from "crypto";
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "fs";
+import { dirname, join, relative } from "path";
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -101,11 +96,7 @@ export function writeManifest(root: string, manifest: Manifest): void {
   const manifestPath = join(root, MANIFEST_FILE);
   const dir = dirname(manifestPath);
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-  writeFileSync(
-    manifestPath,
-    JSON.stringify(manifest, null, 2) + "\n",
-    "utf-8",
-  );
+  writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf-8");
 }
 
 // ─── Builder ───────────────────────────────────────────────────────────────
@@ -157,16 +148,12 @@ export function buildManifest(
 
 /** Returns all paths the manifest considers owned. */
 export function ownedPaths(manifest: Manifest): string[] {
-  return manifest.files
-    .filter((f) => f.ownership === "owned")
-    .map((f) => f.path);
+  return manifest.files.filter((f) => f.ownership === "owned").map((f) => f.path);
 }
 
 /** Returns all paths the manifest considers preserved. */
 export function preservedPaths(manifest: Manifest): string[] {
-  return manifest.files
-    .filter((f) => f.ownership === "preserved")
-    .map((f) => f.path);
+  return manifest.files.filter((f) => f.ownership === "preserved").map((f) => f.path);
 }
 
 /**
@@ -226,11 +213,7 @@ export function captureBackup(root: string, paths: string[]): BackupEntry[] {
 /**
  * Writes backup entries to the backup directory.
  */
-export function writeBackup(
-  root: string,
-  entries: BackupEntry[],
-  tag: string,
-): string {
+export function writeBackup(root: string, entries: BackupEntry[], tag: string): string {
   const backupRoot = join(root, BACKUP_DIR, tag);
   for (const entry of entries) {
     const dest = join(backupRoot, entry.path);

@@ -1,14 +1,16 @@
 /// <reference types="node" />
+
+import {
+  buildManifest,
+  type GenerateResult,
+  generate,
+  MANIFEST_FILE,
+  readManifest,
+  staleFiles,
+  writeManifest,
+} from "@agentfile/core";
 import { existsSync, readFileSync } from "fs";
 import { join } from "path";
-import {
-  generate,
-  readManifest,
-  buildManifest,
-  writeManifest,
-  staleFiles,
-  MANIFEST_FILE,
-} from "@agentfile/core";
 import { logger } from "../logger.js";
 
 const AI_AGENTS_FILE = ".ai-agents";
@@ -20,9 +22,7 @@ function readAgents(root: string): string[] | null {
   if (!existsSync(agentsPath)) {
     logger.warn(`No ${AI_AGENTS_FILE} file found.`);
     if (existsSync(join(root, AI_AGENTS_EXAMPLE))) {
-      logger.info(
-        `Copy ${AI_AGENTS_EXAMPLE} to ${AI_AGENTS_FILE} and list the agents you use.`,
-      );
+      logger.info(`Copy ${AI_AGENTS_EXAMPLE} to ${AI_AGENTS_FILE} and list the agents you use.`);
     }
     return null;
   }
@@ -53,7 +53,7 @@ export async function syncCommand(options: { dryRun?: boolean } = {}) {
   logger.info(`Agents: ${agents.join(", ")}\n`);
 
   // Run generation
-  let result;
+  let result: GenerateResult;
   try {
     result = generate({ root, agents, dryRun });
   } catch (err) {
@@ -81,9 +81,7 @@ export async function syncCommand(options: { dryRun?: boolean } = {}) {
   }
 
   logger.success(
-    dryRun
-      ? "Dry run passed. All templates render without errors."
-      : "All agent files generated successfully.",
+    dryRun ? "Dry run passed. All templates render without errors." : "All agent files generated successfully.",
   );
 
   // Write manifest (skip in dry-run mode)

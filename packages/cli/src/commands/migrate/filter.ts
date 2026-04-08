@@ -1,3 +1,4 @@
+import { relative } from "path";
 import type { MigrateReportEntry } from "./types.js";
 
 export function detectIDE(filePath: string): string | null {
@@ -19,7 +20,7 @@ export function filterSourcesByTarget(
 
   for (const absolutePath of sourcePaths) {
     const ide = detectIDE(absolutePath);
-    const relativePath = absolutePath.replace(root + "/", "");
+    const relativePath = relative(root, absolutePath);
 
     if (targets?.length && ide && !targets.includes(ide)) {
       report.push({

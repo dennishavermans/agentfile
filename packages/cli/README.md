@@ -61,6 +61,14 @@ npx @agentfile/cli rollback --tag migrate-1700000000000
 
 Restores files from `.agentfile-backup/`.
 
+```bash
+npx @agentfile/cli ui
+npx @agentfile/cli ui --port 3000
+npx @agentfile/cli ui --root ./packages/app
+```
+
+Starts a local dashboard in your browser for inspecting your contract, previewing generated files, and monitoring drift. Defaults to port `4311`.
+
 ## What it generates
 
 | Agent | File |

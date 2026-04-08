@@ -1,11 +1,6 @@
 import type { MergeResult, ParsedFile, RuleCategory } from "./types.js";
 
-const RULE_CATEGORIES: RuleCategory[] = [
-  "coding",
-  "architecture",
-  "testing",
-  "naming",
-];
+const RULE_CATEGORIES: RuleCategory[] = ["coding", "architecture", "testing", "naming"];
 
 export function mergeFiles(files: ParsedFile[]): MergeResult {
   const result: MergeResult = {
@@ -29,10 +24,7 @@ export function mergeFiles(files: ParsedFile[]): MergeResult {
       const existing = result.skills.find((item) => item.name === skill.name);
       if (!existing) {
         result.skills.push(skill);
-      } else if (
-        skill.description &&
-        existing.description !== skill.description
-      ) {
+      } else if (skill.description && existing.description !== skill.description) {
         result.conflicts.push(
           `Skill "${skill.name}" has differing descriptions between source files — kept first, review manually`,
         );

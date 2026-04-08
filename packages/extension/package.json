@@ -1,0 +1,135 @@
+{
+  "name": "agentfile",
+  "displayName": "Agentfile",
+  "description": "Manage, validate, and sync Agentfile contracts in VS Code (beta)",
+  "version": "0.1.0",
+  "preview": true,
+  "publisher": "agentfile",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dennishavermans/agentfile"
+  },
+  "homepage": "https://github.com/dennishavermans/agentfile#readme",
+  "bugs": {
+    "url": "https://github.com/dennishavermans/agentfile/issues"
+  },
+  "icon": "media/agentfile-icon.png",
+  "galleryBanner": {
+    "color": "#0f172a",
+    "theme": "dark"
+  },
+  "keywords": [
+    "ai",
+    "agents",
+    "copilot",
+    "claude",
+    "cursor",
+    "contract",
+    "agentfile"
+  ],
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished",
+    "onWorkspaceContains:ai/contract.yaml",
+    "onCommand:agentfile.focus"
+  ],
+  "main": "./dist/extension.js",
+  "files": [
+    "dist",
+    "media",
+    "README.md",
+    "CHANGELOG.md"
+  ],
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "agentfile",
+          "title": "agentfile",
+          "icon": "media/agentfile-icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "agentfile": [
+        {
+          "id": "agentfile.sidebar",
+          "name": "Overview",
+          "type": "webview"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "agentfile.focus",
+        "title": "agentfile: Focus Sidebar"
+      },
+      {
+        "command": "agentfile.init",
+        "title": "agentfile: Initialize Project"
+      },
+      {
+        "command": "agentfile.migrate",
+        "title": "agentfile: Migrate Project"
+      },
+      {
+        "command": "agentfile.sync",
+        "title": "agentfile: Sync"
+      },
+      {
+        "command": "agentfile.refresh",
+        "title": "agentfile: Refresh"
+      },
+      {
+        "command": "agentfile.validate",
+        "title": "agentfile: Validate Contract"
+      },
+      {
+        "command": "agentfile.openContract",
+        "title": "agentfile: Open Contract"
+      },
+      {
+        "command": "agentfile.openAgentOutput",
+        "title": "agentfile: Open Agent Output"
+      },
+      {
+        "command": "agentfile.diff",
+        "title": "agentfile: Diff"
+      },
+      {
+        "command": "agentfile.clean",
+        "title": "agentfile: Clean"
+      },
+      {
+        "command": "agentfile.rollback",
+        "title": "agentfile: Rollback"
+      }
+    ]
+  },
+  "scripts": {
+    "clean": "rm -rf dist",
+    "build": "npm run clean && node esbuild.mjs",
+    "typecheck": "tsc --noEmit",
+    "package": "npm run build && vsce package --no-dependencies",
+    "publish:marketplace": "npm run build && vsce publish --no-dependencies",
+    "publish:openvsx": "ovsx publish *.vsix"
+  },
+  "dependencies": {
+    "@agentfile/core": "^0.4.0",
+    "yaml": "^2.8.3"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "@types/vscode": "^1.90.0",
+    "@vscode/vsce": "^3.7.1",
+    "esbuild": "^0.28.0",
+    "ovsx": "^0.10.10",
+    "typescript": "^6.0.2"
+  }
+}

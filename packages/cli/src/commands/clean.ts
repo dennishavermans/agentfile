@@ -1,13 +1,8 @@
 /// <reference types="node" />
+
+import { MANIFEST_FILE, ownedPaths, readManifest, writeManifest } from "@agentfile/core";
 import { existsSync, unlinkSync } from "fs";
 import { join } from "path";
-import {
-  readManifest,
-  writeManifest,
-  staleFiles,
-  ownedPaths,
-  MANIFEST_FILE,
-} from "@agentfile/core";
 import { logger } from "../logger.js";
 
 export interface CleanOptions {
@@ -23,9 +18,7 @@ export async function cleanCommand(options: CleanOptions = {}): Promise<void> {
 
   const manifest = readManifest(root);
   if (!manifest) {
-    logger.error(
-      `No ${MANIFEST_FILE} found. Run \`agentfile sync\` first to generate the manifest.`,
-    );
+    logger.error(`No ${MANIFEST_FILE} found. Run \`agentfile sync\` first to generate the manifest.`);
     process.exit(1);
     return;
   }
@@ -67,9 +60,7 @@ export async function cleanCommand(options: CleanOptions = {}): Promise<void> {
     for (const p of present) {
       logger.info(`  ${p}`);
     }
-    logger.info(
-      "\nTo detect stale files, run `agentfile sync` first — it reports stale files automatically.",
-    );
+    logger.info("\nTo detect stale files, run `agentfile sync` first — it reports stale files automatically.");
   } else {
     // Interactive: list what would be deleted
     logger.info("\nOwned files that can be regenerated:");
@@ -79,9 +70,7 @@ export async function cleanCommand(options: CleanOptions = {}): Promise<void> {
 
     if (dryRun) {
       console.log();
-      logger.info(
-        `Dry run: ${present.length} file(s) would be deleted. Run without --dry-run to proceed.`,
-      );
+      logger.info(`Dry run: ${present.length} file(s) would be deleted. Run without --dry-run to proceed.`);
       return;
     }
 

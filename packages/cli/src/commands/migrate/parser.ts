@@ -1,12 +1,7 @@
 /// <reference types="node" />
 import { readFileSync } from "fs";
 import { basename } from "path";
-import type {
-  ParsedFile,
-  ParsedSkill,
-  RuleCategory,
-  Section,
-} from "./types.js";
+import type { ParsedFile, ParsedSkill, RuleCategory, Section } from "./types.js";
 
 const RULE_HEADING_PATTERNS: [RegExp, RuleCategory][] = [
   [/^coding(\s+(rules?|standards?))?$/i, "coding"],
@@ -31,9 +26,7 @@ function matchRuleCategory(heading: string): RuleCategory | null {
 }
 
 function isSkillContainer(heading: string): boolean {
-  return SKILL_CONTAINER_PATTERNS.some((pattern) =>
-    pattern.test(heading.trim()),
-  );
+  return SKILL_CONTAINER_PATTERNS.some((pattern) => pattern.test(heading.trim()));
 }
 
 function getHeadingLevel(line: string): number {
@@ -97,10 +90,7 @@ function parseSections(lines: string[]): Section[] {
 }
 
 function looksLikeSkill(section: Section): boolean {
-  const allText = [
-    ...section.lines,
-    ...section.children.map((c) => c.heading),
-  ].join(" ");
+  const allText = [...section.lines, ...section.children.map((c) => c.heading)].join(" ");
   return (
     /steps?|expected\s+output|workflow/i.test(allText) ||
     extractNumberedList(section.lines).length >= 2 ||
@@ -168,10 +158,7 @@ function parseSkillFromSection(section: Section): ParsedSkill {
     .join(" ")
     .trim();
 
-  const steps = [
-    ...extractNumberedList(stepLines),
-    ...extractBullets(stepLines),
-  ].filter(Boolean);
+  const steps = [...extractNumberedList(stepLines), ...extractBullets(stepLines)].filter(Boolean);
 
   const context = [...extractBullets(contextLines)].filter(Boolean);
 
@@ -254,9 +241,7 @@ export function parseAgentFile(filePath: string): ParsedFile {
   };
 
   for (const line of lines.slice(0, 20)) {
-    const nameMatch = line.match(
-      /\*\*(?:project|app(?:lication)?)(?::\*\*|\*\*:)\s*(.+)/i,
-    );
+    const nameMatch = line.match(/\*\*(?:project|app(?:lication)?)(?::\*\*|\*\*:)\s*(.+)/i);
     if (nameMatch && !result.projectName) {
       result.projectName = nameMatch[1].trim();
     }

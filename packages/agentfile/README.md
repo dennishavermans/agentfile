@@ -23,7 +23,12 @@ Available commands mirror `@agentfile/cli`:
 - `diff`
 - `clean`
 - `rollback`
+- `ui`
 
 ## Documentation
 
 See the [main repository](https://github.com/dennishavermans/agentfile) for full documentation.
+
+## License
+
+MIT

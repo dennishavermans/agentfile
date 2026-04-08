@@ -1,7 +1,7 @@
 {
   "name": "@agentfile/cli",
-  "version": "0.3.0",
-  "description": "CLI for agentfile — init, migrate, sync, validate, watch, diff, clean, and rollback",
+  "version": "0.4.0",
+  "description": "CLI for agentfile — init, migrate, sync, validate, watch, diff, clean, rollback, and ui",
   "type": "module",
   "main": "./dist/bin.js",
   "bin": {
@@ -44,7 +44,8 @@
     "access": "public"
   },
   "dependencies": {
-    "@agentfile/core": "^0.3.0",
+    "@agentfile/core": "^0.4.0",
+    "@agentfile/ui": "^0.1.0-beta.0",
     "chalk": "^5.6.2",
     "commander": "^14.0.3",
     "enquirer": "^2.4.1"
@@ -52,7 +53,7 @@
   "devDependencies": {
     "@types/node": "^25.5.0",
     "tsx": "^4.21.0",
-    "typescript": "^5.9.3",
+    "typescript": "^6.0.2",
     "vitest": "^4.1.0"
   }
 }

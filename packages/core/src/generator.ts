@@ -1,31 +1,19 @@
 /// <reference types="node" />
-import { writeFileSync, mkdirSync, existsSync, readFileSync } from "fs";
-import { join, dirname } from "path";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
+import { dirname, join } from "path";
 
+import { loadContract, loadOverride, resolveAgent, resolveAgentSelection } from "./loader.js";
+import { addMarker } from "./manifest.js";
 import {
-  loadContract,
-  loadOverride,
-  resolveAgent,
-  resolveAgentSelection,
-} from "./loader.js";
-import {
-  renderTemplate,
-  renderSkillMdc,
-  extractPreservedZones,
-  buildArtifactTokens,
   buildAggregateArtifactTokens,
+  buildArtifactTokens,
+  extractPreservedZones,
   renderArtifactTemplate,
+  renderSkillMdc,
+  renderTemplate,
   type SkillsFormat,
 } from "./renderer.js";
-import { addMarker } from "./manifest.js";
-import type {
-  Contract,
-  Override,
-  AgentConfig,
-  Artifact,
-  GenerateResult,
-  AgentResult,
-} from "./schema.js";
+import type { AgentConfig, AgentResult, Artifact, Contract, GenerateResult, Override } from "./schema.js";
 
 // ─── Options ───────────────────────────────────────────────────────────────
 
@@ -43,12 +31,7 @@ export interface ValidateOptions {
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
-function writeOutput(
-  absPath: string,
-  content: string,
-  dryRun: boolean,
-  markers: boolean,
-): string {
+function writeOutput(absPath: string, content: string, dryRun: boolean, markers: boolean): string {
   const finalContent = markers ? addMarker(absPath, content) : content;
   if (!dryRun) {
     const dir = dirname(absPath);
@@ -59,24 +42,14 @@ function writeOutput(
 }
 
 // Cursor generates one .mdc file per skill in addition to its main file
-function generateCursorSkillFiles(
-  root: string,
-  contract: Contract,
-  dryRun: boolean,
-  markers: boolean,
-): AgentResult[] {
+function generateCursorSkillFiles(root: string, contract: Contract, dryRun: boolean, markers: boolean): AgentResult[] {
   if (!contract.skills.length) return [];
 
   return contract.skills.map((skill) => {
     const output = `.cursor/rules/skills/${skill.name}.mdc`;
     const rawContent = renderSkillMdc(skill);
     try {
-      const content = writeOutput(
-        join(root, output),
-        rawContent,
-        dryRun,
-        markers,
-      );
+      const content = writeOutput(join(root, output), rawContent, dryRun, markers);
       return {
         status: "ok" as const,
         agent: `cursor:skill:${skill.name}`,
@@ -135,9 +108,7 @@ function generateArtifactFiles(
       results.push({
         status: "error",
         agent: `${agentName}:${type}`,
-        error: new Error(
-          `Artifact template not found: ${tmplConfig.template} (expected at ${templatePath})`,
-        ),
+        error: new Error(`Artifact template not found: ${tmplConfig.template} (expected at ${templatePath})`),
       });
       continue;
     }
@@ -161,12 +132,7 @@ function generateArtifactFiles(
 
       try {
         const rawContent = renderArtifactTemplate(templateContent, tokens);
-        const content = writeOutput(
-          join(root, output),
-          rawContent,
-          dryRun,
-          markers,
-        );
+        const content = writeOutput(join(root, output), rawContent, dryRun, markers);
         results.push({ status: "ok", agent: label, output, content });
       } catch (err) {
         results.push({
@@ -178,30 +144,21 @@ function generateArtifactFiles(
     } else {
       // ── Per-artifact mode: one file per artifact ──
       for (const artifact of artifacts) {
-        const body = artifact.content_file
-          ? (() => {
-              const bodyPath = join(root, artifact.content_file);
-              return existsSync(bodyPath)
-                ? readFileSync(bodyPath, "utf-8")
-                : "";
-            })()
-          : "";
+        let body = "";
+        if (artifact.content_file) {
+          const bodyPath = join(root, artifact.content_file);
+          if (existsSync(bodyPath)) {
+            body = readFileSync(bodyPath, "utf-8");
+          }
+        }
 
         const tokens = buildArtifactTokens(artifact, body);
-        const output = tmplConfig.output_pattern.replace(
-          /\$\{name\}/g,
-          artifact.name,
-        );
+        const output = tmplConfig.output_pattern.replace(/\$\{name\}/g, artifact.name);
         const label = `${agentName}:${type}:${artifact.name}`;
 
         try {
           const rawContent = renderArtifactTemplate(templateContent, tokens);
-          const content = writeOutput(
-            join(root, output),
-            rawContent,
-            dryRun,
-            markers,
-          );
+          const content = writeOutput(join(root, output), rawContent, dryRun, markers);
           results.push({ status: "ok", agent: label, output, content });
         } catch (err) {
           results.push({
@@ -257,26 +214,13 @@ export function generate(options: GenerateOptions): GenerateResult {
 
       // Determine skills rendering format per agent
       const skillsFormat: SkillsFormat =
-        agentName === "copilot"
-          ? "copilot"
-          : agentName === "agents-md"
-            ? "agents-md"
-            : "markdown";
+        agentName === "copilot" ? "copilot" : agentName === "agents-md" ? "agents-md" : "markdown";
 
       const outputPath = join(root, resolved.config.output);
-      const existingContent = existsSync(outputPath)
-        ? readFileSync(outputPath, "utf-8")
-        : null;
-      const preservedZones = existingContent
-        ? extractPreservedZones(existingContent)
-        : new Map<string, string>();
+      const existingContent = existsSync(outputPath) ? readFileSync(outputPath, "utf-8") : null;
+      const preservedZones = existingContent ? extractPreservedZones(existingContent) : new Map<string, string>();
 
-      const rawContent = renderTemplate(
-        resolved.template,
-        { contract, override },
-        skillsFormat,
-        preservedZones,
-      );
+      const rawContent = renderTemplate(resolved.template, { contract, override }, skillsFormat, preservedZones);
       const output = resolved.config.output;
 
       const content = writeOutput(outputPath, rawContent, dryRun, markers);
@@ -284,12 +228,7 @@ export function generate(options: GenerateOptions): GenerateResult {
 
       // Cursor: also generate per-skill .mdc files
       if (agentName === "cursor") {
-        const skillResults = generateCursorSkillFiles(
-          root,
-          contract,
-          dryRun,
-          markers,
-        );
+        const skillResults = generateCursorSkillFiles(root, contract, dryRun, markers);
         results.push(...skillResults);
       }
 
