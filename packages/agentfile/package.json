@@ -4,7 +4,7 @@
   "description": "One contract. Every AI agent. Zero clutter.",
   "type": "module",
   "bin": {
-    "agentfile": "./dist/bin.js"
+    "agentfile": "dist/bin.js"
   },
   "files": [
     "dist",
@@ -18,7 +18,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/dennishavermans/agentfile"
+    "url": "git+https://github.com/dennishavermans/agentfile.git"
   },
   "homepage": "https://github.com/dennishavermans/agentfile#readme",
   "bugs": {
