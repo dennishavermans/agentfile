@@ -37,10 +37,7 @@ function findUpward(startDir: string, relativePath: string): string | null {
 
 function buildCliCommand(root: string, command: string, args = ""): string {
   const monorepoCli = findUpward(root, "packages/cli/dist/bin.js");
-  const installedCli = findUpward(
-    root,
-    "node_modules/@agentfile/cli/dist/bin.js",
-  );
+  const installedCli = findUpward(root, "node_modules/@agentfile/cli/dist/bin.js");
 
   if (monorepoCli) {
     return `node "${monorepoCli}" ${command}${args ? ` ${args}` : ""}`;
@@ -73,17 +70,9 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(diagnostics);
 
   const sidebarProvider = new AgentfileSidebarProvider(root);
-  context.subscriptions.push(
-    vscode.window.registerWebviewViewProvider(
-      "agentfile.sidebar",
-      sidebarProvider,
-    ),
-  );
+  context.subscriptions.push(vscode.window.registerWebviewViewProvider("agentfile.sidebar", sidebarProvider));
 
-  const statusBar = vscode.window.createStatusBarItem(
-    vscode.StatusBarAlignment.Left,
-    100,
-  );
+  const statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
   statusBar.command = "agentfile.sync";
   context.subscriptions.push(statusBar);
 
@@ -156,9 +145,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
   const openContract = async (): Promise<void> => {
     if (!existsSync(contractPath)) {
-      void vscode.window.showWarningMessage(
-        "No contract found — run agentfile init to get started",
-      );
+      void vscode.window.showWarningMessage("No contract found — run agentfile init to get started");
       return;
     }
 
@@ -166,10 +153,7 @@ export function activate(context: vscode.ExtensionContext): void {
     await vscode.window.showTextDocument(document);
   };
 
-  const openContractRule = async (
-    category?: string,
-    index?: number,
-  ): Promise<void> => {
+  const openContractRule = async (category?: string, index?: number): Promise<void> => {
     if (!existsSync(contractPath)) {
       await openContract();
       return;
@@ -203,9 +187,7 @@ export function activate(context: vscode.ExtensionContext): void {
     if (node.status === "disabled") {
       const enabled = enableAgent(root, node.name);
       if (enabled) {
-        void vscode.window.showInformationMessage(
-          `${node.name} enabled. Creating ${node.outputPath}...`,
-        );
+        void vscode.window.showInformationMessage(`${node.name} enabled. Creating ${node.outputPath}...`);
       }
       await runSync();
     }
@@ -258,14 +240,10 @@ export function activate(context: vscode.ExtensionContext): void {
       }
 
       const result = generate({ root, agents: selectedAgents, dryRun: true });
-      const files = result.results
-        .filter((item) => item.status === "ok")
-        .map((item) => item.output);
+      const files = result.results.filter((item) => item.status === "ok").map((item) => item.output);
 
       if (files.length) {
-        void vscode.window.showInformationMessage(
-          `Sync completed. Updated files: ${files.join(", ")}`,
-        );
+        void vscode.window.showInformationMessage(`Sync completed. Updated files: ${files.join(", ")}`);
       }
     } catch {
       // Terminal output remains source of truth; this preview list is best-effort.
@@ -366,8 +344,7 @@ export function activate(context: vscode.ExtensionContext): void {
     }
 
     const tag = await vscode.window.showInputBox({
-      prompt:
-        "Enter the backup tag to restore (run 'List backups' first to see available tags)",
+      prompt: "Enter the backup tag to restore (run 'List backups' first to see available tags)",
       placeHolder: "e.g. migrate-1700000000000",
     });
 
@@ -379,18 +356,13 @@ export function activate(context: vscode.ExtensionContext): void {
       name: "agentfile rollback",
     });
     terminal.show();
-    terminal.sendText(
-      buildCliCommand(root, "rollback", `--tag "${tag}"`),
-      true,
-    );
+    terminal.sendText(buildCliCommand(root, "rollback", `--tag "${tag}"`), true);
     scheduleRefresh(refreshUi, [400, 1200, 2500]);
   };
 
   context.subscriptions.push(
     vscode.commands.registerCommand("agentfile.focus", async () => {
-      await vscode.commands.executeCommand(
-        "workbench.view.extension.agentfile",
-      );
+      await vscode.commands.executeCommand("workbench.view.extension.agentfile");
       await vscode.commands.executeCommand("agentfile.sidebar.focus");
     }),
     vscode.commands.registerCommand("agentfile.refresh", refreshUi),
@@ -401,21 +373,13 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand("agentfile.clean", runClean),
     vscode.commands.registerCommand("agentfile.rollback", runRollback),
     vscode.commands.registerCommand("agentfile.openContract", openContract),
-    vscode.commands.registerCommand(
-      "agentfile.openContractRule",
-      openContractRule,
-    ),
-    vscode.commands.registerCommand(
-      "agentfile.openAgentOutput",
-      openAgentOutput,
-    ),
+    vscode.commands.registerCommand("agentfile.openContractRule", openContractRule),
+    vscode.commands.registerCommand("agentfile.openAgentOutput", openAgentOutput),
     vscode.commands.registerCommand("agentfile.validate", async () => {
       diagnostics.clear();
 
       if (!existsSync(contractPath)) {
-        void vscode.window.showWarningMessage(
-          "No contract found — run agentfile init to get started",
-        );
+        void vscode.window.showWarningMessage("No contract found — run agentfile init to get started");
         return;
       }
 
@@ -428,13 +392,9 @@ export function activate(context: vscode.ExtensionContext): void {
         if (error instanceof ValidationError) {
           const rawYaml = readFileSync(contractPath, "utf-8");
           const doc = parseDocument(rawYaml, { prettyErrors: false });
-          const items = error.issues.map((issue) =>
-            issueToDiagnostic(issue, rawYaml, doc),
-          );
+          const items = error.issues.map((issue) => issueToDiagnostic(issue, rawYaml, doc));
           diagnostics.set(contractUri, items);
-          void vscode.window.showErrorMessage(
-            `Validation failed with ${items.length} issue(s).`,
-          );
+          void vscode.window.showErrorMessage(`Validation failed with ${items.length} issue(s).`);
           return false;
         }
 
@@ -450,9 +410,7 @@ export function activate(context: vscode.ExtensionContext): void {
     }),
   );
 
-  const watcher = vscode.workspace.createFileSystemWatcher(
-    "**/ai/contract.yaml",
-  );
+  const watcher = vscode.workspace.createFileSystemWatcher("**/ai/contract.yaml");
   context.subscriptions.push(
     watcher,
     watcher.onDidChange(async () => {

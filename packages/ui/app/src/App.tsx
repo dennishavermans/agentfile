@@ -1,17 +1,5 @@
-import {
-  closestCenter,
-  DndContext,
-  type DragEndEvent,
-  PointerSensor,
-  useSensor,
-  useSensors,
-} from "@dnd-kit/core";
-import {
-  arrayMove,
-  SortableContext,
-  useSortable,
-  verticalListSortingStrategy,
-} from "@dnd-kit/sortable";
+import { closestCenter, DndContext, type DragEndEvent, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
+import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import hljs from "highlight.js/lib/core";
@@ -32,13 +20,7 @@ import { useMemo, useState } from "react";
 
 import { Badge } from "./components/ui/badge";
 import { Button } from "./components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "./components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./components/ui/card";
 import { Separator } from "./components/ui/separator";
 import { useTheme } from "./hooks/useTheme";
 import {
@@ -57,12 +39,7 @@ hljs.registerLanguage("markdown", markdown);
 
 type RuleCategory = keyof ContractResponse["rules"];
 
-const categories: RuleCategory[] = [
-  "coding",
-  "architecture",
-  "testing",
-  "naming",
-];
+const categories: RuleCategory[] = ["coding", "architecture", "testing", "naming"];
 
 const formatTime = (value: number): string => {
   if (!value) {
@@ -72,15 +49,12 @@ const formatTime = (value: number): string => {
   return new Date(value).toLocaleString();
 };
 
-const highlightMarkdown = (text: string): string =>
-  hljs.highlight(text, { language: "markdown" }).value;
+const highlightMarkdown = (text: string): string => hljs.highlight(text, { language: "markdown" }).value;
 
-const metricCardClassName =
-  "border-border/80 bg-card/80 backdrop-blur-sm shadow-[0_1px_0_rgba(255,255,255,0.03)]";
+const metricCardClassName = "border-border/80 bg-card/80 backdrop-blur-sm shadow-[0_1px_0_rgba(255,255,255,0.03)]";
 
 function SortableRule({ id, text }: { id: string; text: string }) {
-  const { attributes, listeners, setNodeRef, transform, transition } =
-    useSortable({ id });
+  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id });
 
   return (
     <li
@@ -95,13 +69,7 @@ function SortableRule({ id, text }: { id: string; text: string }) {
   );
 }
 
-function StatusPill({
-  stale,
-  disabled,
-}: {
-  stale: boolean;
-  disabled: boolean;
-}) {
+function StatusPill({ stale, disabled }: { stale: boolean; disabled: boolean }) {
   if (disabled) {
     return <Badge variant="muted">disabled</Badge>;
   }
@@ -174,21 +142,13 @@ export const App = () => {
   const sensors = useSensors(useSensor(PointerSensor));
 
   const reorderRules = (category: RuleCategory, event: DragEndEvent) => {
-    if (
-      !contractQuery.data ||
-      !event.over ||
-      event.active.id === event.over.id
-    ) {
+    if (!contractQuery.data || !event.over || event.active.id === event.over.id) {
       return;
     }
 
     const current = contractQuery.data.rules[category];
-    const oldIndex = current.findIndex(
-      (rule) => `${category}:${rule}` === event.active.id,
-    );
-    const newIndex = current.findIndex(
-      (rule) => `${category}:${rule}` === event.over?.id,
-    );
+    const oldIndex = current.findIndex((rule) => `${category}:${rule}` === event.active.id);
+    const newIndex = current.findIndex((rule) => `${category}:${rule}` === event.over?.id);
 
     if (oldIndex < 0 || newIndex < 0) {
       return;
@@ -214,10 +174,7 @@ export const App = () => {
     const stale = rows.filter((item) => item.stale).length;
     const lastSync = Math.max(...rows.map((item) => item.lastSynced), 0);
     const ruleCount = contractQuery.data
-      ? categories.reduce(
-          (sum, key) => sum + contractQuery.data.rules[key].length,
-          0,
-        )
+      ? categories.reduce((sum, key) => sum + contractQuery.data.rules[key].length, 0)
       : 0;
 
     return {
@@ -242,12 +199,8 @@ export const App = () => {
                     <FolderCog className="h-6 w-6 text-primary" />
                   </div>
                   <div>
-                    <CardTitle className="text-2xl">
-                      agentfile dashboard
-                    </CardTitle>
-                    <CardDescription>
-                      No contract found for this project root yet.
-                    </CardDescription>
+                    <CardTitle className="text-2xl">agentfile dashboard</CardTitle>
+                    <CardDescription>No contract found for this project root yet.</CardDescription>
                   </div>
                 </div>
                 <Button
@@ -256,11 +209,7 @@ export const App = () => {
                   onClick={() => toggleTheme()}
                   title={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}
                 >
-                  {theme === "dark" ? (
-                    <Sun className="h-4 w-4" />
-                  ) : (
-                    <Moon className="h-4 w-4" />
-                  )}
+                  {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
                 </Button>
               </div>
             </CardHeader>
@@ -268,23 +217,14 @@ export const App = () => {
               <div className="space-y-3">
                 <h2 className="text-lg font-semibold">What this means</h2>
                 <p className="text-sm text-muted-foreground">
-                  The web UI is running correctly, but the selected project does
-                  not contain an
-                  <code className="mx-1 rounded bg-muted px-1.5 py-0.5 text-xs">
-                    ai/contract.yaml
-                  </code>
+                  The web UI is running correctly, but the selected project does not contain an
+                  <code className="mx-1 rounded bg-muted px-1.5 py-0.5 text-xs">ai/contract.yaml</code>
                   file yet.
                 </p>
                 <div className="rounded-lg border border-border bg-background/60 p-4 text-sm text-muted-foreground">
-                  Run{" "}
-                  <span className="font-medium text-foreground">
-                    agentfile init
-                  </span>{" "}
-                  for a new project or{" "}
-                  <span className="font-medium text-foreground">
-                    agentfile migrate
-                  </span>{" "}
-                  to import existing instructions.
+                  Run <span className="font-medium text-foreground">agentfile init</span> for a new project or{" "}
+                  <span className="font-medium text-foreground">agentfile migrate</span> to import existing
+                  instructions.
                 </div>
               </div>
               <div className="rounded-xl border border-primary/20 bg-primary/5 p-5">
@@ -313,32 +253,18 @@ export const App = () => {
                 <Sparkles className="h-3.5 w-3.5" />
                 agent orchestration
               </div>
-              <CardTitle className="text-3xl">
-                {contractQuery.data?.project.name ?? "agentfile dashboard"}
-              </CardTitle>
+              <CardTitle className="text-3xl">{contractQuery.data?.project.name ?? "agentfile dashboard"}</CardTitle>
               <CardDescription>
-                Inspect generated agent outputs, validate the contract, and sync
-                changes across tools.
+                Inspect generated agent outputs, validate the contract, and sync changes across tools.
               </CardDescription>
             </div>
             <div className="flex flex-wrap gap-3">
-              <Button
-                variant="outline"
-                onClick={() => validateMutation.mutate()}
-              >
+              <Button variant="outline" onClick={() => validateMutation.mutate()}>
                 <CheckCircle2 className="h-4 w-4" />
                 Validate
               </Button>
-              <Button
-                onClick={() => syncMutation.mutate()}
-                disabled={syncMutation.isPending}
-              >
-                <RefreshCcw
-                  className={cn(
-                    "h-4 w-4",
-                    syncMutation.isPending && "animate-spin",
-                  )}
-                />
+              <Button onClick={() => syncMutation.mutate()} disabled={syncMutation.isPending}>
+                <RefreshCcw className={cn("h-4 w-4", syncMutation.isPending && "animate-spin")} />
                 {syncMutation.isPending ? "Syncing" : "Sync all"}
               </Button>
               <Button
@@ -347,62 +273,42 @@ export const App = () => {
                 onClick={() => toggleTheme()}
                 title={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}
               >
-                {theme === "dark" ? (
-                  <Sun className="h-4 w-4" />
-                ) : (
-                  <Moon className="h-4 w-4" />
-                )}
+                {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
               </Button>
             </div>
           </CardHeader>
           <CardContent className="grid gap-4 p-6 md:grid-cols-2 xl:grid-cols-5">
             <Card className={metricCardClassName}>
               <CardContent className="p-5">
-                <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                  Active agents
-                </p>
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">Active agents</p>
                 <p className="mt-2 text-3xl font-semibold">
                   {stats.active}
-                  <span className="ml-1 text-base text-muted-foreground">
-                    / {stats.total}
-                  </span>
+                  <span className="ml-1 text-base text-muted-foreground">/ {stats.total}</span>
                 </p>
               </CardContent>
             </Card>
             <Card className={metricCardClassName}>
               <CardContent className="p-5">
-                <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                  Rule count
-                </p>
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">Rule count</p>
                 <p className="mt-2 text-3xl font-semibold">{stats.ruleCount}</p>
               </CardContent>
             </Card>
             <Card className={metricCardClassName}>
               <CardContent className="p-5">
-                <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                  Skills
-                </p>
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">Skills</p>
                 <p className="mt-2 text-3xl font-semibold">{stats.skills}</p>
               </CardContent>
             </Card>
             <Card className={metricCardClassName}>
               <CardContent className="p-5">
-                <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                  Last sync
-                </p>
-                <p className="mt-2 text-sm font-medium text-foreground">
-                  {formatTime(stats.lastSync)}
-                </p>
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">Last sync</p>
+                <p className="mt-2 text-sm font-medium text-foreground">{formatTime(stats.lastSync)}</p>
               </CardContent>
             </Card>
             <Card className={metricCardClassName}>
               <CardContent className="p-5">
-                <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                  Stale outputs
-                </p>
-                <p className="mt-2 text-3xl font-semibold text-amber-300">
-                  {stats.stale}
-                </p>
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">Stale outputs</p>
+                <p className="mt-2 text-3xl font-semibold text-amber-300">{stats.stale}</p>
               </CardContent>
             </Card>
           </CardContent>
@@ -416,9 +322,7 @@ export const App = () => {
                   <Layers3 className="h-5 w-5 text-primary" />
                   Agent status
                 </CardTitle>
-                <CardDescription>
-                  Select an agent to inspect the generated file preview.
-                </CardDescription>
+                <CardDescription>Select an agent to inspect the generated file preview.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
                 <div className="max-h-[460px] space-y-2 overflow-auto pr-1">
@@ -451,18 +355,11 @@ export const App = () => {
                               />
                               <span className="font-medium">{item.name}</span>
                             </div>
-                            <p className="mt-2 text-xs text-muted-foreground">
-                              {item.outputPath}
-                            </p>
+                            <p className="mt-2 text-xs text-muted-foreground">{item.outputPath}</p>
                           </div>
-                          <StatusPill
-                            stale={item.stale}
-                            disabled={item.disabled}
-                          />
+                          <StatusPill stale={item.stale} disabled={item.disabled} />
                         </div>
-                        <p className="mt-3 text-xs text-muted-foreground">
-                          Last synced: {formatTime(item.lastSynced)}
-                        </p>
+                        <p className="mt-3 text-xs text-muted-foreground">Last synced: {formatTime(item.lastSynced)}</p>
                       </button>
                     );
                   })}
@@ -490,25 +387,16 @@ export const App = () => {
             <Card className="border-border/80 bg-card/80 backdrop-blur">
               <CardHeader>
                 <CardTitle className="text-lg">Skills</CardTitle>
-                <CardDescription>
-                  Shared workflows embedded in the contract.
-                </CardDescription>
+                <CardDescription>Shared workflows embedded in the contract.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
                 {contractQuery.data?.skills.map((skill) => (
-                  <div
-                    key={skill.name}
-                    className="rounded-xl border border-border bg-background/50 p-4"
-                  >
+                  <div key={skill.name} className="rounded-xl border border-border bg-background/50 p-4">
                     <div className="flex items-center justify-between gap-3">
                       <p className="font-medium">{skill.name}</p>
-                      <Badge variant="outline">
-                        {skill.steps.length} steps
-                      </Badge>
+                      <Badge variant="outline">{skill.steps.length} steps</Badge>
                     </div>
-                    <p className="mt-2 text-sm text-muted-foreground">
-                      {skill.description}
-                    </p>
+                    <p className="mt-2 text-sm text-muted-foreground">{skill.description}</p>
                   </div>
                 ))}
               </CardContent>
@@ -524,8 +412,7 @@ export const App = () => {
                 </CardTitle>
                 <CardDescription>
                   {selectedAgent
-                    ? (previewQuery.data?.outputPath ??
-                      "Loading generated output...")
+                    ? (previewQuery.data?.outputPath ?? "Loading generated output...")
                     : "Select an agent to preview generated content."}
                 </CardDescription>
               </CardHeader>
@@ -536,9 +423,7 @@ export const App = () => {
                       <code
                         // biome-ignore lint/security/noDangerouslySetInnerHtml: intentional — highlight.js generates safe sanitized HTML
                         dangerouslySetInnerHTML={{
-                          __html: highlightMarkdown(
-                            previewQuery.data?.content ?? "",
-                          ),
+                          __html: highlightMarkdown(previewQuery.data?.content ?? ""),
                         }}
                       />
                     </pre>
@@ -549,34 +434,31 @@ export const App = () => {
                           Unified diff
                         </div>
                         <pre className="max-h-[260px] overflow-auto rounded-lg bg-black/40 p-4 text-xs">
-                          {(diffQuery.data?.diff ?? "")
-                            .split("\n")
-                            .map((line, index) => {
-                              const className = line.startsWith("+")
-                                ? "text-emerald-300"
-                                : line.startsWith("-")
-                                  ? "text-red-300"
-                                  : "text-muted-foreground";
+                          {(diffQuery.data?.diff ?? "").split("\n").map((line, index) => {
+                            const className = line.startsWith("+")
+                              ? "text-emerald-300"
+                              : line.startsWith("-")
+                                ? "text-red-300"
+                                : "text-muted-foreground";
 
-                              return (
+                            return (
+                              // biome-ignore lint/suspicious/noArrayIndexKey: diff lines are display-only, index is the correct stable key
+                              <span
                                 // biome-ignore lint/suspicious/noArrayIndexKey: diff lines are display-only, index is the correct stable key
-                                <span
-                                  // biome-ignore lint/suspicious/noArrayIndexKey: diff lines are display-only, index is the correct stable key
-                                  key={`${line}-${index}`}
-                                  className={`block ${className}`}
-                                >
-                                  {line}
-                                </span>
-                              );
-                            })}
+                                key={`${line}-${index}`}
+                                className={`block ${className}`}
+                              >
+                                {line}
+                              </span>
+                            );
+                          })}
                         </pre>
                       </div>
                     ) : null}
                   </>
                 ) : (
                   <div className="rounded-xl border border-dashed border-border bg-background/40 p-10 text-center text-sm text-muted-foreground">
-                    Choose an agent on the left to inspect the generated output
-                    and stale diff.
+                    Choose an agent on the left to inspect the generated output and stale diff.
                   </div>
                 )}
               </CardContent>
@@ -585,9 +467,7 @@ export const App = () => {
             <Card className="border-border/80 bg-card/80 backdrop-blur">
               <CardHeader>
                 <CardTitle className="text-lg">Contract rules</CardTitle>
-                <CardDescription>
-                  Reorder rules by drag and drop. Changes persist immediately.
-                </CardDescription>
+                <CardDescription>Reorder rules by drag and drop. Changes persist immediately.</CardDescription>
               </CardHeader>
               <CardContent className="grid gap-6 lg:grid-cols-2">
                 {contractQuery.data ? (
@@ -595,14 +475,9 @@ export const App = () => {
                     const items = contractQuery.data.rules[category];
 
                     return (
-                      <div
-                        key={category}
-                        className="space-y-3 rounded-xl border border-border bg-background/50 p-4"
-                      >
+                      <div key={category} className="space-y-3 rounded-xl border border-border bg-background/50 p-4">
                         <div className="flex items-center justify-between gap-3">
-                          <p className="text-sm font-medium capitalize">
-                            {category}
-                          </p>
+                          <p className="text-sm font-medium capitalize">{category}</p>
                           <Badge variant="outline">{items.length}</Badge>
                         </div>
                         <DndContext
@@ -616,11 +491,7 @@ export const App = () => {
                           >
                             <ul className="space-y-2">
                               {items.map((rule) => (
-                                <SortableRule
-                                  key={`${category}:${rule}`}
-                                  id={`${category}:${rule}`}
-                                  text={rule}
-                                />
+                                <SortableRule key={`${category}:${rule}`} id={`${category}:${rule}`} text={rule} />
                               ))}
                             </ul>
                           </SortableContext>
@@ -629,9 +500,7 @@ export const App = () => {
                     );
                   })
                 ) : (
-                  <p className="text-sm text-muted-foreground">
-                    Loading rules…
-                  </p>
+                  <p className="text-sm text-muted-foreground">Loading rules…</p>
                 )}
               </CardContent>
             </Card>
@@ -640,9 +509,7 @@ export const App = () => {
               <Card
                 className={cn(
                   "border-border/80",
-                  validateMutation.isSuccess
-                    ? "bg-emerald-500/10"
-                    : "bg-destructive/10",
+                  validateMutation.isSuccess ? "bg-emerald-500/10" : "bg-destructive/10",
                 )}
               >
                 <CardContent className="flex items-center gap-3 p-4 text-sm">
@@ -651,11 +518,7 @@ export const App = () => {
                   ) : (
                     <AlertTriangle className="h-4 w-4 text-destructive" />
                   )}
-                  <span>
-                    {validateMutation.isSuccess
-                      ? "Validation succeeded."
-                      : "Validation failed."}
-                  </span>
+                  <span>{validateMutation.isSuccess ? "Validation succeeded." : "Validation failed."}</span>
                 </CardContent>
               </Card>
             ) : null}

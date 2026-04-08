@@ -13,21 +13,13 @@ import { watchCommand } from "./commands/watch.js";
 
 const program = new Command();
 
-program
-  .name("agentfile")
-  .description("Unified AI agent contract manager")
-  .version("0.4.0");
+program.name("agentfile").description("Unified AI agent contract manager").version("0.4.0");
 
-program
-  .command("init")
-  .description("Scaffold a new agentfile setup in the current project")
-  .action(initCommand);
+program.command("init").description("Scaffold a new agentfile setup in the current project").action(initCommand);
 
 program
   .command("migrate")
-  .description(
-    "Import existing agent instruction files into a draft ai/contract.yaml",
-  )
+  .description("Import existing agent instruction files into a draft ai/contract.yaml")
   .option(
     "--from <file>",
     "Source agent instruction file to migrate (repeatable)",
@@ -35,24 +27,13 @@ program
     [] as string[],
   )
   .option("--dry-run", "Print the generated contract.yaml without writing it")
-  .option(
-    "--output <path>",
-    "Write the contract to a custom path instead of ai/contract.yaml",
+  .option("--output <path>", "Write the contract to a custom path instead of ai/contract.yaml")
+  .option("--replace-policy <policy>", "What to do with source files after migration: keep, archive, or delete", "keep")
+  .option("--targets <ides>", "Only migrate sources matching these IDE targets (comma-separated)", (val: string) =>
+    val.split(",").map((s) => s.trim()),
   )
-  .option(
-    "--replace-policy <policy>",
-    "What to do with source files after migration: keep, archive, or delete",
-    "keep",
-  )
-  .option(
-    "--targets <ides>",
-    "Only migrate sources matching these IDE targets (comma-separated)",
-    (val: string) => val.split(",").map((s) => s.trim()),
-  )
-  .option(
-    "--exclude <ides>",
-    "Exclude sources matching these IDE targets (comma-separated)",
-    (val: string) => val.split(",").map((s) => s.trim()),
+  .option("--exclude <ides>", "Exclude sources matching these IDE targets (comma-separated)", (val: string) =>
+    val.split(",").map((s) => s.trim()),
   )
   .action(
     (options: {
@@ -65,11 +46,7 @@ program
     }) =>
       migrateCommand({
         ...options,
-        replacePolicy: options.replacePolicy as
-          | "keep"
-          | "archive"
-          | "delete"
-          | undefined,
+        replacePolicy: options.replacePolicy as "keep" | "archive" | "delete" | undefined,
       }),
   );
 
@@ -79,32 +56,22 @@ program
   .option("--dry-run", "Render templates without writing files")
   .action((options) => syncCommand({ dryRun: options.dryRun }));
 
-program
-  .command("validate")
-  .description("Validate ai/contract.yaml schema (used in CI)")
-  .action(validateCommand);
+program.command("validate").description("Validate ai/contract.yaml schema (used in CI)").action(validateCommand);
 
-program
-  .command("watch")
-  .description("Watch ai/ for changes and sync automatically")
-  .action(watchCommand);
+program.command("watch").description("Watch ai/ for changes and sync automatically").action(watchCommand);
 
 program
   .command("clean")
   .description("Remove stale or orphaned generated files")
   .option("--dry-run", "Show what would be removed without deleting")
   .option("--stale-only", "Only remove files no longer in the manifest")
-  .action((options: { dryRun?: boolean; staleOnly?: boolean }) =>
-    cleanCommand(options),
-  );
+  .action((options: { dryRun?: boolean; staleOnly?: boolean }) => cleanCommand(options));
 
 program
   .command("diff")
   .description("Detect drift between generated files and the manifest")
-  .option(
-    "--files <paths>",
-    "Only check specific files (comma-separated)",
-    (val: string) => val.split(",").map((s) => s.trim()),
+  .option("--files <paths>", "Only check specific files (comma-separated)", (val: string) =>
+    val.split(",").map((s) => s.trim()),
   )
   .action((options: { files?: string[] }) => diffCommand(options));
 
@@ -113,19 +80,14 @@ program
   .description("Restore files from a previous backup")
   .option("--tag <tag>", "Specific backup tag to restore")
   .option("--list", "List available backups without restoring")
-  .action((options: { tag?: string; list?: boolean }) =>
-    rollbackCommand(options),
-  );
+  .action((options: { tag?: string; list?: boolean }) => rollbackCommand(options));
 
 program
   .command("ui")
   .description("Start the local agentfile dashboard")
   .option("--dev", "Run UI in development mode")
   .option("--port <port>", "Port for the local dashboard", "4311")
-  .option(
-    "--root <path>",
-    "Project folder to inspect instead of the current working directory",
-  )
+  .option("--root <path>", "Project folder to inspect instead of the current working directory")
   .action((options: { dev?: boolean; port: string; root?: string }) =>
     uiCommand({
       dev: options.dev,
