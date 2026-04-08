@@ -14,7 +14,6 @@
   "bugs": {
     "url": "https://github.com/dennishavermans/agentfile/issues"
   },
-  "icon": "media/agentfile-icon.png",
   "galleryBanner": {
     "color": "#0f172a",
     "theme": "dark"
@@ -40,12 +39,6 @@
     "onCommand:agentfile.focus"
   ],
   "main": "./dist/extension.js",
-  "files": [
-    "dist",
-    "media",
-    "README.md",
-    "CHANGELOG.md"
-  ],
   "contributes": {
     "viewsContainers": {
       "activitybar": [
