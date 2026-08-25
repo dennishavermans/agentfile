@@ -68,22 +68,53 @@ export function loadYamlSource(file: string, text: string): YamlSource {
     return { file, line: 1, column: 1 };
   };
 
-  const diagnostics: Diagnostic[] = document.errors.map((error) => {
+  // One unreadable file is one finding. A single malformed line can produce
+  // dozens of parser errors (an unquoted description full of colons yields one
+  // per colon), and forty findings for one file teach a developer to ignore
+  // the tool — so the first error speaks and the rest become a count.
+  const diagnostics: Diagnostic[] = document.errors.slice(0, 1).map((error) => {
     const start = lineCounter.linePos(error.pos[0]);
+    const more = document.errors.length - 1;
     return diagnostic({
       code: "AGF003",
-      message: error.message,
-      explanation: "The file is not valid YAML, so none of its configuration could be read.",
+      message: error.message.split("\n")[0],
+      explanation:
+        "The file is not valid YAML, so none of its configuration could be read." +
+        (more > 0 ? ` The parser reported ${more} further error${more === 1 ? "" : "s"} in this file.` : ""),
       suggestion: "Fix the YAML syntax and run the command again.",
       location: { file, line: start.line, column: start.col },
-      data: { name: error.name },
+      data: { name: error.name, furtherErrors: more },
     });
   });
+
+  // Parsing can succeed while conversion still throws — `globs: *.py` parses as
+  // an unresolved alias, and real repositories write exactly that (Cursor itself
+  // tolerates it). A file agentfile cannot read must become a finding, never a
+  // crash that takes the whole scan down with it.
+  let value: unknown;
+  if (!diagnostics.length) {
+    try {
+      value = document.toJS();
+    } catch (error) {
+      diagnostics.push(
+        diagnostic({
+          code: "AGF003",
+          message: error instanceof Error ? error.message : String(error),
+          explanation:
+            "The file parses as YAML but cannot be converted to a value. A bare `*` starts a " +
+            "YAML alias, so a value like `globs: *.py` needs quoting to mean the literal glob.",
+          suggestion: 'Quote the value, e.g. globs: "*.py".',
+          location: { file, line: 1, column: 1 },
+          data: { name: error instanceof Error ? error.name : "Error" },
+        }),
+      );
+    }
+  }
 
   return {
     file,
     text,
-    value: diagnostics.length ? undefined : document.toJS(),
+    value,
     diagnostics,
     locate,
   };

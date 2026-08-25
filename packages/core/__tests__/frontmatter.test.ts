@@ -36,6 +36,17 @@ describe("parseFrontmatter", () => {
     expect(parsed.hasFrontmatter).toBe(false);
   });
 
+  it("reports a bare-glob alias (globs: *.py) as a finding instead of crashing", () => {
+    // Real Cursor rules in the wild write `globs: *.py`, which YAML reads as an
+    // unresolved alias. The scan must survive it.
+    const parsed = parseFrontmatter("rule.mdc", "---\nglobs: *.py\nalwaysApply: false\n---\nBody\n");
+
+    expect(parsed.diagnostics.length).toBeGreaterThan(0);
+    expect(parsed.diagnostics[0].code).toBe("AGF003");
+    expect(parsed.diagnostics[0].suggestion).toContain('"*.py"');
+    expect(parsed.data).toBeUndefined();
+  });
+
   it("handles an empty frontmatter block", () => {
     const parsed = parseFrontmatter("a.md", "---\n---\nBody");
     expect(parsed.data).toEqual({});
