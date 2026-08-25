@@ -1,10 +1,12 @@
 #!/usr/bin/env node
 /// <reference types="node" />
 import { Command } from "commander";
+import { checkCommand } from "./commands/check.js";
 import { cleanCommand } from "./commands/clean.js";
 import { diffCommand } from "./commands/diff.js";
 import { doctorCommand } from "./commands/doctor.js";
 import { initCommand } from "./commands/init.js";
+import { lintCommand } from "./commands/lint.js";
 import { migrateCommand } from "./commands/migrate.js";
 import { rollbackCommand } from "./commands/rollback.js";
 import { syncCommand } from "./commands/sync.js";
@@ -65,7 +67,39 @@ program
   .option("--verbose", "List every configuration file found")
   .action((options: { root?: string; format?: string; verbose?: boolean }) => doctorCommand(options));
 
-program.command("validate").description("Validate ai/contract.yaml schema (used in CI)").action(validateCommand);
+const collect = (val: string, prev: string[]) => prev.concat(val.split(",").map((s) => s.trim()));
+
+program
+  .command("check")
+  .description("Fast deterministic validation, suitable for pre-commit hooks and editors")
+  .option("--root <path>", "Directory to check instead of the current working directory")
+  .option("--format <format>", "Output format: human or json", "human")
+  .option("--strict", "Treat warnings as errors")
+  .action((options: { root?: string; format?: string; strict?: boolean }) => checkCommand(options));
+
+program
+  .command("validate")
+  .description("Strict deterministic validation across every layer (used in CI)")
+  .option("--root <path>", "Directory to validate instead of the current working directory")
+  .option("--format <format>", "Output format: human or json", "human")
+  .option("--target <ide>", "Check compatibility against a target, repeatable, or 'all'", collect, [] as string[])
+  .option("--strict", "Treat warnings as errors")
+  .option("--list-rules", "Print the rule set and exit")
+  .action((options: { root?: string; format?: string; target?: string[]; strict?: boolean; listRules?: boolean }) =>
+    validateCommand(options),
+  );
+
+program
+  .command("lint")
+  .description("Analyse configuration quality: drifted copies, duplication, context cost")
+  .option("--root <path>", "Directory to analyse instead of the current working directory")
+  .option("--format <format>", "Output format: human or json", "human")
+  .option("--budget <tokens>", "Always-loaded context budget, in estimated tokens")
+  .option("--similarity <ratio>", "Near-duplicate similarity threshold between 0 and 1")
+  .option("--strict", "Treat warnings as errors")
+  .action((options: { root?: string; format?: string; budget?: string; similarity?: string; strict?: boolean }) =>
+    lintCommand(options),
+  );
 
 program.command("watch").description("Watch ai/ for changes and sync automatically").action(watchCommand);
 

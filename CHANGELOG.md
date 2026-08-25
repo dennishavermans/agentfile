@@ -69,8 +69,57 @@ existing 144 tests pass untouched. See `docs/v2-architecture.md`.
   distinguish, over the 1024-character specification limit, or that never say
   when to use the skill. This measures metadata quality, not model behaviour.
 
+### Added — validation: `check`, `lint`, and a hardened `validate`
+
+The three commands are three selections over one rule set, not three
+implementations, which is what stops them from disagreeing about whether
+something is a problem. `agentfile validate --list-rules` prints the set.
+
+- **`agentfile check`** — fast deterministic validation for pre-commit hooks and
+  editors. Runs the structural and resolution layers, which are set operations
+  over data the single filesystem walk already produced: a full run takes around
+  140 ms including Node startup. No network, no model, nothing executed.
+  Supports `--root`, `--format json`, and `--strict`.
+- **`agentfile lint`** — quality analysis: copies of a rule that have drifted
+  apart, and always-loaded context measured against a budget. Deterministic and
+  local, with no embeddings and no model. Supports `--budget` and `--similarity`
+  to move the thresholds, plus `--root`, `--format json`, and `--strict`.
+- **`agentfile validate`** — now runs every implemented layer. Gains `--target`
+  (repeatable, or `all`) to check what compilation to a specific agent platform
+  would lose, `--strict`, `--format json`, `--root`, and `--list-rules`.
+- **`--strict`** promotes warnings to errors so a warning fails the build.
+  Info-level findings are deliberately left alone: they report gaps in
+  agentfile's own capability registry, and an unverified combination should not
+  fail someone's CI.
+- **Compatibility validation** — the features a repository actually uses are read
+  off the IR and checked against the capability registry, so a finding always
+  names both the feature and the target's own documentation URL. One finding per
+  target and feature, not one per node.
+- **New diagnostics** — `AGF303` unreachable configuration, `AGF304`
+  inconsistent scope, `AGF305` near-duplicate instruction. `AGF401` context
+  overload is now emitted. All documented in `docs/diagnostics.md`.
+
+### Changed
+
+- **`agentfile validate` can now fail on findings from outside the contract.**
+  The v1 behaviour is otherwise preserved exactly: when `ai/contract.yaml` is
+  present it is validated first and reported in the same words, and a schema
+  failure is still an immediate exit 1. What is new is that error-severity
+  findings elsewhere — a `.mcp.json` server that will silently fail to load, an
+  import pointing at a file that does not exist — now also fail the run. Each is
+  a real defect that generation does not skip; it silently produces empty content
+  instead. A repository whose CI passed before will only start failing if it has
+  one of them.
+- **`agentfile validate` no longer requires a contract.** A repository with an
+  `AGENTS.md` and no `ai/` directory is validated on what it has instead of
+  failing with "contract not found". A repository with an `ai/` directory still
+  requires a valid contract there, so existing contract-based CI is unaffected.
+
 ### Fixed
 
+- `agentfile doctor` and the validation commands now share one definition of
+  repository-wide duplication, instead of `doctor` carrying its own copy that
+  could drift from the rule the other commands run.
 - Duplicated instructions are now found in prose, not just in structured rules:
   text shared between instruction files is compared line by line, so the same
   rule maintained separately for Claude, Copilot, and Cursor is reported as

@@ -3,6 +3,8 @@ import {
   alwaysLoadedContext,
   analyzeSkillRouting,
   CHARACTERS_PER_TOKEN,
+  contextBudgetDiagnostics,
+  DEFAULT_CONTEXT_BUDGET_TOKENS,
   deriveDirectives,
   estimateContext,
   findInstructionOverlap,
@@ -413,5 +415,60 @@ describe("overlapDiagnostics", () => {
   it("carries machine-readable counts", () => {
     const [found] = overlapDiagnostics(overlaps);
     expect(found.data).toMatchObject({ sharedLines: 1, platforms: "agents-md,cursor" });
+  });
+});
+
+// ─── Context budget ────────────────────────────────────────────────────────
+
+describe("contextBudgetDiagnostics", () => {
+  function configurationOfSize(characters: number, file = "AGENTS.md"): AgentConfiguration {
+    const configuration = emptyConfiguration(ROOT);
+    configuration.instructions.push(instruction(file, "x".repeat(characters)));
+    return configuration;
+  }
+
+  it("reports nothing while always-loaded context is inside the budget", () => {
+    expect(contextBudgetDiagnostics(configurationOfSize(100))).toEqual([]);
+  });
+
+  it("reports AGF401 once the budget is exceeded", () => {
+    const overBudget = (DEFAULT_CONTEXT_BUDGET_TOKENS + 100) * CHARACTERS_PER_TOKEN;
+    const [found] = contextBudgetDiagnostics(configurationOfSize(overBudget));
+
+    expect(found.code).toBe("AGF401");
+    expect(found.severity).toBe("warning");
+    expect(found.data?.budgetTokens).toBe(DEFAULT_CONTEXT_BUDGET_TOKENS);
+  });
+
+  it("honours a caller-supplied budget", () => {
+    expect(contextBudgetDiagnostics(configurationOfSize(400), { budgetTokens: 10 })).toHaveLength(1);
+    expect(contextBudgetDiagnostics(configurationOfSize(400), { budgetTokens: 10_000 })).toEqual([]);
+  });
+
+  it("names the largest contributors, since a total alone is not actionable", () => {
+    const configuration = emptyConfiguration(ROOT);
+    configuration.instructions.push(instruction("small.md", "x".repeat(200)));
+    configuration.instructions.push(instruction("huge.md", "x".repeat(40_000)));
+
+    const [found] = contextBudgetDiagnostics(configuration);
+    expect(found.explanation).toContain("huge.md");
+    // Largest first.
+    expect(found.explanation?.indexOf("huge.md")).toBeLessThan(found.explanation?.indexOf("small.md") ?? -1);
+  });
+
+  it("says the figure is an estimate and the budget is not a platform limit", () => {
+    const [found] = contextBudgetDiagnostics(configurationOfSize(40_000));
+    expect(found.explanation).toContain("estimated from character length");
+    expect(found.explanation).toContain("not a limit imposed by");
+    expect(found.data?.method).toBe("characters-per-token-heuristic");
+  });
+
+  it("ignores context that only loads for specific paths", () => {
+    const configuration = emptyConfiguration(ROOT);
+    configuration.instructions.push(
+      instruction("scoped.md", "x".repeat(40_000), { applies: appliesToPaths(["src/**"]) }),
+    );
+
+    expect(contextBudgetDiagnostics(configuration)).toEqual([]);
   });
 });

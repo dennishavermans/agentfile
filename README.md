@@ -150,6 +150,43 @@ It reads `AGENTS.md`, `CLAUDE.md`, `.claude/rules/`, `.claude/skills/`, `.claude
 
 `doctor` runs no model, makes no network calls, and never executes a hook, script, or MCP command it finds. It exits non-zero on errors, so it can gate CI.
 
+### `npx @agentfile/cli check`
+Fast deterministic validation, built for pre-commit hooks and editors. A full run takes around 140 ms including Node startup.
+
+```bash
+npx @agentfile/cli check
+npx @agentfile/cli check --strict        # warnings fail the run
+npx @agentfile/cli check --format json
+```
+
+Runs the structural and resolution checks: files that will not parse, references that point at nothing, the same rule maintained in several places, glob-scoped rules that match no file, and rules whose scope differs between platforms. No network, no model, nothing executed.
+
+### `npx @agentfile/cli lint`
+Quality analysis — the things that are not wrong but are costing you.
+
+```bash
+npx @agentfile/cli lint
+npx @agentfile/cli lint --budget 2000       # tighten the context budget
+npx @agentfile/cli lint --similarity 0.75   # loosen near-duplicate detection
+```
+
+Finds copies of a rule that have **drifted apart** — exact comparison goes quiet at exactly the moment someone edits one copy and not the others — and measures always-loaded context against a budget, naming the largest contributors. Similarity is measured on words, not meaning, and the output says so.
+
+### `npx @agentfile/cli validate`
+Strict validation across every layer. Designed for CI.
+
+```bash
+npx @agentfile/cli validate
+npx @agentfile/cli validate --target claude    # what would compiling to Claude Code lose?
+npx @agentfile/cli validate --target all
+npx @agentfile/cli validate --strict
+npx @agentfile/cli validate --list-rules       # print the rule set
+```
+
+With `--target`, it checks the features your configuration uses against what that platform actually supports, and every finding cites the platform's own documentation. Without `--target` it says compatibility was not checked, rather than assuming a target and failing your build over it.
+
+`ai/contract.yaml` is still validated first and reported exactly as before, and a schema failure is still an immediate exit 1.
+
 ### `npx @agentfile/cli init`
 Interactive setup. Scaffolds `ai/contract.yaml`, agent templates, `.ai-agents.example`, and a CI workflow. Safe to run in existing projects — never overwrites existing files.
 

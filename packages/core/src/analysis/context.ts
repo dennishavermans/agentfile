@@ -11,6 +11,7 @@
  * what to cut.
  */
 
+import { type Diagnostic, diagnostic } from "../diagnostics/index.js";
 import type { AgentConfiguration, Instruction } from "../ir/index.js";
 import { ROOT_PATH } from "../paths/index.js";
 
@@ -149,4 +150,79 @@ export function analyzeSkillRouting(configuration: AgentConfiguration): SkillRou
       descriptionLength: description.length,
     };
   });
+}
+
+/**
+ * Default always-loaded context budget, in estimated tokens.
+ *
+ * No agent platform documents a maximum size for always-loaded instructions, so
+ * this is agentfile's default and nothing more — it is not a platform limit, and
+ * the diagnostic says so. It is set where always-loaded prose stops being free:
+ * roughly 16 KB of markdown, paid on every request of every session, before the
+ * agent has read a single line of code.
+ */
+export const DEFAULT_CONTEXT_BUDGET_TOKENS = 4000;
+
+/** How many of the largest contributing files a diagnostic names. */
+const LISTED_FILES = 3;
+
+export interface ContextBudgetOptions {
+  /** Estimated-token budget. Defaults to `DEFAULT_CONTEXT_BUDGET_TOKENS`. */
+  budgetTokens?: number;
+}
+
+/**
+ * AGF401 when always-loaded context exceeds its budget.
+ *
+ * The figure is an estimate and the message is explicit about that, because the
+ * decision it informs — what to delete — deserves to know how firm the number
+ * is. The largest contributors are named, since "you are over budget" without
+ * "here is what is big" is not actionable.
+ */
+export function contextBudgetDiagnostics(
+  configuration: AgentConfiguration,
+  options: ContextBudgetOptions = {},
+): Diagnostic[] {
+  const budget = options.budgetTokens ?? DEFAULT_CONTEXT_BUDGET_TOKENS;
+  const always = alwaysLoadedContext(configuration);
+  const { estimatedTokens } = always.estimate;
+
+  if (estimatedTokens <= budget) return [];
+
+  // Largest first, so the suggestion points at what is worth cutting.
+  const byFile = new Map<string, number>();
+  for (const instruction of always.instructions) {
+    const file = instruction.provenance.file;
+    byFile.set(file, (byFile.get(file) ?? 0) + instruction.body.length);
+  }
+  const largest = [...byFile]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, LISTED_FILES)
+    .map(([file, characters]) => `  ${file} — roughly ${Math.round(characters / CHARACTERS_PER_TOKEN)} tokens`);
+
+  return [
+    diagnostic({
+      code: "AGF401",
+      message: `Always-loaded context is roughly ${estimatedTokens.toLocaleString("en-US")} tokens, over the ${budget.toLocaleString("en-US")}-token budget`,
+      explanation: [
+        `${always.files.length} file${always.files.length === 1 ? "" : "s"} load in every session regardless of what is being worked on.`,
+        "Largest contributors:",
+        "",
+        ...largest,
+        "",
+        "The token figure is estimated from character length, not measured with any",
+        `target's tokenizer. The budget is agentfile's default, not a limit imposed by`,
+        "an agent platform — no platform documents one.",
+      ].join("\n"),
+      suggestion:
+        "Move the parts that only matter for specific work into path-scoped rules or skills, so they load when they are relevant instead of always.",
+      data: {
+        estimatedTokens,
+        budgetTokens: budget,
+        characters: always.estimate.characters,
+        files: always.files.length,
+        method: always.estimate.method,
+      },
+    }),
+  ];
 }

@@ -131,6 +131,27 @@ export const DIAGNOSTIC_CODES = {
     defaultSeverity: "warning",
     status: "active",
   },
+  AGF303: {
+    name: "unreachable-configuration",
+    title: "Configuration never applies",
+    band: "resolution",
+    defaultSeverity: "warning",
+    status: "active",
+  },
+  AGF304: {
+    name: "inconsistent-scope",
+    title: "Same instruction, different scope per platform",
+    band: "resolution",
+    defaultSeverity: "warning",
+    status: "active",
+  },
+  AGF305: {
+    name: "near-duplicate-instruction",
+    title: "Near-duplicate instruction",
+    band: "resolution",
+    defaultSeverity: "warning",
+    status: "active",
+  },
 
   // ─── AGF4xx — context budget ────────────────────────────────────────────
   AGF401: {
@@ -138,7 +159,7 @@ export const DIAGNOSTIC_CODES = {
     title: "Context budget exceeded",
     band: "context",
     defaultSeverity: "warning",
-    status: "reserved",
+    status: "active",
   },
 
   // ─── AGF5xx — security ──────────────────────────────────────────────────

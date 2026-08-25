@@ -51,10 +51,65 @@ npx @agentfile/cli sync
 Reads your personal `.ai-agents` file and generates the correct instruction file for each agent in its native format.
 
 ```bash
+npx @agentfile/cli check
+```
+
+Fast deterministic validation, for pre-commit hooks and editors. Around 140 ms
+including Node startup: structural and resolution checks only, over the file
+listing a single filesystem walk already produced.
+
+It reports files that will not parse, references that point at nothing, the same
+rule maintained in several places, glob-scoped rules that match no file in the
+repository, and rules whose scope differs between platforms.
+
+```bash
+npx @agentfile/cli check --strict        # warnings fail the run
+npx @agentfile/cli check --format json
+npx @agentfile/cli check --root ./apps/web
+```
+
+```bash
+npx @agentfile/cli lint
+```
+
+Quality analysis: copies of a rule that have **drifted apart**, and always-loaded
+context measured against a budget with the largest contributors named. Exact
+comparison goes quiet at exactly the moment someone edits one copy and not the
+others, which is when the configuration starts disagreeing with itself.
+
+Similarity is measured on words, not meaning — two rules that share wording are
+reported, and two that mean the same thing in different words are not. The
+output says so rather than implying more than it can deliver.
+
+```bash
+npx @agentfile/cli lint --budget 2000       # tighten the context budget
+npx @agentfile/cli lint --similarity 0.75   # loosen near-duplicate detection
+```
+
+```bash
 npx @agentfile/cli validate
 ```
 
-Validates `ai/contract.yaml` against the schema. Exits 0 or 1. Designed for CI.
+Strict validation across every layer. Exits 0 or 1. Designed for CI.
+
+`ai/contract.yaml` is validated first and reported exactly as it always was, and
+a schema failure is still an immediate exit 1.
+
+```bash
+npx @agentfile/cli validate --target claude   # what would compiling to Claude Code lose?
+npx @agentfile/cli validate --target all
+npx @agentfile/cli validate --strict          # warnings fail the run
+npx @agentfile/cli validate --list-rules      # print the rule set
+```
+
+With `--target`, agentfile checks the features your configuration actually uses
+against what that platform supports, and every finding cites the platform's own
+documentation. Without `--target` it reports that compatibility was not checked
+rather than assuming a target and failing your build over it.
+
+`--strict` promotes warnings to errors. Info-level findings stay informational:
+they report gaps in agentfile's own capability registry, and an unverified
+combination should not fail your CI.
 
 ```bash
 npx @agentfile/cli migrate --from .github/copilot-instructions.md --from CLAUDE.md

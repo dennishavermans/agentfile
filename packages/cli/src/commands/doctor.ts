@@ -13,6 +13,7 @@
 import {
   alwaysLoadedContext,
   analyzeSkillRouting,
+  configuredDirectories,
   type Diagnostic,
   type DiscoveryResult,
   discover,
@@ -21,6 +22,7 @@ import {
   formatJson,
   hasErrors,
   overlapDiagnostics,
+  repositoryResolutionDiagnostics,
   resolveForPath,
   summarize,
 } from "@agentfile/core";
@@ -46,52 +48,18 @@ function formatCount(count: number, singular: string, plural = `${singular}s`): 
   return `${count} ${count === 1 ? singular : plural}`;
 }
 
-/** Directories that carry their own configuration, so they are worth reporting on. */
-function configuredDirectories(result: DiscoveryResult): string[] {
-  const directories = new Set<string>();
-
-  for (const instruction of result.configuration.instructions) {
-    if (instruction.applies.kind === "directory" && instruction.applies.directory) {
-      directories.add(instruction.applies.directory);
-    }
-  }
-  for (const directive of result.configuration.directives) {
-    if (directive.applies.kind === "directory" && directive.applies.directory) {
-      directories.add(directive.applies.directory);
-    }
-  }
-
-  return [...directories].sort();
-}
-
 /**
  * Duplicate detection across the whole repository.
  *
- * The resolver answers per path, so doctor asks it about the root plus one
- * representative path inside each configured directory. That covers every
- * combination of sources that can actually co-apply, without walking every file
- * in the repository.
+ * Both halves come from core, which is what keeps `doctor` and `check` from
+ * disagreeing about what counts as duplication: declared rules that co-apply at
+ * some path, and text repeated between instruction files.
  */
 function repositoryWideDiagnostics(result: DiscoveryResult): Diagnostic[] {
-  const probes = ["", ...configuredDirectories(result).map((directory) => `${directory}/probe`)];
-  const seen = new Set<string>();
-  const diagnostics: Diagnostic[] = [];
-
-  for (const probe of probes) {
-    for (const item of resolveForPath(result.configuration, probe).diagnostics) {
-      // The same duplicate surfaces at every path it reaches; report it once.
-      const key = `${item.code}:${item.location?.file}:${item.location?.line}:${item.message}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      diagnostics.push(item);
-    }
-  }
-
-  // Text shared between instruction files, which is the duplication that
-  // matters most: the same rule maintained separately per platform.
-  diagnostics.push(...overlapDiagnostics(findInstructionOverlap(result.configuration.instructions)));
-
-  return diagnostics;
+  return [
+    ...repositoryResolutionDiagnostics(result.configuration),
+    ...overlapDiagnostics(findInstructionOverlap(result.configuration.instructions)),
+  ];
 }
 
 function reportInventory(result: DiscoveryResult, verbose: boolean): void {
@@ -172,7 +140,7 @@ function reportContextBudget(result: DiscoveryResult): void {
 }
 
 function reportScopes(result: DiscoveryResult): void {
-  const directories = configuredDirectories(result);
+  const directories = configuredDirectories(result.configuration);
   if (!directories.length) return;
 
   logger.title("Directory-scoped configuration");

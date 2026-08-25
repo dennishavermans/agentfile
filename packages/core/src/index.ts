@@ -110,26 +110,51 @@ export {
 // ─── Analysis ──────────────────────────────────────────────────────────────
 export type {
   AlwaysLoadedContext,
+  ContextBudgetOptions,
   ContextEstimate,
   DeriveOptions,
+  InstructionLine,
   InstructionOverlap,
+  LineOptions,
+  NearDuplicateOptions,
+  NearDuplicatePair,
+  NearDuplicateResult,
   OverlapOptions,
+  ScopeMismatch,
+  ScopeOptions,
   SkillRoutingSignal,
 } from "./analysis/index.js";
 export {
   alwaysLoadedContext,
   analyzeSkillRouting,
   CHARACTERS_PER_TOKEN,
+  contextBudgetDiagnostics,
+  DEFAULT_CONTEXT_BUDGET_TOKENS,
   deriveAllDirectives,
   deriveDirectives,
+  describeScope,
   estimateContext,
   findInstructionOverlap,
+  findNearDuplicateInstructions,
+  findScopeMismatches,
+  hasNegation,
+  instructionLines,
   isAlwaysLoaded,
+  isIgnorableLine,
+  jaccardSimilarity,
   MAX_DESCRIPTION_LENGTH,
   MAX_SKILL_NAME_LENGTH,
+  MAXIMUM_COMPARISONS,
+  MINIMUM_CONTENT_TOKENS,
   MINIMUM_OVERLAP_LINE_LENGTH,
+  MINIMUM_SHARED_TOKENS,
+  NEAR_DUPLICATE_THRESHOLD,
+  nearDuplicateDiagnostics,
   normalizeInstructionLine,
   overlapDiagnostics,
+  scopeMismatchDiagnostics,
+  scopeSignature,
+  tokenize,
   WEAK_DESCRIPTION_LENGTH,
 } from "./analysis/index.js";
 // ─── Target capabilities ───────────────────────────────────────────────────
@@ -139,14 +164,18 @@ export type {
   CapabilityRow,
   FeatureId,
   FeatureMeta,
+  FeatureUsage,
   TargetId,
 } from "./capabilities/index.js";
 export {
   CAPABILITIES,
   capability,
+  compatibilityDiagnostics,
   diagnoseCapability,
   FEATURES,
   featureMeta,
+  featuresUsed,
+  groupFeatureUsage,
   KNOWN_TARGETS,
   supports,
   targetCapabilities,
@@ -287,10 +316,40 @@ export type {
   ExclusionReason,
   Explanation,
   MatchReason,
+  ReachabilityOptions,
   ResolutionRank,
   ResolveOptions,
 } from "./resolver/index.js";
-export { explainInstruction, normalizeDirectiveText, resolveForPath, SCOPE_RANK } from "./resolver/index.js";
+export {
+  configuredDirectories,
+  deadPatterns,
+  explainInstruction,
+  normalizeDirectiveText,
+  probePaths,
+  repositoryResolutionDiagnostics,
+  resolveForPath,
+  SCOPE_RANK,
+  unreachableDiagnostics,
+} from "./resolver/index.js";
+// ─── Validation ────────────────────────────────────────────────────────────
+export type {
+  Rule,
+  RuleContext,
+  RuleResult,
+  RuleSkip,
+  ValidationLayer,
+  ValidationOptions,
+  ValidationResult,
+} from "./validation/index.js";
+export {
+  CHECK_LAYERS,
+  findRule,
+  IMPLEMENTED_LAYERS,
+  LINT_LAYERS,
+  RULES,
+  runValidation,
+  selectRules,
+} from "./validation/index.js";
 // ─── YAML source handling ──────────────────────────────────────────────────
 export type { YamlSource } from "./yaml/index.js";
 export { formatIssuePath, loadYamlSource, schemaIssuesToDiagnostics } from "./yaml/index.js";

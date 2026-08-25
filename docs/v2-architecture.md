@@ -533,8 +533,8 @@ backward compatibility verified.
 | **0** | this document | **done** |
 | **1** | `diagnostics/`, `paths/`, `ir/`, `capabilities/`, `resolver/`, `adapters/contract-v1`, tests | **done** — see §11 |
 | 2 | `discovery/` + `agentfile doctor` | **done** — see §12 |
-| 3 | `agentfile check` / hardened `validate` / `lint` on shared primitives | next |
-| 4 | `agentfile context <path>` / `agentfile explain` | planned |
+| 3 | `agentfile check` / hardened `validate` / `lint` on shared primitives | **done** — see §13 |
+| 4 | `agentfile context <path>` / `agentfile explain` | next |
 | 5 | `SKILL.md` parsing, validation, linting, analysis | planned |
 | 6 | `agentfile audit` (static only) | planned |
 | 7 | compilers over the IR; `generator.ts` refactored to a compiler host | planned |
@@ -732,7 +732,152 @@ now *read*; validating it against the specification is Phase 5), P11, P12.
 
 ---
 
-## 13. Sources
+## 13. Phase 3 as built
+
+### 13.1 One rule set, three selections
+
+`check`, `validate`, and `lint` are not three implementations. They are three
+selections over one rule set — `packages/core/src/validation/` — which is what
+stops them disagreeing about whether something is a problem. ESLint's flat
+config works the same way, for the same reason.
+
+The layers are the rework brief's own separation of responsibility (§12), so the
+selection needed no invention:
+
+| Layer | Rules | `check` | `lint` | `validate` |
+|---|---|:-:|:-:|:-:|
+| structural | `configuration-integrity` | ✓ | | ✓ |
+| resolution | `duplicate-instructions`, `unreachable-configuration`, `inconsistent-scope` | ✓ | | ✓ |
+| quality | `near-duplicate-instructions`, `context-budget` | | ✓ | ✓ |
+| compatibility | `target-compatibility` | | | ✓ |
+| security | *(Phase 6)* | | | |
+| behavioral | *(Phase 8)* | | | |
+
+`security` and `behavioral` are declared with no rules rather than left out. A
+selected layer with nothing in it reports itself as empty, because a layer that
+silently does not exist is worse than one that says so.
+
+Four invariants are pinned by test rather than by convention:
+
+* rule ids are unique and kebab-case
+* a rule only claims codes that exist in the registry
+* a rule only claims `active` codes, never `reserved` ones
+* **every active code is claimed by some rule** — so a code cannot become
+  emitted-by-nobody as the rule set moves
+
+### 13.2 A rule computes nothing itself
+
+Each rule is a thin composition over a primitive that already exists and is
+already tested. A rule decides *when* a finding is reported, never *how* it is
+computed. That constraint is what keeps a second definition of duplication or
+reachability from appearing: `duplicate-instructions` calls the resolver and the
+overlap analysis, and has no comparison logic of its own.
+
+The same move retired a duplication introduced in Phase 2. `doctor` had its own
+copy of "resolve the root plus one probe per configured directory, then
+deduplicate"; that is now `repositoryResolutionDiagnostics` in core, and `doctor`
+calls it. Two commands, one definition.
+
+### 13.3 New diagnostics
+
+| Code | What it catches | Why it is deterministic |
+|---|---|---|
+| `AGF303` | glob-scoped configuration no file matches | set intersection against the scan's file list, using the resolver's own matcher |
+| `AGF304` | shared text whose applicability differs per platform | the text is already known to be shared, so the only question is whether the two IR nodes' `Applicability` agree |
+| `AGF305` | copies of a rule that have drifted apart | token-set Jaccard over normalised lines |
+| `AGF401` | always-loaded context over budget | now emitted; was reserved |
+
+`AGF304` needed one non-obvious decision: `always` and a directory scope of the
+repository root canonicalise to the same signature. Everything is inside the
+root, so they are one statement — and without that, every repository with both a
+root `AGENTS.md` and a root `CLAUDE.md` would report a mismatch that does not
+exist.
+
+### 13.4 Similarity: exact Jaccard, not MinHash
+
+The brief lists MinHash among the candidate techniques (§12). It was not used,
+deliberately. MinHash exists to *approximate* Jaccard when a corpus is too large
+to compare pairwise; an instruction corpus is hundreds of lines. Approximating
+here would add error for no saving. So Jaccard is computed exactly, and the
+pairwise cost is controlled the honest way instead — an inverted token index, so
+lines with nothing in common are never compared, plus a comparison budget that
+*reports itself* when reached rather than quietly returning fewer findings.
+
+Three limits are enforced in code and stated in every finding:
+
+* **Words, not meaning.** "Use pnpm" and "npm is forbidden" share no tokens and
+  are never paired. Paraphrase detection needs embeddings, which the brief keeps
+  optional.
+* **Polarity is never crossed.** A pair whose negation markers differ is skipped.
+  Those lines may genuinely contradict each other, and calling a contradiction a
+  duplicate would send a developer to delete one of them — the worst possible
+  outcome for this analysis. The stopword list therefore excludes every negation
+  and every modal.
+* **Cross-file only.** A file repeating itself is a lint concern about that file.
+
+The 0.6 threshold was chosen against real drift, not picked round: *"Use pnpm as
+the package manager"* against *"...never npm"* scores 0.67, and *"Never commit
+secrets to the repository"* against *"...to this repo"* scores 0.60. It is
+configurable with `--similarity`.
+
+### 13.5 Compatibility only answers a question that was asked
+
+`featuresUsed` reads the capabilities a repository relies on straight off the IR,
+so a new discovery adapter contributes usages without that file changing. Those
+are checked against the capability registry, and every finding carries the
+target's own documentation URL.
+
+The compatibility layer runs **only when `--target` is named**. Inferring targets
+from the platforms discovered was implemented and then rejected: a repository
+with an `AGENTS.md` and a `.claude/skills/` directory would infer `agents-md`,
+and `agents-md` cannot express skills, so a CI build would fail over a target
+nobody was compiling to. "Will compiling to X lose behaviour" is only a question
+once X is named. Without a target the rule reports that it did not run.
+
+Findings are one per target and feature, not one per node — thirty skills against
+a target with no skill concept is one clear error, not thirty identical ones.
+
+### 13.6 `--strict`
+
+`--strict` promotes warnings to errors. Infos are deliberately untouched: the
+info-level codes report unverified platform behaviour, so `validate --target all
+--strict` would otherwise fail on gaps in *agentfile's own* registry rather than
+on anything wrong with the repository.
+
+### 13.7 Backward compatibility
+
+`validate` predates these layers and is wired into the CI workflow `init`
+generates, so its v1 behaviour is preserved and verified by diffing against the
+stashed implementation on the same fixture:
+
+* the title, the four success lines, and their wording are byte-identical
+* a contract that fails its schema is still an immediate exit 1, before anything
+  else runs
+* a repository with an `ai/` directory still requires a valid contract there
+
+Two changes are intentional and are called out in the CHANGELOG:
+
+1. **Error-severity findings from outside the contract can now fail the run.**
+   Each is a real defect — an MCP server that will silently fail to load, an
+   import pointing at a missing file — and generation does not skip those, it
+   silently produces empty content. A previously-passing repository starts
+   failing only if it has one.
+2. **A contract is no longer required.** A repository with an `AGENTS.md` and no
+   `ai/` directory is validated on what it has, instead of failing with
+   "contract not found".
+
+### 13.8 Measured
+
+`check` on this repository and on the messy fixture: **≈140 ms** including Node
+startup, one filesystem walk, no network, no model. That is the number that makes
+the pre-commit claim in §30 of the brief true rather than aspirational.
+
+562 tests (487 core, 75 CLI). Build and typecheck clean; lint unchanged from
+baseline.
+
+---
+
+## 14. Sources
 
 - <https://agents.md/>
 - <https://code.claude.com/docs/en/memory>
