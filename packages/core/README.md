@@ -92,6 +92,80 @@ Backup and restore generated files:
 - `restoreBackup(root, entries)`
 - `listBackups(root)`
 
+## v2 API (normalized configuration)
+
+The v1 API above is unchanged and remains fully supported. Alongside it, core
+exposes the deterministic v2 layers: a normalized representation of agent
+configuration, a resolution engine, and stable diagnostics. See
+[`docs/v2-architecture.md`](https://github.com/dennishavermans/agentfile/blob/main/docs/v2-architecture.md).
+
+### Resolve what applies to a path
+
+```typescript
+import { loadConfigurationFromContract, resolveForPath, formatHuman } from '@agentfile/core'
+
+const { configuration, diagnostics } = loadConfigurationFromContract({ root: process.cwd() })
+
+const effective = resolveForPath(configuration, 'apps/mobile/src/Login.tsx')
+
+for (const entry of effective.directives) {
+  const { file, line } = entry.node.provenance
+  console.log(`${entry.node.text}`)
+  console.log(`  from ${file}:${line} — ${entry.reason.detail}`)
+}
+
+// Considered but not applied, with the reason why.
+console.log(effective.excluded)
+
+console.log(formatHuman([...diagnostics, ...effective.diagnostics]))
+```
+
+Instructions and directives come back ordered least- to most-specific, so the
+last one wins an override and the whole list is the concatenation order.
+
+### Diagnostics
+
+Findings carry a stable `AGFxxx` code, a severity, a position, an explanation,
+and a suggested fix. Match on codes, never on message text — see
+[`docs/diagnostics.md`](https://github.com/dennishavermans/agentfile/blob/main/docs/diagnostics.md).
+
+```typescript
+import { formatJson, hasErrors, summarize } from '@agentfile/core'
+
+process.stdout.write(formatJson(diagnostics))   // versioned, deterministic
+console.log(summarize(diagnostics))             // { errors, warnings, infos, total }
+process.exitCode = hasErrors(diagnostics) ? 1 : 0
+```
+
+### Target capabilities
+
+Every capability claim is attributed to the target's own documentation.
+Unverified combinations report as `unknown` rather than being guessed.
+
+```typescript
+import { capability, diagnoseCapability, supports } from '@agentfile/core'
+
+supports('cursor', 'instructions.path-scoped')      // true
+capability('claude', 'instructions.agents-md').level // 'emulated'
+capability('agents-md', 'skills').level              // 'unsupported'
+
+// Report what a compilation would lose, instead of dropping it silently.
+const finding = diagnoseCapability('agents-md', 'skills', { subject: 'skill "deploy"' })
+```
+
+### Testing against in-memory fixtures
+
+The layers take a `FileSystem`, so fixture repositories need no temp directories:
+
+```typescript
+import { loadConfigurationFromContract, memoryFileSystem } from '@agentfile/core'
+
+const result = loadConfigurationFromContract({
+  root: '/repo',
+  fs: memoryFileSystem({ '/repo/ai/contract.yaml': contractYaml }),
+})
+```
+
 ## Benchmark
 
 Use the built-in benchmark to measure template rendering and dry-run generation performance against a larger synthetic contract:

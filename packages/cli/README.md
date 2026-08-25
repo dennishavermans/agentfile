@@ -2,9 +2,35 @@
 
 > One contract. Every AI agent. Zero clutter.
 
-CLI for [agentfile](https://github.com/dennishavermans/agentfile) — scaffold, migrate, generate, validate, diff, clean, and rollback AI agent instruction files from a single `contract.yaml`.
+CLI for [agentfile](https://github.com/dennishavermans/agentfile) — analyse existing AI agent configuration, and scaffold, migrate, generate, validate, diff, clean, and rollback instruction files from a single `contract.yaml`.
 
 ## Usage
+
+```bash
+npx @agentfile/cli doctor
+```
+
+Analyses the AI agent configuration your repository already has — `AGENTS.md`,
+`CLAUDE.md`, `.claude/rules/`, `.claude/skills/`, `.claude/agents/`,
+`.cursor/rules/`, `.github/copilot-instructions.md`,
+`.github/instructions/`, and `.mcp.json`.
+
+You do not need to adopt agentfile first. `doctor` reads, reports, and changes
+nothing: it runs no model, makes no network calls, and never executes a hook,
+script, or MCP command it finds.
+
+It reports what configuration exists and where, how much context loads in every
+session, which rules are duplicated across platforms, skills whose description
+is too thin for an agent to route on, and misconfigurations such as an MCP
+server that will silently fail to load.
+
+```bash
+npx @agentfile/cli doctor --verbose        # list every file found
+npx @agentfile/cli doctor --format json    # machine-readable, for CI
+npx @agentfile/cli doctor --root ./apps/web
+```
+
+Exits non-zero when it finds an error, so it can gate CI.
 
 ```bash
 npx @agentfile/cli init

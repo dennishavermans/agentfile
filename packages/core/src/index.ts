@@ -88,3 +88,209 @@ export {
   OverrideSchema,
   SkillSchema,
 } from "./schema.js";
+
+// ═══════════════════════════════════════════════════════════════════════════
+// v2 layers
+//
+// Everything above is the v1 API and stays byte-compatible. Everything below is
+// additive: the normalized representation and the deterministic layers built on
+// it. See docs/v2-architecture.md.
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ─── Adapters ──────────────────────────────────────────────────────────────
+export type { ContractAdapterOptions, LoadResult } from "./adapters/index.js";
+export {
+  CONTRACT_PATH,
+  checkFileReferences,
+  contractToConfiguration,
+  loadConfigurationFromContract,
+  OVERRIDE_PATH,
+  overrideToInstructions,
+} from "./adapters/index.js";
+// ─── Analysis ──────────────────────────────────────────────────────────────
+export type {
+  AlwaysLoadedContext,
+  ContextEstimate,
+  DeriveOptions,
+  InstructionOverlap,
+  OverlapOptions,
+  SkillRoutingSignal,
+} from "./analysis/index.js";
+export {
+  alwaysLoadedContext,
+  analyzeSkillRouting,
+  CHARACTERS_PER_TOKEN,
+  deriveAllDirectives,
+  deriveDirectives,
+  estimateContext,
+  findInstructionOverlap,
+  isAlwaysLoaded,
+  MAX_DESCRIPTION_LENGTH,
+  MAX_SKILL_NAME_LENGTH,
+  MINIMUM_OVERLAP_LINE_LENGTH,
+  normalizeInstructionLine,
+  overlapDiagnostics,
+  WEAK_DESCRIPTION_LENGTH,
+} from "./analysis/index.js";
+// ─── Target capabilities ───────────────────────────────────────────────────
+export type {
+  CapabilityCheckContext,
+  CapabilityLevel,
+  CapabilityRow,
+  FeatureId,
+  FeatureMeta,
+  TargetId,
+} from "./capabilities/index.js";
+export {
+  CAPABILITIES,
+  capability,
+  diagnoseCapability,
+  FEATURES,
+  featureMeta,
+  KNOWN_TARGETS,
+  supports,
+  targetCapabilities,
+} from "./capabilities/index.js";
+// ─── Diagnostics ───────────────────────────────────────────────────────────
+export type {
+  CodeStatus,
+  Diagnostic,
+  DiagnosticBand,
+  DiagnosticCode,
+  DiagnosticCodeMeta,
+  DiagnosticInput,
+  DiagnosticReport,
+  DiagnosticSummary,
+  HumanFormatOptions,
+  Location,
+  RelatedLocation,
+  Severity,
+} from "./diagnostics/index.js";
+export {
+  allDiagnosticCodes,
+  buildReport,
+  DIAGNOSTIC_CODES,
+  DIAGNOSTIC_REPORT_VERSION,
+  diagnostic,
+  diagnosticMeta,
+  formatHuman,
+  formatJson,
+  hasErrors,
+  sortDiagnostics,
+  summarize,
+} from "./diagnostics/index.js";
+// ─── Discovery ─────────────────────────────────────────────────────────────
+export type {
+  DiscoveredInstructions,
+  DiscoveredMcpServers,
+  DiscoveredSkills,
+  DiscoveredSubagents,
+  DiscoverOptions,
+  DiscoveryResult,
+  RepositoryScan,
+  ScanOptions,
+} from "./discovery/index.js";
+export {
+  checkInstructionImports,
+  DEFAULT_IGNORED_DIRECTORIES,
+  discover,
+  discoverAgentsMd,
+  discoverClaudeMd,
+  discoverClaudeRules,
+  discoverCopilotInstructions,
+  discoverCursorRules,
+  discoverLegacyCursorRules,
+  discoverMcpServers,
+  discoverSkills,
+  discoverSubagents,
+  filesNamed,
+  filesUnder,
+  findImports,
+  governedDirectory,
+  SKILL_DIRECTORIES,
+  SKILL_SPEC_FIELDS,
+  scanRepository,
+} from "./discovery/index.js";
+// ─── Filesystem port ───────────────────────────────────────────────────────
+export type { DirectoryEntry, FileSystem } from "./fs/index.js";
+export { memoryFileSystem, nodeFileSystem } from "./fs/index.js";
+// ─── Intermediate representation ───────────────────────────────────────────
+export type {
+  AgentConfiguration,
+  Applicability,
+  ArtifactEntry,
+  ConfigOrigin,
+  ConfigScope,
+  Directive,
+  DocEntry,
+  HookEntry,
+  Instruction,
+  McpServerEntry,
+  McpTransport,
+  PermissionRule,
+  PlatformId,
+  ProjectMetadata,
+  Provenance,
+  SkillEntry,
+  SkillResource,
+  SkillResourceKind,
+  SourceFile,
+  SubagentEntry,
+} from "./ir/index.js";
+export {
+  ALWAYS,
+  appliesToDirectory,
+  appliesToPaths,
+  countNodes,
+  emptyConfiguration,
+  IR_VERSION,
+  MANUAL,
+  MODEL_SELECTED,
+  mergeConfigurations,
+  nodeId,
+  slugify,
+} from "./ir/index.js";
+// ─── Frontmatter parsing ───────────────────────────────────────────────────
+export type { ParsedFrontmatter } from "./parsers/index.js";
+export {
+  booleanField,
+  extraFields,
+  globListField,
+  listField,
+  mapField,
+  parseFrontmatter,
+  stringField,
+} from "./parsers/index.js";
+// ─── Path matching ─────────────────────────────────────────────────────────
+export type { GlobSpecificity } from "./paths/index.js";
+export {
+  ancestorDirectories,
+  compareGlobSpecificity,
+  dirnameOf,
+  expandDirectoryPattern,
+  globSpecificity,
+  isWithin,
+  matchesAnyPattern,
+  matchesPattern,
+  matchingPatterns,
+  normalizePath,
+  pathDepth,
+  ROOT_PATH,
+  sortByGlobSpecificity,
+  splitGlobList,
+} from "./paths/index.js";
+// ─── Resolution ────────────────────────────────────────────────────────────
+export type {
+  Applied,
+  EffectiveConfiguration,
+  Excluded,
+  ExclusionReason,
+  Explanation,
+  MatchReason,
+  ResolutionRank,
+  ResolveOptions,
+} from "./resolver/index.js";
+export { explainInstruction, normalizeDirectiveText, resolveForPath, SCOPE_RANK } from "./resolver/index.js";
+// ─── YAML source handling ──────────────────────────────────────────────────
+export type { YamlSource } from "./yaml/index.js";
+export { formatIssuePath, loadYamlSource, schemaIssuesToDiagnostics } from "./yaml/index.js";

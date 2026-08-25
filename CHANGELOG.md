@@ -7,6 +7,83 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [Unreleased]
+
+### Added — v2 foundation (`@agentfile/core`)
+
+The first phase of the v2 rework. Everything here is **additive**: the v1 API,
+CLI commands, generated output, and manifest format are unchanged, and the
+existing 144 tests pass untouched. See `docs/v2-architecture.md`.
+
+- **Diagnostics** — stable `AGFxxx` code registry with severities, positions,
+  explanations, and suggested fixes. Two formatters: human-readable, and a
+  versioned deterministic JSON envelope for CI and editors. Documented in
+  `docs/diagnostics.md`, kept in sync by a test.
+- **Normalized IR** — a platform-neutral representation of instructions,
+  directives, skills, subagents, hooks, MCP servers, permissions, artifacts, and
+  docs. Every node carries provenance (file, line, platform, scope, origin).
+- **Resolver** — one deterministic implementation answering what configuration
+  applies to a path, why it applies, what outranks it, and what was excluded and
+  for what reason. Ordering is scope, then directory depth, then specificity
+  tier, then pattern specificity, then declaration order.
+- **Path matching** — normalisation, ancestor chains, and glob matching with a
+  documented specificity order, built on Node's `path.matchesGlob` so no
+  third-party matcher is required.
+- **Capability registry** — 41 rows across Claude Code, Copilot, Cursor, plain
+  AGENTS.md, and Codex, each attributed to a documentation URL. Unverified
+  combinations report as `unknown` rather than being guessed.
+- **Position-aware YAML loading** — schema violations become located diagnostics
+  instead of pre-formatted strings, so consumers no longer re-parse messages to
+  find a line number.
+- **Filesystem port** — `FileSystem` with real and in-memory implementations,
+  making fixture-repository tests possible without temp directories.
+- **Contract v1 adapter** — the existing `ai/contract.yaml` becomes a source
+  feeding the IR, so nothing about the v1 format is deprecated or rewritten.
+
+### Added — discovery and `agentfile doctor`
+
+- **`agentfile doctor`** — analyses the AI agent configuration a repository
+  already has, with no setup and no adoption required. Reports what
+  configuration exists per platform, how much context loads in every session,
+  rules duplicated across platforms, skills whose description is too thin to
+  route on, and misconfigurations that would otherwise fail silently. Supports
+  `--verbose`, `--format json`, and `--root`. Exits non-zero on errors.
+  Runs no model, makes no network calls, and never executes a hook, script, or
+  MCP command it finds.
+- **Discovery** — reads `AGENTS.md` (root and nested), `CLAUDE.md`,
+  `.claude/CLAUDE.md`, `CLAUDE.local.md`, `.claude/rules/`, `.claude/skills/`,
+  `.claude/agents/`, `.cursor/rules/`, `.cursorrules`, `.cursor/skills/`,
+  `.github/copilot-instructions.md`, `.github/instructions/*.instructions.md`,
+  `.github/skills/`, `.agents/skills/`, and `.mcp.json`. Every format is mapped
+  from its own published documentation; unverified behaviour is reported as
+  unknown rather than assumed.
+- **Repository scanning** — one bounded walk shared by every adapter, which
+  skips generated and vendored directories, does not follow symlinked
+  directories, and reports truncation instead of hanging on a pathological tree.
+- **Frontmatter parsing** — a single parser for every markdown agent format,
+  with brace-aware splitting of `paths`, `globs`, and `applyTo` glob lists.
+- **Context budget analysis** — always-loaded context measured exactly in
+  characters and lines, with a token figure explicitly labelled as an estimate
+  and its method named.
+- **Skill routing signals** — flags descriptions that are missing, too short to
+  distinguish, over the 1024-character specification limit, or that never say
+  when to use the skill. This measures metadata quality, not model behaviour.
+
+### Fixed
+
+- Duplicated instructions are now found in prose, not just in structured rules:
+  text shared between instruction files is compared line by line, so the same
+  rule maintained separately for Claude, Copilot, and Cursor is reported as
+  `AGF302` with each file's own line number.
+- Broken `content_file` and `docs[].file` references are now reported as
+  `AGF004` errors. Previously a typo silently produced empty content in every
+  developer's generated output.
+- Instruction-file imports that point at a missing path are reported as
+  `AGF004`. A missing import target silently drops the instructions the file
+  promises, with no error from the agent.
+
+---
+
 ## [0.4.0] — 2026-04-08
 
 ### Added

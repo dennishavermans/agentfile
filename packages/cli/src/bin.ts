@@ -3,6 +3,7 @@
 import { Command } from "commander";
 import { cleanCommand } from "./commands/clean.js";
 import { diffCommand } from "./commands/diff.js";
+import { doctorCommand } from "./commands/doctor.js";
 import { initCommand } from "./commands/init.js";
 import { migrateCommand } from "./commands/migrate.js";
 import { rollbackCommand } from "./commands/rollback.js";
@@ -55,6 +56,14 @@ program
   .description("Generate agent instruction files from ai/contract.yaml")
   .option("--dry-run", "Render templates without writing files")
   .action((options) => syncCommand({ dryRun: options.dryRun }));
+
+program
+  .command("doctor")
+  .description("Analyse the AI agent configuration already present in this repository")
+  .option("--root <path>", "Directory to analyse instead of the current working directory")
+  .option("--format <format>", "Output format: human or json", "human")
+  .option("--verbose", "List every configuration file found")
+  .action((options: { root?: string; format?: string; verbose?: boolean }) => doctorCommand(options));
 
 program.command("validate").description("Validate ai/contract.yaml schema (used in CI)").action(validateCommand);
 

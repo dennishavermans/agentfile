@@ -1,11 +1,13 @@
 node_modules/
 dist/
 *.tsbuildinfo
+REWORK.md
 
 # agentfile generated files
 .ai-agents
 AGENTS.md
 CLAUDE.md
+.claude/
 .github/copilot-instructions.md
 .cursor/
 .windsurfrules

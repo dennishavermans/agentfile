@@ -131,6 +131,25 @@ Add to `package.json`:
 
 ## Commands
 
+### `npx @agentfile/cli doctor`
+Analyses the AI agent configuration your repository already has — no setup required, nothing written to disk.
+
+```bash
+npx @agentfile/cli doctor
+npx @agentfile/cli doctor --verbose      # list every file found
+npx @agentfile/cli doctor --format json  # machine-readable, for CI
+```
+
+It reads `AGENTS.md`, `CLAUDE.md`, `.claude/rules/`, `.claude/skills/`, `.claude/agents/`, `.cursor/rules/`, `.github/copilot-instructions.md`, `.github/instructions/`, and `.mcp.json`, then reports:
+
+- what configuration exists, per platform, and where it lives
+- how much context loads into **every** session (an estimate, clearly labelled)
+- rules duplicated across platforms — the drift the rest of agentfile prevents
+- skills whose description is too thin for an agent to route on
+- misconfigurations such as an MCP server that will silently fail to load, or an instruction file importing a path that does not exist
+
+`doctor` runs no model, makes no network calls, and never executes a hook, script, or MCP command it finds. It exits non-zero on errors, so it can gate CI.
+
 ### `npx @agentfile/cli init`
 Interactive setup. Scaffolds `ai/contract.yaml`, agent templates, `.ai-agents.example`, and a CI workflow. Safe to run in existing projects — never overwrites existing files.
 

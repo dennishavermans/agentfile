@@ -1,0 +1,746 @@
+# Agentfile v2 — Architecture Audit and Direction
+
+> **Status:** Phase 0 deliverable (architecture audit).
+> **Scope:** describes the repository as it actually exists at `0.4.0`, the architectural
+> problems found, the proposed v2 direction, and the incremental migration strategy.
+> **Source of truth for intent:** `REWORK.md`. This document is the source of truth for
+> *what the code currently is* and *what we will change*.
+
+---
+
+## 1. Baseline verification
+
+Everything below was verified against a clean checkout before any v2 work started.
+
+| Check | Command | Result |
+|---|---|---|
+| Tests | `npm test` | 144 passing (core 106, cli 38) |
+| Build | `npm run build` | all 5 packages build |
+| Typecheck | `npm run typecheck` | clean |
+| Lint | `npm run lint` | 3 warnings, 47 infos, 0 errors |
+| Node | `engines` | `>=24.0.0` (verified on v26.4.0) |
+
+The baseline is green. Every phase below must keep it green.
+
+---
+
+## 2. Current architecture
+
+### 2.1 Workspace layout
+
+```text
+agentfile/  (npm workspaces, private root)
+├── packages/core        @agentfile/core        0.4.0      1,228 LOC src
+├── packages/cli         @agentfile/cli         0.4.0      1,670 LOC src
+├── packages/agentfile   @agentfile/agentfile   0.4.0          1 file (bin re-export)
+├── packages/ui          @agentfile/ui          0.1.0-beta.0   380 LOC server + React app
+└── packages/extension   agentfile (vsix)       0.1.0      1,224 LOC src
+```
+
+Dependency graph today:
+
+```text
+                    ┌──────────────────┐
+                    │ @agentfile/core  │  zod, yaml
+                    └────────┬─────────┘
+            ┌────────────────┼────────────────┬──────────────────┐
+            │                │                │                  │
+   ┌────────▼───────┐ ┌──────▼──────┐  ┌──────▼───────┐  ┌───────▼────────┐
+   │ @agentfile/cli │ │ @agentfile/ │  │  extension   │  │ (external      │
+   │  commander     │ │ ui  express │  │  vscode api  │  │  consumers)    │
+   └────────┬───────┘ └─────────────┘  └──────┬───────┘  └────────────────┘
+            │                ▲                │
+            │ depends on ────┘                │ shells out to CLI binary
+            │                                 │ (extension.ts buildCliCommand)
+   ┌────────▼──────────────┐                  │
+   │ @agentfile/agentfile  │◄─────────────────┘
+   │ (published wrapper)   │
+   └───────────────────────┘
+```
+
+Note the cycle-ish shape: `cli` depends on `ui` (for the `ui` command), `ui` depends on
+`core`, and `extension` depends on `core` *and* invokes the `cli` binary as a subprocess.
+
+### 2.2 Core modules
+
+| File | LOC | Responsibility |
+|---|---|---|
+| `packages/core/src/schema.ts` | 185 | Zod schemas for `contract.yaml`, agent `config.yaml`, `ai.override.yaml` |
+| `packages/core/src/loader.ts` | 107 | fs read + YAML parse + Zod validate; agent folder discovery |
+| `packages/core/src/renderer.ts` | 312 | `${token}` substitution, skill renderers, preserve-zones |
+| `packages/core/src/generator.ts` | 257 | orchestration, artifact expansion, file writes |
+| `packages/core/src/manifest.ts` | 277 | content hashing, ownership, drift detection, backups |
+| `packages/core/src/index.ts` | 90 | public barrel |
+
+### 2.3 Data flow today
+
+```text
+.ai-agents  (personal agent selection, one name per line)
+ai/contract.yaml            ─┐
+ai/agents/<name>/config.yaml ├─► loader.ts ──► Zod-validated objects
+ai/agents/<name>/template.md ┤
+ai.override.yaml (CWD only) ─┘
+                                     │
+                                     ▼
+                           renderer.ts  buildTokenMap()
+                           (closed token map, regex replace)
+                                     │
+                                     ▼
+                           generator.ts  writeOutput()
+                           + addMarker()  + preserve zones
+                                     │
+                                     ▼
+                    CLAUDE.md / AGENTS.md / .cursor/rules/*.mdc /
+                    .github/copilot-instructions.md / artifact files
+                                     │
+                                     ▼
+                    .agentfile-manifest.json  (hash + ownership)
+```
+
+The contract *format* and the internal *model* are the same object. There is no
+intermediate representation: `Contract` (a Zod output type) is passed straight into the
+renderer and the generator.
+
+### 2.4 CLI surface (must not regress)
+
+`init`, `migrate`, `sync`, `validate`, `watch`, `clean`, `diff`, `rollback`, `ui` —
+wired in `packages/cli/src/bin.ts`.
+
+---
+
+## 3. What is genuinely good and must be preserved
+
+1. **`manifest.ts` is the strongest module in the repo.** SHA-256 content hashing,
+   ownership classification (`owned` / `preserved` / `unmanaged`), drift detection,
+   stale-file detection, and backup/restore. This is exactly the "provenance and
+   traceability" primitive REWORK §23 asks for, already built. Reuse as-is.
+2. **Preserve zones** (`renderer.ts:248-284`) — `<!-- agentfile:preserve id="x" -->`
+   round-trips hand-written content through regeneration. A real, non-obvious feature.
+3. **Template-driven artifacts** (`schema.ts:102-133`, `generator.ts:79-175`) — the
+   `artifact_templates` map keyed by an open-ended `type` string is already an adapter
+   seam. New output kinds need no engine change.
+4. **Dynamic agent discovery** (`loader.ts:85-91`) — a new target is a new folder.
+5. **Migration parser** (`packages/cli/src/commands/migrate/parser.ts`, 260 LOC) — a
+   working heuristic markdown-section parser. This is the seed of Phase 2 discovery.
+6. **Test discipline** — 144 tests, fast, no network. Keep the bar.
+7. **Packaging** — five packages with clean publish scripts, correct `exports`, LICENSE.
+
+---
+
+## 4. Architectural problems
+
+Ranked by how much they block the v2 mission.
+
+### P1 — Platform knowledge is hardcoded inside the engine
+
+REWORK §7 requires platforms to be adapters. Today the generator special-cases them:
+
+```ts
+// packages/core/src/generator.ts:216-217
+const skillsFormat: SkillsFormat =
+  agentName === "copilot" ? "copilot" : agentName === "agents-md" ? "agents-md" : "markdown";
+
+// packages/core/src/generator.ts:229-233
+if (agentName === "cursor") {
+  const skillResults = generateCursorSkillFiles(root, contract, dryRun, markers);
+  ...
+}
+```
+
+The engine matches on agent *folder names*. Renaming `ai/agents/cursor/` to
+`ai/agents/cursor-ide/` silently stops generating per-skill `.mdc` files. Adding a
+platform that needs per-entity fan-out requires editing core.
+
+### P2 — There is no resolution engine
+
+REWORK §9 calls resolution a core primitive. Today:
+
+```ts
+// packages/core/src/generator.ts:189-191
+const contractPath  = join(root, "ai", "contract.yaml");
+const agentsDir     = join(root, "ai", "agents");
+const overridePath  = join(root, "ai.override.yaml");
+```
+
+`root` is always `process.cwd()`. Monorepo support is "cd into the package and re-run
+sync". There is no hierarchy walk, no path matching, no precedence, no inheritance, and
+no way to answer *"what applies to `apps/mobile/src/Login.tsx`?"*. `agentfile context`
+and `agentfile explain` have nothing to be built on.
+
+### P3 — No diagnostics model
+
+Errors are thrown `Error` objects with pre-formatted human strings:
+
+```ts
+// packages/core/src/loader.ts:20-28
+export class ValidationError extends Error {
+  constructor(public readonly file: string, public readonly issues: string[]) {
+    super(`Validation failed in ${file}:\n${issues.map((i) => `  • ${i}`).join("\n")}`);
+```
+
+Consequences: no stable codes, no severities, no line/column (Zod's `issue.path` is
+flattened to a string at `loader.ts:46-50`), no `--format json`, no way for the VS Code
+extension to place squiggles reliably, and no way for CI to filter by severity. The
+extension already has to re-derive positions itself (`extension/src/yaml-helpers.ts`).
+
+### P4 — Validation is schema-only, and silently tolerates broken references
+
+`agentfile validate` is one call to `loadContract` (`cli/src/commands/validate.ts:14`).
+Nothing checks that referenced files exist. Worse, the generator *silently* substitutes
+empty content for missing files:
+
+```ts
+// packages/core/src/generator.ts:147-152
+if (artifact.content_file) {
+  const bodyPath = join(root, artifact.content_file);
+  if (existsSync(bodyPath)) { body = readFileSync(bodyPath, "utf-8"); }
+}   // ← no else: a typo'd content_file produces an empty ${body}, no warning
+```
+
+`docs[].file` (`renderer.ts:185-192`) is likewise never checked for existence.
+
+### P5 — No target capability model
+
+Because every target's output is a user-authored template, agentfile cannot know that,
+say, Copilot path-specific instructions only apply to a subset of surfaces, or that a
+given target has no concept of a subagent. REWORK §12 ("compatibility validation") and
+§22 ("do not invent capabilities") need an explicit registry. There is none.
+
+### P6 — Agentfile is useless in repositories that have not adopted it
+
+`generate()` hard-requires `ai/contract.yaml`. REWORK §8/§35 make "works on an arbitrary
+messy repo" the primary adoption wedge (`agentfile doctor`). The only code that reads
+foreign formats is the CLI-local migrate parser, which is not reachable from `core`,
+`ui`, or the extension.
+
+### P7 — Three independent implementations of "is it in sync"
+
+| Location | Method |
+|---|---|
+| `packages/core/src/manifest.ts:163-178` | SHA-256 content hash vs manifest (correct) |
+| `packages/ui/server.ts:52-88` | `contract.mtimeMs > output.mtimeMs` |
+| `packages/extension/src/project-state.ts:39-63` | `contract.mtimeMs > output.mtimeMs` |
+
+The two mtime versions report drift after a no-op `touch` and miss drift when a file is
+edited and back-dated. REWORK §10 explicitly forbids this duplication.
+
+### P8 — Closed rule vocabulary leaks across five packages
+
+`rules` is fixed to exactly `coding | architecture | testing | naming`
+(`schema.ts:75-88`) and that list is re-hardcoded in `renderer.ts:233-243`,
+`cli/commands/migrate/parser.ts:6-11`, `cli/commands/migrate/yaml.ts`,
+`ui/server.ts`, `extension/src/project-state.ts:70-79`, and the UI React app. Any new
+category is a six-package change.
+
+### P9 — The `skills` schema is an invented format
+
+`SkillSchema` (`schema.ts:10-17`) defines `steps`, `expected_output`, `examples`.
+REWORK §15 is explicit: *"Do not invent a replacement for `SKILL.md`."* The Agent Skills
+standard (see §8 below) is a real, widely-adopted external spec that agentfile should
+consume as a first-class input, not shadow.
+
+### P10 — I/O is interleaved with logic
+
+`loader.ts`, `generator.ts`, and `manifest.ts` all call `fs` directly. There is no
+filesystem port, so there is no in-memory testing, no caching, and no way to make
+`agentfile check` fast on a large repo (REWORK §30).
+
+### P11 — Unknown tokens fail silently
+
+`renderTemplate` builds its regex from the *known* token keys
+(`renderer.ts:303-305`), so `${rules.codin}` is left verbatim in the output with no
+diagnostic. A typo ships to every developer's `CLAUDE.md`.
+
+### P12 — `clean` documents its own incompleteness
+
+`cli/src/commands/clean.ts:29-33` contains a comment explaining that a proper stale
+check requires re-running generation in dry-run mode, which it does not do. This is a
+symptom of P2/P3: without shared primitives, each command reimplements a partial view.
+
+---
+
+## 5. Verified platform facts (research inputs)
+
+REWORK §8 and §22 forbid inventing platform behavior. These facts were read from the
+vendors' own documentation and are the authority for the discovery and capability layers.
+Re-verify before extending any adapter — these formats move.
+
+### 5.1 `AGENTS.md` — <https://agents.md/>
+- Plain Markdown, **no frontmatter, no required structure**.
+- Placed at repo root; **nested `AGENTS.md` in subdirectories is supported**, and agents
+  read the *nearest* file in the directory tree — the closest one takes precedence.
+- Explicit user prompts override file instructions; subproject files supersede root.
+- Read by a broad set of tools; some require opt-in configuration.
+
+### 5.2 Claude Code `CLAUDE.md` — <https://code.claude.com/docs/en/memory>
+- Scopes, broadest → most specific: **managed policy** (OS-specific system path) →
+  **user** `~/.claude/CLAUDE.md` → **project** `./CLAUDE.md` *or* `./.claude/CLAUDE.md` →
+  **local** `./CLAUDE.local.md`.
+- Files in the CWD **and every ancestor directory** load at launch. Subdirectory files
+  load **on demand** when Claude reads files there.
+- **Discovered files are concatenated, not overridden.** Order is filesystem-root → CWD;
+  within a directory, `CLAUDE.local.md` is appended after `CLAUDE.md`.
+- `@path/to/file` imports: relative to the *importing file*, recursive, **max depth 4**,
+  skipped inside code spans/fences.
+- Claude Code reads `CLAUDE.md`, **not** `AGENTS.md`; the documented bridge is a
+  `@AGENTS.md` import or a symlink.
+- Guidance: **target under 200 lines** per file; files over 4 MiB are skipped.
+- `.claude/rules/*.md` — recursive discovery; optional `paths:` frontmatter (glob list)
+  scopes a rule to matching files; rules without `paths` load unconditionally.
+  Brace expansion is bounded (documented budget of 1,000 expanded patterns / 4 MiB).
+- `claudeMdExcludes` (glob list, merged across settings layers) suppresses files.
+
+### 5.3 Agent Skills / `SKILL.md` — <https://agentskills.io/specification>
+Directory: `skill-name/SKILL.md` (required) plus optional `scripts/`, `references/`,
+`assets/`. Frontmatter, with exact constraints:
+
+| Field | Required | Constraint |
+|---|---|---|
+| `name` | yes | 1–64 chars, lowercase `a-z0-9` + `-`, no leading/trailing hyphen, **no `--`**, **must match the parent directory name** |
+| `description` | yes | 1–1024 chars, non-empty; should state *what* and *when* |
+| `license` | no | license name or bundled file reference |
+| `compatibility` | no | 1–500 chars |
+| `metadata` | no | map of string → string |
+| `allowed-tools` | no | space-separated tool list (experimental) |
+
+Progressive disclosure: metadata (~100 tokens) at startup → body on activation
+(**< 5000 tokens recommended, keep `SKILL.md` under 500 lines**) → resources on demand.
+References should be relative paths, **one level deep**.
+
+Claude Code accepts the six spec fields plus its own extensions (`when_to_use`, `paths`,
+`allowed-tools`, `disallowed-tools`, `model`, `effort`, `disable-model-invocation`, …).
+Claude Code truncates `description` + `when_to_use` at **1,536 characters** in the skill
+listing. Non-spec keys are rejected by claude.ai uploads / the Skills API — a real
+portability constraint agentfile should report.
+
+### 5.4 Cursor — <https://cursor.com/docs/context/rules>
+`.cursor/rules/*.mdc`, version-controlled. Frontmatter: `description`, `globs`,
+`alwaysApply`. Four application modes: always / apply-intelligently (by description) /
+auto-attach (by glob) / manual (`@`-mention). Nested `.cursor/rules` supported;
+`AGENTS.md` supported as a metadata-free alternative, root and nested.
+
+### 5.5 GitHub Copilot — <https://docs.github.com/en/copilot/how-tos/configure-custom-instructions/add-repository-instructions>
+Three kinds: repo-wide `.github/copilot-instructions.md`; path-specific
+`.github/instructions/NAME.instructions.md` with **`applyTo`** frontmatter (comma-separated
+globs, optional `excludeAgent`); and `AGENTS.md` anywhere (nearest wins), with
+`CLAUDE.md`/`GEMINI.md` accepted at the root. Precedence: personal > repository >
+organization, but all applicable instructions are supplied together. **Path-specific
+instructions currently apply only to the Copilot cloud agent and Copilot code review** —
+a concrete `degraded`/`unsupported` capability fact.
+
+### 5.6 MCP configuration — <https://code.claude.com/docs/en/mcp>
+Project scope is `.mcp.json` at the repo root, `{ "mcpServers": { "<name>": { … } } }`.
+Entry shape: `command` + `args` + `env` for stdio; `type` (`http` / `streamable-http`
+alias / `sse` / `ws`) + `url` + `headers` for remote; optional `timeout` (ms).
+**An entry with `url` but no `type` is a configuration error** — a deterministic,
+checkable rule. Other scopes (`local`, `user`) live in `~/.claude.json`, not the repo.
+
+### 5.7 Claude Code subagents — <https://code.claude.com/docs/en/sub-agents>
+`.claude/agents/**/*.md` (project, discovered by walking up; nearest wins) and
+`~/.claude/agents/`. Required frontmatter `name` (lowercase + hyphens, **cannot contain
+`:`**) and `description`. Optional: `tools`, `disallowedTools`, `model`,
+`permissionMode`, `maxTurns`, `skills`, `mcpServers`, `hooks`, `memory`, `background`,
+`effort`, `isolation`, `color`, `initialPrompt`.
+
+---
+
+## 6. Industry patterns adopted
+
+Researched so v2 follows established tooling conventions rather than inventing them.
+
+### 6.1 ESLint flat config — per-file resolution
+<https://eslint.org/docs/latest/use/configure/configuration-files>
+
+- Configuration is an **ordered array of objects**; for a given file, *every* matching
+  object applies and they are **merged in declaration order, later wins**.
+- `files` / `ignores` are glob-based; `ignores` alone = global, `ignores` alongside other
+  keys = scoped to that object.
+- `--inspect-config` exists specifically so a developer can ask *"which config objects
+  apply to this file?"*.
+
+**Adopted:** the resolver is an ordered list of scoped nodes, merged deterministically,
+and `agentfile context <path>` is our `--inspect-config`. This also matches the
+`CLAUDE.md` concatenation semantics in §5.2 — the same mental model works for both.
+
+### 6.2 ESLint rule metadata — diagnostics design
+<https://eslint.org/docs/latest/extend/custom-rules>
+
+- `meta.type` (`problem` / `suggestion` / `layout`), `meta.docs` (incl. a URL),
+  `meta.messages` keyed by **`messageId`** so the message text can change without
+  breaking consumers, `meta.fixable`, `meta.hasSuggestions`.
+- Reports carry a location, a `messageId`, and interpolation `data` — not a
+  pre-formatted string.
+
+**Adopted:** `Diagnostic` carries a stable `code`, a `messageId`-style separation of
+identity from prose, a location, structured `data`, and an optional `suggestion`.
+Formatting is a separate concern (human formatter vs JSON formatter), exactly as ESLint
+separates rules from formatters.
+
+### 6.3 Other conventions taken as given
+- **Severity + non-zero exit** for CI (ESLint, tsc, Biome).
+- **Codes in bands** with a documented, frozen taxonomy (TypeScript `TSxxxx`,
+  Rust `Exxxx`, Ruff `E501`-style prefixes).
+- **A fast local check vs a strict CI validate** (`tsc --noEmit` vs full build;
+  `eslint --cache`).
+- **Stable machine output** as a first-class format, not a debug afterthought.
+
+---
+
+## 7. Proposed v2 architecture
+
+### 7.1 Principle: additive layers inside the existing packages
+
+We do **not** create new packages and do **not** move `loader.ts` / `renderer.ts` /
+`generator.ts` / `manifest.ts`. Their exported API stays byte-compatible. v2 adds new
+directories under `packages/core/src/` and new commands under `packages/cli/src/`.
+
+```text
+packages/core/src/
+├── schema.ts            (unchanged — contract v1 format schema)
+├── loader.ts            (unchanged)
+├── renderer.ts          (unchanged — becomes a compiler building block)
+├── generator.ts         (unchanged in Phase 1; refactored in Phase 7)
+├── manifest.ts          (unchanged)
+├── index.ts             (additive exports only)
+│
+├── diagnostics/         NEW  codes, Diagnostic type, builder, human + JSON formatters
+├── paths/               NEW  glob matching, specificity ordering, path normalization
+├── ir/                  NEW  platform-neutral intermediate representation + provenance
+├── capabilities/        NEW  target capability registry (facts from §5)
+├── resolver/            NEW  path → effective configuration, with explanation
+├── adapters/            NEW  contract v1 → IR  (Phase 1)
+├── discovery/           Phase 2  foreign-format discovery (AGENTS.md, CLAUDE.md, …)
+├── analysis/            Phase 3/5  lint + skill quality + context budget
+├── security/            Phase 6  static risk analysis
+└── compilers/           Phase 7  target adapters over the IR
+```
+
+Target pipeline (REWORK §6):
+
+```text
+discovery ─► parsers ─► IR ─► resolver ─► effective config ─► validation/analysis
+                                                                      │
+                                                        optional evaluation
+                                                                      │
+                                                                  compiler ─► native output
+```
+
+### 7.2 The IR
+
+Designed from what the repo already models plus the verified platform facts. Every node
+carries provenance, because provenance is what makes `context`, `explain`, diagnostics,
+and lossy-compilation reporting possible from one primitive.
+
+```text
+Provenance { file, line?, column?, platform, scope, origin }
+   platform : "agentfile" | "claude" | "copilot" | "cursor" | "agents-md" | "codex" | …
+   scope    : "managed" | "user" | "project" | "directory" | "local"
+   origin   : "declared" | "derived" | "imported" | "generated"
+
+AgentConfiguration
+├── instructions  Instruction[]   markdown body + applies-to (paths|always) + provenance
+├── skills        SkillEntry[]    Agent Skills shape (§5.3) + resources + provenance
+├── subagents     SubagentEntry[] name/description/tools/model + provenance
+├── hooks         HookEntry[]     event + matcher + command (never executed)
+├── mcpServers    McpServerEntry[] stdio | http | sse | ws
+├── permissions   PermissionRule[] allow/deny/ask
+├── artifacts     ArtifactEntry[]  carried over from contract v1 (open `type`)
+├── docs          DocEntry[]
+└── metadata      { project, stack, … }
+```
+
+Constraints: the IR imports nothing platform-specific; platform identity lives only in
+`Provenance.platform` and in the capability registry. A new platform = a discovery
+adapter + a compiler adapter + capability rows. No IR change.
+
+### 7.3 Diagnostics
+
+Code bands follow the taxonomy illustrated in REWORK §13 exactly, so the codes named
+there keep their meaning:
+
+| Band | Domain | Anchored by REWORK §13 |
+|---|---|---|
+| `AGF0xx` | configuration & structure | `AGF001 invalid configuration` |
+| `AGF1xx` | skills | `AGF101 invalid skill`, `AGF102 missing skill metadata` |
+| `AGF2xx` | targets & compatibility | `AGF201 unsupported target feature` |
+| `AGF3xx` | instructions & resolution | `AGF301 conflicting instructions`, `AGF302 duplicate instruction` |
+| `AGF4xx` | context budget | `AGF401 context overload` |
+| `AGF5xx` | security | `AGF501 security issue` |
+| `AGF6xx` | behavioral evaluation | `AGF601 behavioral regression` |
+
+A `Diagnostic` carries: `code`, `severity`, `message`, optional `explanation`,
+`suggestion`, `location` (file + line/col + range), `related` locations, and structured
+`data`. Two formatters ship: a human formatter that produces the REWORK §13
+"Conflict: package manager" shape, and a versioned JSON formatter for
+`--format json`.
+
+### 7.4 Resolution
+
+Deterministic, and explainable by construction. For a target path:
+
+1. normalize the path, compute its ancestor chain;
+2. select every configuration node whose scope matches (always-on, ancestor-directory,
+   or `paths`/`globs`/`applyTo` glob match);
+3. order by **scope rank, then directory depth, then declaration order** — matching both
+   ESLint's later-wins array semantics (§6.1) and Claude Code's root→leaf concatenation
+   (§5.2);
+4. return the ordered list *plus* the reason each node was selected.
+
+Merge strategy is per-kind and explicit: instructions **concatenate** (that is what the
+platforms actually do — §5.2), while single-valued settings **override** and record the
+overridden node so `explain` and `AGF301` can name both sides.
+
+### 7.5 Capabilities
+
+A registry of `(target, feature) → supported | unsupported | emulated | degraded | unknown`
+with a note and a doc URL. Seeded only from §5 facts; anything unresearched is
+`unknown`, never assumed. This is what lets `compile` report what is lost instead of
+silently dropping it.
+
+### 7.6 Filesystem port
+
+A narrow `FileSystem` interface (`readFile`, `exists`, `readDir`, `stat`) with a real
+implementation and an in-memory one. New subsystems take it as a parameter; existing
+modules keep their direct `fs` calls until Phase 7. This unlocks fixture-repo tests and
+future caching without a big-bang refactor.
+
+---
+
+## 8. Migration strategy and backward compatibility
+
+| Concern | Guarantee |
+|---|---|
+| `contract.yaml` version | stays `1`. No v2 schema is introduced until a migration path exists and is tested (REWORK §26). |
+| Existing core exports | unchanged; `index.ts` only gains exports. |
+| CLI commands | all nine keep their flags, output shape, and exit codes. New commands are added, none repurposed. |
+| Generated output | byte-identical for unchanged inputs; snapshot tests enforce it. |
+| Manifest format | `version: 1` unchanged. |
+| UI / extension | keep working against the current core API; they migrate to shared primitives incrementally (fixes P7). |
+| Node / TS | no floor changes. |
+
+The v1 contract is not deprecated — it becomes *one* discovery source feeding the IR via
+`adapters/contract-v1`, exactly like `AGENTS.md` or `SKILL.md` will be.
+
+---
+
+## 9. Implementation plan
+
+Mapped onto REWORK §28. Each phase ends with: tests green, build green, docs updated,
+backward compatibility verified.
+
+| Phase | Deliverable | Status |
+|---|---|---|
+| **0** | this document | **done** |
+| **1** | `diagnostics/`, `paths/`, `ir/`, `capabilities/`, `resolver/`, `adapters/contract-v1`, tests | **done** — see §11 |
+| 2 | `discovery/` + `agentfile doctor` | **done** — see §12 |
+| 3 | `agentfile check` / hardened `validate` / `lint` on shared primitives | next |
+| 4 | `agentfile context <path>` / `agentfile explain` | planned |
+| 5 | `SKILL.md` parsing, validation, linting, analysis | planned |
+| 6 | `agentfile audit` (static only) | planned |
+| 7 | compilers over the IR; `generator.ts` refactored to a compiler host | planned |
+| 8 | `agentfile eval` with deterministic assertions in a sandbox | planned |
+| 9 | optional AI judge | not started |
+
+Deliberately **not** built yet (REWORK §11 "do not implement commands prematurely"):
+`adopt`, `eval`, `skill *`, registry/marketplace, embeddings.
+
+---
+
+## 10. Risks
+
+| # | Risk | Mitigation |
+|---|---|---|
+| R1 | Platform formats change under us | every fact in §5 is dated, attributed, and re-verified before an adapter ships; unresearched features are `unknown`, never guessed |
+| R2 | Scope creep into a rewrite | new code is additive; the four legacy core modules are untouched until Phase 7 |
+| R3 | Diagnostic codes churn | taxonomy frozen in §7.3 and anchored to REWORK §13; codes are append-only |
+| R4 | Glob semantics diverge between platforms (minimatch vs picomatch vs brace budgets) | one matcher behind `paths/` — Node's built-in `path.matchesGlob`, zero dependencies (see §11.2); dot-directory behaviour pinned by test; divergences recorded as capability rows |
+| R5 | `check` becomes slow | filesystem port + explicit no-network/no-LLM rule; benchmarks in `packages/core/benchmarks` |
+| R6 | Two models coexisting (contract vs IR) confuses contributors | contract v1 is explicitly *a discovery source*, documented here and in code comments |
+| R7 | Security analysis over-promises | diagnostics phrase risk, never safety; nothing untrusted is ever executed during static analysis (REWORK §21/§33) |
+| R8 | UI/extension drift while core moves | P7 duplication is retired by pointing both at the shared resolver/manifest primitives |
+
+---
+
+## 11. Phase 1 as built
+
+Delivered, with the full suite green: **300 tests** (262 core, 38 CLI), build,
+typecheck, and lint all clean, and the pre-existing 144 tests untouched and
+passing.
+
+### 11.1 What shipped
+
+| Module | Purpose |
+|---|---|
+| `core/src/diagnostics/` | frozen `AGFxxx` registry, `Diagnostic` type, human + JSON formatters, summary/exit-code helpers |
+| `core/src/paths/` | path normalisation, ancestor chains, glob matching, documented specificity ordering |
+| `core/src/ir/` | platform-neutral IR with provenance on every node, plus merge/id helpers |
+| `core/src/capabilities/` | 41 sourced capability rows over 12 features and 5 targets, and capability→diagnostic mapping |
+| `core/src/resolver/` | the single resolution implementation, with per-node match reasons, exclusion reasons, and rank exposure |
+| `core/src/fs/` | two-method filesystem port with real and in-memory implementations |
+| `core/src/yaml/` | position-aware YAML loading; Zod issues → located diagnostics |
+| `core/src/adapters/` | contract v1 → IR, reference checking, non-throwing load |
+| `docs/diagnostics.md` | public code reference, kept in sync by a test |
+
+`packages/core/src/index.ts` gained exports only. `schema.ts`, `loader.ts`,
+`renderer.ts`, `generator.ts`, and `manifest.ts` were not modified.
+
+### 11.2 Decisions that differ from the Phase 0 plan
+
+**Glob matcher: Node built-in, not `picomatch`.** §7 assumed a third-party
+matcher. Node's `path.matchesGlob` (present since v22.5, stable since v24.8)
+was verified against every pattern form the platforms actually use — globstars,
+single-star segment boundaries, brace alternatives, directory patterns — and
+handled all of them. It ships zero dependencies and no `@types` package, so it
+wins on both supply chain and maintenance. It is used only inside `paths/`, so
+swapping engines later is a one-file change. The one semantic worth knowing —
+a leading `*` does not match a leading dot, so `**/*.md` does not match
+`.claude/rules/x.md` — is pinned by test rather than left to discovery.
+
+**Reserved codes are declared but not emitted.** `AGF101`, `AGF102`, `AGF301`,
+`AGF401`, `AGF501`, and `AGF601` carry `status: "reserved"`. The taxonomy is
+fixed now so it stays stable, but nothing emits them, so no consumer sees a code
+appear without a release note. `AGF301` in particular needs typed settings or
+negation analysis to detect deterministically, so it waits for the analysis
+layer rather than shipping as a heuristic.
+
+**AGF004 is an error, not a warning.** The v1 generator substitutes empty
+content for a missing `content_file`, so the failure currently ships to every
+developer's generated output silently. Loud is correct here.
+
+**Nested skills are path-scoped.** A contract inside a subdirectory scopes its
+skills to that subtree rather than offering them repository-wide. This was found
+by running the stack against a real monorepo fixture, not by unit tests, and it
+matches how both Claude Code and Cursor treat nested skill directories (§5.3,
+§5.4). Regression tests now cover both directions.
+
+### 11.3 Problems from §4 now closed or reduced
+
+| Problem | Status |
+|---|---|
+| P2 no resolution engine | **closed** — `resolveForPath` answers what/why/where, with exclusion reasons |
+| P3 no diagnostics model | **closed** — codes, severities, positions, JSON output |
+| P4 silent broken references | **closed for contract references** — AGF004 |
+| P5 no capability model | **closed** — sourced registry, `unknown` where unverified |
+| P10 I/O interleaved with logic | **reduced** — new layers take a `FileSystem`; legacy modules unchanged until Phase 7 |
+
+Still open, by design: P1 (platform names in the generator), P6 (discovery),
+P7 (three staleness implementations), P8 (closed rule vocabulary — the IR now
+treats `category` as an open label, but the v1 schema still fixes the four),
+P9 (`SKILL.md` as a real input), P11, P12. Each is scheduled to a later phase.
+
+### 11.4 Verified end to end
+
+The stack was run against an on-disk monorepo fixture — root contract plus an
+`apps/mobile` contract, a missing `content_file`, and the same package-manager
+rule declared twice in different casing. It produced: correct root→leaf
+directive ordering with real line numbers, per-path scoping that keeps mobile
+rules and skills out of `apps/web`, the duplicate detected across files, the
+broken reference caught, and a sourced compatibility error for emitting skills
+to plain AGENTS.md.
+
+---
+
+## 12. Phase 2 as built
+
+Delivered, suite green: **459 tests** (408 core, 51 CLI), build, typecheck, and
+lint clean, and the pre-existing 144 tests still passing untouched.
+
+### 12.1 What shipped
+
+| Module | Purpose |
+|---|---|
+| `core/src/discovery/scan.ts` | one bounded repository walk, shared by every adapter; reports truncation rather than hanging |
+| `core/src/discovery/instructions.ts` | AGENTS.md, CLAUDE.md / `.claude/CLAUDE.md` / CLAUDE.local.md, `.claude/rules/`, `.cursor/rules/`, `.cursorrules`, Copilot repo-wide and `applyTo` instructions |
+| `core/src/discovery/skills.ts` | `SKILL.md` from `.claude/skills`, `.cursor/skills`, `.github/skills`, `.agents/skills`, with resource classification |
+| `core/src/discovery/agents-mcp.ts` | `.claude/agents/**` subagents and `.mcp.json` servers |
+| `core/src/parsers/frontmatter.ts` | one frontmatter parser for every markdown agent format, plus field coercion |
+| `core/src/analysis/context.ts` | always-loaded context budget and skill-routing metadata signals |
+| `core/src/analysis/derive.ts` | atomic directives derived from prose bullets, marked `origin: "derived"` |
+| `core/src/analysis/overlap.ts` | line-level duplication between instruction files |
+| `cli/src/commands/doctor.ts` | `agentfile doctor`, human and JSON output |
+
+`FileSystem` grew `readDirectory` and `isDirectory` — the concrete need arrived
+with the scanner. `Instruction` gained an optional `bodyLine` so positions
+derived from a body still point at the right line in a file with frontmatter.
+
+### 12.2 What `doctor` reports
+
+Deterministically, with no model and no network, and without executing anything
+it finds:
+
+* every configuration file, attributed to a platform and a scope
+* always-loaded context, as characters and lines measured exactly plus a token
+  figure labelled as an estimate with its method named
+* directory-scoped configuration, resolved per directory
+* rules duplicated across files and across platforms
+* skills whose description is too thin to route on
+* misconfigurations: an MCP entry with a `url` and no `type`, a stdio server
+  with no `command`, an unrecognised transport, an instruction file importing a
+  path that does not exist, malformed YAML or JSON, unclosed frontmatter
+
+Exit code is non-zero only on error-severity findings, matching the existing
+`validate` and `diff` convention.
+
+Measured on this repository (138 files, 11 directories skipped) and on the
+messy fixture, a full `doctor` run takes **130–150 ms** including Node startup,
+which keeps it inside pre-commit budget as §30 requires. One filesystem walk,
+no network, no model.
+
+### 12.3 Decisions worth recording
+
+**Prose duplication is detected line by line, not by extracting rules.** The
+first implementation derived directives from bullets and compared those. Running
+it against a realistic fixture showed the flaw immediately: `.cursor/rules/*.mdc`
+and `.github/copilot-instructions.md` commonly state a rule as a plain sentence,
+not a bullet, so the most valuable finding in the whole tool was missed. Line
+comparison catches bullets and prose alike and never has to decide whether a
+sentence "is a rule" — a decision that would either miss real duplication or
+invent it. Statement-level comparison is still used, but only for *declared*
+directives, so bullets are not reported twice.
+
+**Derived directives are kept, and labelled.** Derivation still runs, because
+per-path rule counts and future conflict detection need statements. Every
+derived directive carries `origin: "derived"` and a note naming the bullet it
+came from, so it can never be mistaken for something the author declared.
+
+**Glob lists are split brace-aware.** `applyTo`, `globs`, and `paths` are all
+documented as accepting a comma-separated string, and all three support brace
+expansion, so a naive comma split turns `src/**/*.{ts,tsx}` into two broken
+patterns. A test caught this; `splitGlobList` fixes it for all three fields.
+
+**Symlinked directories are not followed during the scan**, and dot directories
+are not skipped wholesale — the configuration being looked for lives in
+`.claude`, `.cursor`, `.github`, and `.agents`. Only an explicit list of
+generated and vendored directory names is skipped.
+
+**Nested configuration is scoped to its subtree.** A `.claude/rules/` or
+`.cursor/rules/` inside `apps/web` governs `apps/web`, not `apps/web/.claude` —
+`governedDirectory` walks out of configuration directories so nesting depth
+reflects the code the configuration applies to.
+
+### 12.4 Problems from §4 now closed
+
+| Problem | Status |
+|---|---|
+| P6 useless without adoption | **closed** — `doctor` works on a repository that has never used agentfile; the contract is one optional source among many |
+| P4 silent broken references | **fully closed** — AGF004 now also covers instruction-file imports |
+
+Still open, by design: P1 (platform names in the generator, Phase 7), P7 (three
+staleness implementations, Phase 3), P8 (the v1 schema still fixes four rule
+categories, though the IR treats `category` as an open label), P9 (`SKILL.md` is
+now *read*; validating it against the specification is Phase 5), P11, P12.
+
+---
+
+## 13. Sources
+
+- <https://agents.md/>
+- <https://code.claude.com/docs/en/memory>
+- <https://code.claude.com/docs/en/skills>
+- <https://code.claude.com/docs/en/sub-agents>
+- <https://code.claude.com/docs/en/mcp>
+- <https://agentskills.io/> and <https://agentskills.io/specification>
+- <https://cursor.com/docs/context/rules>
+- <https://docs.github.com/en/copilot/how-tos/configure-custom-instructions/add-repository-instructions>
+- <https://eslint.org/docs/latest/use/configure/configuration-files>
+- <https://eslint.org/docs/latest/extend/custom-rules>
