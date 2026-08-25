@@ -250,6 +250,13 @@ export const DIAGNOSTIC_CODES = {
     defaultSeverity: "error",
     status: "reserved",
   },
+  AGF602: {
+    name: "eval-assertion-failed",
+    title: "Behavioral eval assertion failed",
+    band: "evaluation",
+    defaultSeverity: "error",
+    status: "active",
+  },
 } as const satisfies Record<string, DiagnosticCodeMeta>;
 
 export type DiagnosticCode = keyof typeof DIAGNOSTIC_CODES;

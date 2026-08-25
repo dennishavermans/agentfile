@@ -380,7 +380,17 @@ not:
 ## AGF6xx — behavioral evaluation
 
 ### `AGF601` behavioral-regression · error · reserved
-A behavioral evaluation assertion that previously passed now fails.
+A behavioral evaluation assertion that previously passed now fails. Reserved
+until eval results are compared against a stored baseline.
+
+### `AGF602` eval-assertion-failed · error · active
+A deterministic assertion in an `agentfile eval` run failed: an expected file is
+missing, a command exited non-zero, required text is absent, or forbidden text
+is present. The finding carries what was observed, and the run happened in an
+isolated workspace — the working tree was not touched.
+
+Emitted by the eval runner rather than by a validation rule — it is a fact about
+a sandboxed run, not about the configuration.
 
 ---
 

@@ -8,6 +8,7 @@ import { compileCommand } from "./commands/compile.js";
 import { contextCommand } from "./commands/context.js";
 import { diffCommand } from "./commands/diff.js";
 import { doctorCommand } from "./commands/doctor.js";
+import { evalCommand } from "./commands/eval.js";
 import { explainCommand } from "./commands/explain.js";
 import { initCommand } from "./commands/init.js";
 import { lintCommand } from "./commands/lint.js";
@@ -91,6 +92,22 @@ program
   .option("--list-rules", "Print the rule set and exit")
   .action((options: { root?: string; format?: string; target?: string[]; strict?: boolean; listRules?: boolean }) =>
     validateCommand(options),
+  );
+
+program
+  .command("eval")
+  .description("Run behavioral evals: an agent task in a sandbox, judged by deterministic assertions")
+  .argument("[files...]", "Eval definition files (default: every *.eval.yaml in the repository)")
+  .option("--agent <template>", 'Agent command template, e.g. "claude -p {prompt}"')
+  .option("--root <path>", "Directory to run in instead of the current working directory")
+  .option("--no-cache", "Re-run evals even when definition, agent, and repository state are unchanged")
+  .option("--keep-workspace", "Leave each eval's temporary workspace on disk for inspection")
+  .option("--format <format>", "Output format: human or json", "human")
+  .action(
+    (
+      files: string[],
+      options: { agent?: string; root?: string; cache?: boolean; keepWorkspace?: boolean; format?: string },
+    ) => evalCommand({ ...options, files }),
   );
 
 program

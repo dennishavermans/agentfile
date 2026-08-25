@@ -421,6 +421,27 @@ export {
   planCompilation,
   selectSources,
 } from "./compilers/index.js";
+// ─── Behavioral evaluation ──────────────────────────────────────────────────
+export type {
+  AssertionResult,
+  EvalDefinition,
+  EvalResult,
+  EvalStatus,
+  RunEvalOptions,
+  Sandbox,
+  Workspace,
+} from "./evals/index.js";
+export {
+  EVAL_DIRECTORY,
+  EVAL_FILE_SUFFIX,
+  evalCacheKey,
+  evalFilesIn,
+  gitSeedFiles,
+  gitStateFingerprint,
+  parseEvalDefinition,
+  runEval,
+  temporaryDirectorySandbox,
+} from "./evals/index.js";
 // ─── Validation ────────────────────────────────────────────────────────────
 export type {
   Rule,

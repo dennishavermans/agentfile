@@ -54,6 +54,7 @@ describe("the rule set", () => {
     // must name its emitter — an entry nothing emits belongs in `reserved`.
     const commandEmitted = new Set([
       "AGF204", // compile host: overwrite refusal is a fact about the disk, not the configuration
+      "AGF602", // eval runner: an assertion failure is a fact about a sandboxed run, not the configuration
     ]);
     const active = allDiagnosticCodes().filter((code) => diagnosticMeta(code).status === "active");
 

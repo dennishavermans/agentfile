@@ -538,7 +538,7 @@ backward compatibility verified.
 | 5 | `SKILL.md` parsing, validation, linting, analysis | **done** — see §15 |
 | 6 | `agentfile audit` (static only) | **done** — see §16 |
 | 7 | compilers over the IR + `agentfile compile` | **done** — see §17 |
-| 8 | `agentfile eval` with deterministic assertions in a sandbox | planned |
+| 8 | `agentfile eval` with deterministic assertions in a sandbox | **done** — see §18 |
 | 9 | optional AI judge | not started |
 
 Deliberately **not** built yet (REWORK §11 "do not implement commands prematurely"):
@@ -1198,7 +1198,67 @@ ownership in the manifest, and is idempotent under `--check`. 755 tests
 
 ---
 
-## 18. Sources
+## 18. Phase 8 as built
+
+### 18.1 REWORK §18's model, literally
+
+`evals/*.eval.yaml` follows the brief's conceptual test shape field for field —
+name, prompt, and deterministic assertions (`files`, `absent`, `commands`,
+`contains`, `forbidden`). Where the brief is silent the shape borrows from the
+eval tools people already know (promptfoo's typed assertion list, plugin eval's
+per-case configuration) rather than inventing a third convention. An eval that
+asserts nothing is rejected: it would pass vacuously.
+
+The flow is the brief's preferred model verbatim: run the agent in an isolated
+environment, collect the resulting state, validate through deterministic
+assertions. Every assertion result carries its observation — "exit 2", "found
+at src/Button.tsx:14" — so a failure reads like evidence. Failures are `AGF602`;
+`AGF601` stays reserved for future baseline comparison.
+
+### 18.2 SAFE TO ANALYZE vs SAFE TO EXECUTE
+
+Everything an eval executes — setup, the agent, assertion commands — runs in a
+workspace seeded into a temporary directory from what the repository versions
+(`git ls-files -co --exclude-standard`, or the discovery scan outside git).
+Nothing runs in the working tree, and the tests assert that the user's tree is
+untouched after a run. The `Sandbox` interface is deliberately replaceable
+(REWORK §21); the first implementation states what it provides (filesystem
+isolation, timeouts, output caps) and what it does not (network isolation,
+resource limits) in its own description, printed with every run.
+
+### 18.3 No implicit agent, no silent spend
+
+A prompted eval runs only when the user names the agent
+(`--agent "claude -p {prompt}"`); without one it is reported as skipped, never
+as passed. The prompt is data, not shell: `{prompt}` becomes a single-quoted
+literal and the raw text travels as `$AGENTFILE_EVAL_PROMPT`, so quotes and
+`$(...)` in a prompt cannot become part of the command.
+
+Results are cached (REWORK §20) against the definition text, the agent command,
+and a repository fingerprint of HEAD plus the *content* of tracked changes and
+untracked files — the porcelain status alone would serve stale hits, since
+editing an already-modified file does not change it. agentfile's own state under
+`.agentfile/` is excluded from the fingerprint so the cache cannot invalidate
+itself. No fingerprint (not a git repository) means no caching, never a stale
+hit.
+
+### 18.4 Exit codes CI can gate on
+
+0 all passed, 1 assertions failed, 2 the harness could not run an eval — the
+promptfoo split between "the test failed" and "the tool failed", which CI needs
+to distinguish. A cached failure replays as a failure; the smoke test caught the
+label that said otherwise, and a regression test now pins it.
+
+### 18.5 Verified
+
+A prompted eval against a scripted agent passes all three assertion kinds with
+located evidence, leaves the user's tree untouched, caches its result, and
+replays it on an unchanged tree. 780 tests (658 core, 122 CLI). Build and
+typecheck clean. `docs/evals.md` documents the format.
+
+---
+
+## 19. Sources
 
 - <https://agents.md/>
 - <https://code.claude.com/docs/en/memory>
