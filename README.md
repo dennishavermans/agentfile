@@ -212,6 +212,37 @@ It also validates every `SKILL.md` against the [Agent Skills specification](http
 
 `ai/contract.yaml` is still validated first and reported exactly as before, and a schema failure is still an immediate exit 1.
 
+### `npx @agentfile/cli audit`
+Security and trust analysis of hooks, skills, MCP servers, and permission rules.
+
+```bash
+npx @agentfile/cli audit
+npx @agentfile/cli audit --all      # include informational findings
+npx @agentfile/cli audit --strict   # treat warnings as errors
+```
+
+Reads everything as text and executes nothing. Reports risky hook commands, unpinned MCP packages, committed credentials, permission rules that do not grant what they appear to, and prompt-injection indicators — each finding with the reason and, where it applies, the platform documentation that backs it. The output names every surface analysed and every file it could not read, and a clean result says what it means: no pattern matched, **not** "this is safe".
+
+### `npx @agentfile/cli compile`
+Compiles the normalized configuration into native target files.
+
+```bash
+npx @agentfile/cli compile --target claude cursor    # from whatever your source of truth is
+npx @agentfile/cli compile --target agents-md --check  # CI: exit 1 on drift, writes nothing
+```
+
+Whatever the repository maintains — AGENTS.md, CLAUDE.md, an agentfile contract — becomes the input; the requested targets get their documented file shapes (AGENTS.md files, CLAUDE.md plus `.claude/rules`, Copilot instruction files, Cursor `.mdc` rules). What a target cannot express is reported (`AGF201`–`AGF203`) instead of silently dropped, output is deterministic and marker-stamped, and a file agentfile does not own is never overwritten without `--force`.
+
+### `npx @agentfile/cli eval`
+Behavioral evaluation: run an agent task in an isolated workspace, judge the result with deterministic assertions. See [docs/evals.md](docs/evals.md).
+
+```bash
+npx @agentfile/cli eval --agent "claude -p {prompt}"
+npx @agentfile/cli eval evals/button.eval.yaml --keep-workspace
+```
+
+Nothing executes in your working tree, no agent runs unless you name one, and results are cached against the repository state so unchanged evals are not re-run. Exit codes: 0 passed, 1 assertions failed, 2 harness error.
+
 ### `npx @agentfile/cli init`
 Interactive setup. Scaffolds `ai/contract.yaml`, agent templates, `.ai-agents.example`, and a CI workflow. Safe to run in existing projects — never overwrites existing files.
 

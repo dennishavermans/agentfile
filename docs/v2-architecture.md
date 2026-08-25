@@ -539,7 +539,7 @@ backward compatibility verified.
 | 6 | `agentfile audit` (static only) | **done** — see §16 |
 | 7 | compilers over the IR + `agentfile compile` | **done** — see §17 |
 | 8 | `agentfile eval` with deterministic assertions in a sandbox | **done** — see §18 |
-| 9 | optional AI judge | not started |
+| 9 | optional AI judge | deferred by design — REWORK §19/§28 gate it on mature deterministic eval infrastructure, which Phase 8 has only just introduced |
 
 Deliberately **not** built yet (REWORK §11 "do not implement commands prematurely"):
 `adopt`, `eval`, `skill *`, registry/marketplace, embeddings.
