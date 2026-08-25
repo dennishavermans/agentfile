@@ -646,6 +646,16 @@ describe("import checking", () => {
     expect(found?.message).toContain("docs/missing.md");
   });
 
+  it("does not mistake scoped npm packages in prose for imports", () => {
+    expect(findImports("- `$next-rspack` - @next/rspack-core and @next/rspack-binding maintenance")).toEqual([]);
+    expect(findImports("Uses @types/node and @babel/core under the hood.")).toEqual([]);
+    // An extension or a deeper path is still an import.
+    expect(findImports("See @docs/setup.md and @packages/next/src/README.md")).toEqual([
+      "docs/setup.md",
+      "packages/next/src/README.md",
+    ]);
+  });
+
   it("stays quiet when the import resolves", () => {
     const result = discover({
       root: ROOT,

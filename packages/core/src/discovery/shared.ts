@@ -100,6 +100,16 @@ export function stripCode(markdown: string): string {
 }
 
 /**
+ * A scoped npm package name: one slash, npm-legal lowercase segments, and no
+ * file extension on the second segment. `@next/rspack-core` in prose is a
+ * package, and this shape appears in almost every JavaScript repository —
+ * treating it as an import would report half the ecosystem as broken. A real
+ * one-slash extensionless directory import loses out to this rule; that trade
+ * is deliberate, and imports with an extension or a deeper path are unaffected.
+ */
+const NPM_SCOPED_PACKAGE = /^[a-z0-9~-][a-z0-9._~-]*\/[a-z0-9._~-]+$/;
+
+/**
  * Import targets declared in a markdown body with `@path` syntax.
  *
  * Matches the documented form: an `@` at a word boundary followed by a path.
@@ -111,13 +121,15 @@ export function findImports(markdown: string): string[] {
   const found = new Set<string>();
 
   for (const match of cleaned.matchAll(/(^|[\s(])@([^\s)*,;'"]+)/g)) {
-    const target = match[2];
+    const target = match[2].replace(/[.,:;]+$/, "");
 
     // A bare word is a mention, not an import. Require a path separator or an
     // extension so `@claude` in prose is not mistaken for a file.
     if (!target.includes("/") && !/\.[a-z0-9]+$/i.test(target)) continue;
 
-    found.add(target.replace(/[.,:;]+$/, ""));
+    if (NPM_SCOPED_PACKAGE.test(target) && !/\.[a-z0-9]+$/i.test(target.split("/")[1])) continue;
+
+    found.add(target);
   }
 
   return [...found].sort();
