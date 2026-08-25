@@ -193,6 +193,8 @@ npx @agentfile/cli lint --similarity 0.75   # loosen near-duplicate detection
 
 Finds copies of a rule that have **drifted apart** — exact comparison goes quiet at exactly the moment someone edits one copy and not the others — and measures always-loaded context against a budget, naming the largest contributors. Similarity is measured on words, not meaning, and the output says so.
 
+For skills, it reports descriptions too thin for an agent to route on, two skills an agent has no basis to choose between, bodies past the size the specification recommends, and frontmatter that will not survive being shared through claude.ai or the Skills API.
+
 ### `npx @agentfile/cli validate`
 Strict validation across every layer. Designed for CI.
 
@@ -205,6 +207,8 @@ npx @agentfile/cli validate --list-rules       # print the rule set
 ```
 
 With `--target`, it checks the features your configuration uses against what that platform actually supports, and every finding cites the platform's own documentation. Without `--target` it says compatibility was not checked, rather than assuming a target and failing your build over it.
+
+It also validates every `SKILL.md` against the [Agent Skills specification](https://agentskills.io/specification) — agentfile validates against that standard rather than inventing a replacement — and statically inspects the scripts a skill bundles against a documented set of risk patterns. **Nothing found in the repository is ever executed**, and a clean result says "no pattern matched", never "this is safe".
 
 `ai/contract.yaml` is still validated first and reported exactly as before, and a schema failure is still an immediate exit 1.
 

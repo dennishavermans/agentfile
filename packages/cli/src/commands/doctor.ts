@@ -25,6 +25,7 @@ import {
   repositoryResolutionDiagnostics,
   resolveForPath,
   summarize,
+  validateSkills,
 } from "@agentfile/core";
 import chalk from "chalk";
 import { logger } from "../logger.js";
@@ -59,6 +60,9 @@ function repositoryWideDiagnostics(result: DiscoveryResult): Diagnostic[] {
   return [
     ...repositoryResolutionDiagnostics(result.configuration),
     ...overlapDiagnostics(findInstructionOverlap(result.configuration.instructions)),
+    // Specification breaches in a skill are errors that nothing else in the
+    // toolchain reports, so they belong in the first command anyone runs.
+    ...validateSkills(result.configuration),
   ];
 }
 
@@ -166,7 +170,7 @@ function reportSkillRouting(result: DiscoveryResult): void {
   for (const signal of signals) {
     logger.warn(`${signal.name} ${chalk.gray(`(${signal.file})`)}`);
     for (const problem of signal.problems) {
-      logger.info(`  ${problem}`);
+      logger.info(`  ${problem.message}`);
     }
   }
 

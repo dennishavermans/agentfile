@@ -15,20 +15,27 @@
 
 import type { TargetId } from "../capabilities/index.js";
 import type { Diagnostic, DiagnosticCode } from "../diagnostics/index.js";
+import type { FileSystem } from "../fs/index.js";
 import type { AgentConfiguration } from "../ir/index.js";
 
 /**
  * Validation layers, from the rework brief's own separation of responsibility.
  *
- * `security` and `behavioral` are declared here and carry no rules yet. Naming
- * them now keeps the command surface stable when they land, and makes it visible
- * that `validate` does not currently check either — a layer that silently does
- * not exist is worse than one that reports itself as empty.
+ * `behavioral` is declared here and carries no rules yet. Naming it now keeps the
+ * command surface stable when it lands, and makes it visible that `validate` does
+ * not check it — a layer that silently does not exist is worse than one that
+ * reports itself as empty.
  */
 export type ValidationLayer = "structural" | "resolution" | "quality" | "compatibility" | "security" | "behavioral";
 
 /** Layers that have rules today. */
-export const IMPLEMENTED_LAYERS: readonly ValidationLayer[] = ["structural", "resolution", "quality", "compatibility"];
+export const IMPLEMENTED_LAYERS: readonly ValidationLayer[] = [
+  "structural",
+  "resolution",
+  "quality",
+  "compatibility",
+  "security",
+];
 
 /**
  * Layers `agentfile check` runs.
@@ -44,6 +51,19 @@ export const LINT_LAYERS: readonly ValidationLayer[] = ["quality"];
 
 export interface RuleContext {
   configuration: AgentConfiguration;
+  /** Absolute project root. */
+  root: string;
+  /**
+   * Filesystem access.
+   *
+   * Almost every rule is a pure function of the configuration, which is what
+   * keeps them cheap and trivially testable. Static security inspection is the
+   * exception: it has to read files discovery deliberately did not load, because
+   * a bundled script's contents have no business in the IR. Access is here
+   * rather than smuggled in through a module import, so which rules touch the
+   * disk is visible.
+   */
+  fs: FileSystem;
   /** Findings produced while reading the configuration, before any rule ran. */
   discoveryDiagnostics: readonly Diagnostic[];
   /** Project-relative paths of every scanned file. */

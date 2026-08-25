@@ -51,13 +51,81 @@ content.
 
 ## AGF1xx — skills
 
-### `AGF101` invalid-skill · error · reserved
-A skill does not satisfy the Agent Skills specification: a `name` outside
-1–64 lowercase characters, consecutive hyphens, a name that does not match its
-directory, or a `description` over 1024 characters.
+`SKILL.md` is an external standard
+(<https://agentskills.io/specification>). Agentfile validates against it and does
+not extend it. Every constraint enforced below has its source recorded in
+`packages/core/src/skills/spec.ts`, and the specification's own distinction
+between *must* and *recommended* is preserved in the severities: a breach of a
+requirement is an error, exceeding a recommendation is a warning.
 
-### `AGF102` missing-skill-metadata · error · reserved
+There is deliberately **no skill score**. The rework brief requires any scoring
+system to be explainable, and a single number rolled up from six unrelated
+signals cannot be explained — only argued with. Each finding stands on its own
+and carries its own threshold.
+
+### `AGF101` invalid-skill · error · active
+A skill breaks a specification requirement:
+
+* a `name` over 64 characters, or outside lowercase `a-z0-9` and single hyphens
+* a `name` that does not match its parent directory — platforms locate a skill by
+  directory, so the skill loads under a name its own frontmatter disagrees with,
+  and anything referring to it by the frontmatter name will not find it
+* a `description` over 1024 characters, or `compatibility` over 500
+* two skills sharing a name, where which one loads depends on directory
+  precedence the platforms do not document identically
+
+### `AGF102` missing-skill-metadata · error · active
 A skill omits `name` or `description`, the two fields the specification requires.
+A missing description is not a weak skill but an unusable one: the description is
+the only thing an agent sees before deciding whether to load it.
+
+### `AGF103` skill-routing-quality · warning · active
+The description is valid but an agent cannot route on it reliably — it is too
+short to distinguish this skill from another, or it says what the skill does
+without ever saying when to use it. Also reported when two skills in the same
+repository have descriptions similar enough that nothing tells an agent which to
+pick.
+
+Whether a description is "too broad" in the abstract is a judgement agentfile
+will not fake. Whether two skills give an agent any basis to choose between them
+is a comparison, so that is what is measured.
+
+This measures metadata, not model behaviour. A good description makes correct
+routing likely; it does not guarantee it, and no finding here claims otherwise.
+
+### `AGF104` skill-context-bloat · warning · active
+The body is larger than the specification recommends — over roughly 5000
+estimated tokens or 500 lines — or embeds a code block long enough to be
+reference material.
+
+Skills exist for progressive disclosure: metadata at startup, the body only on
+activation, resources only on demand. A body this large defeats the middle step,
+because all of it enters context the moment the skill is chosen, relevant or not.
+
+Token figures are estimated from character length, not measured with any target's
+tokenizer.
+
+### `AGF105` skill-resource-layout · info · active
+Bundled files are not laid out as the specification expects: nested deeper than
+one level, or never mentioned anywhere in the body.
+
+Info severity throughout, deliberately. A platform may list a skill directory
+rather than following links, so an unreferenced file is not necessarily broken —
+worth knowing about, not worth failing a build over.
+
+### `AGF106` skill-portability · warning · active
+The skill uses frontmatter outside the specification, or more routing metadata
+than a platform will show.
+
+Non-spec keys are not a mistake — Claude Code documents several and they are
+useful. They are a constraint: claude.ai uploads and the Skills API accept only
+the specification's fields, so a skill using extensions cannot be shared through
+those surfaces unchanged. The finding names each key and says whose extension it
+is, because "not in the specification" alone is not actionable.
+
+Also reported when `description` plus `when_to_use` exceeds Claude Code's
+documented 1,536-character listing limit, where truncation falls at the limit
+rather than at the end of the meaning.
 
 ---
 
@@ -174,11 +242,28 @@ always-loaded instructions.
 
 ## AGF5xx — security
 
-### `AGF501` security-issue · error · reserved
-Static analysis found a risk in a hook, script, or MCP configuration.
+### `AGF501` security-issue · error · active
+Static analysis matched a documented risk pattern in a file bundled with a
+skill. Severity follows the pattern: piping a downloaded script into a shell is
+an error, requesting elevated privileges is a warning, and making network calls
+at all is recorded as info so that what a skill reaches out to is visible
+without reading every script.
 
-Security diagnostics describe risk. They never assert that configuration is
-safe, and nothing untrusted is executed to produce them.
+Two rules govern every finding in this band:
+
+1. **Nothing is executed.** Files are read as text and matched against patterns.
+   No shell is spawned and no interpreter is invoked, even when the whole point
+   of the file is to be run.
+2. **Risk is described; safety is never claimed.** A clean result means "no
+   pattern in this list matched", which is far weaker than "this is safe".
+   Pattern matching cannot see intent, cannot follow a variable, and cannot read
+   a binary. Files that could not be inspected — too large, unreadable — are
+   reported rather than passed over silently.
+
+Each pattern carries a name and a stated reason, so a finding can be argued with
+on its merits rather than accepted because a tool said so. The set is
+deliberately small and specific: a large fuzzy set produces findings developers
+learn to ignore, which is worse than none.
 
 ---
 

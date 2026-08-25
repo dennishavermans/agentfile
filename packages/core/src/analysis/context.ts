@@ -101,45 +101,68 @@ export function alwaysLoadedContext(configuration: AgentConfiguration): AlwaysLo
 /**
  * Skills whose description is too weak for an agent to route on.
  *
+ * This is the single judgement of routing quality in the codebase. `doctor`
+ * renders the signals, and the AGF103 diagnostic is built from them — so the two
+ * cannot disagree about whether a description is good enough, which is exactly
+ * the drift this project exists to remove.
+ *
  * Routing quality is measured here as metadata quality, and nothing more. A
  * description agentfile considers good does not prove any particular model will
  * pick the skill; a description this thin makes it unlikely for any of them.
+ *
+ * Specification *violations* are not judged here. An over-length description is
+ * a constraint breach reported as AGF101 by `validateSkills`; a missing one is
+ * AGF102. This answers only "can an agent route on this".
  */
+export type SkillRoutingProblemKind = "missing-description" | "too-short" | "no-when-clause";
+
+export interface SkillRoutingProblem {
+  kind: SkillRoutingProblemKind;
+  /** One line, phrased for a developer. */
+  message: string;
+}
+
 export interface SkillRoutingSignal {
   name: string;
   file: string;
   /** Why the description is weak. Empty when it looks fine. */
-  problems: string[];
+  problems: SkillRoutingProblem[];
   descriptionLength: number;
 }
 
-/** Minimum description length before routing metadata looks too thin to act on. */
+/**
+ * Minimum description length before routing metadata looks too thin to act on.
+ *
+ * Agentfile's threshold, not the specification's — the specification sets only an
+ * upper bound. Set where a description stops being able to carry both halves of
+ * what the specification asks for: what the skill does, and when to use it.
+ */
 export const WEAK_DESCRIPTION_LENGTH = 40;
-
-/** Maximum description length allowed by the Agent Skills specification. */
-export const MAX_DESCRIPTION_LENGTH = 1024;
-
-/** Maximum name length allowed by the Agent Skills specification. */
-export const MAX_SKILL_NAME_LENGTH = 64;
 
 export function analyzeSkillRouting(configuration: AgentConfiguration): SkillRoutingSignal[] {
   return configuration.skills.map((skill) => {
-    const problems: string[] = [];
+    const problems: SkillRoutingProblem[] = [];
     const description = skill.description.trim();
 
     if (!description) {
-      problems.push("has no description, so nothing tells the agent when to use it");
+      problems.push({
+        kind: "missing-description",
+        message: "has no description, so nothing tells the agent when to use it",
+      });
     } else {
       if (description.length < WEAK_DESCRIPTION_LENGTH) {
-        problems.push("description is too short to distinguish this skill from another");
-      }
-      if (description.length > MAX_DESCRIPTION_LENGTH) {
-        problems.push(`description is ${description.length} characters, over the 1024-character specification limit`);
+        problems.push({
+          kind: "too-short",
+          message: `description is ${description.length} characters, too short to distinguish this skill from another`,
+        });
       }
       // The specification asks a description to say what the skill does *and*
       // when to use it. The second half is the part that drives routing.
-      if (!/\b(use|when|for|if|after|before)\b/i.test(description)) {
-        problems.push("description says what the skill does but not when to use it");
+      if (!/\b(use|when|for|if|after|before|whenever)\b/i.test(description)) {
+        problems.push({
+          kind: "no-when-clause",
+          message: "description says what the skill does but never says when to use it",
+        });
       }
     }
 
@@ -151,6 +174,15 @@ export function analyzeSkillRouting(configuration: AgentConfiguration): SkillRou
     };
   });
 }
+
+/**
+ * Specification limits, re-exported under their established names.
+ *
+ * The values live in `skills/spec.ts`, which owns every published constraint.
+ * They are surfaced here because this is where they were first exported and
+ * consumers already import them from the barrel.
+ */
+export { MAX_DESCRIPTION_LENGTH, MAX_NAME_LENGTH as MAX_SKILL_NAME_LENGTH } from "../skills/spec.js";
 
 /**
  * Default always-loaded context budget, in estimated tokens.

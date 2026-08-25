@@ -99,9 +99,9 @@ describe("selectRules", () => {
   });
 
   it("reports a selected layer that has no rules yet", () => {
-    const { rules, emptyLayers } = selectRules({ layers: ["security"] });
+    const { rules, emptyLayers } = selectRules({ layers: ["behavioral"] });
     expect(rules).toEqual([]);
-    expect(emptyLayers).toEqual(["security"]);
+    expect(emptyLayers).toEqual(["behavioral"]);
   });
 });
 

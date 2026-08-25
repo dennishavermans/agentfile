@@ -83,14 +83,42 @@ export const DIAGNOSTIC_CODES = {
     title: "Invalid skill",
     band: "skills",
     defaultSeverity: "error",
-    status: "reserved",
+    status: "active",
   },
   AGF102: {
     name: "missing-skill-metadata",
     title: "Missing skill metadata",
     band: "skills",
     defaultSeverity: "error",
-    status: "reserved",
+    status: "active",
+  },
+  AGF103: {
+    name: "skill-routing-quality",
+    title: "Skill cannot be routed on reliably",
+    band: "skills",
+    defaultSeverity: "warning",
+    status: "active",
+  },
+  AGF104: {
+    name: "skill-context-bloat",
+    title: "Skill is larger than the specification recommends",
+    band: "skills",
+    defaultSeverity: "warning",
+    status: "active",
+  },
+  AGF105: {
+    name: "skill-resource-layout",
+    title: "Skill resources are not laid out as the specification expects",
+    band: "skills",
+    defaultSeverity: "info",
+    status: "active",
+  },
+  AGF106: {
+    name: "skill-portability",
+    title: "Skill uses features that do not travel between platforms",
+    band: "skills",
+    defaultSeverity: "warning",
+    status: "active",
   },
 
   // ─── AGF2xx — targets & compatibility ───────────────────────────────────
@@ -168,7 +196,7 @@ export const DIAGNOSTIC_CODES = {
     title: "Security issue",
     band: "security",
     defaultSeverity: "error",
-    status: "reserved",
+    status: "active",
   },
 
   // ─── AGF6xx — behavioral evaluation ─────────────────────────────────────

@@ -535,8 +535,8 @@ backward compatibility verified.
 | 2 | `discovery/` + `agentfile doctor` | **done** — see §12 |
 | 3 | `agentfile check` / hardened `validate` / `lint` on shared primitives | **done** — see §13 |
 | 4 | `agentfile context <path>` / `agentfile explain` | **done** — see §14 |
-| 5 | `SKILL.md` parsing, validation, linting, analysis | next |
-| 6 | `agentfile audit` (static only) | planned |
+| 5 | `SKILL.md` parsing, validation, linting, analysis | **done** — see §15 |
+| 6 | `agentfile audit` (static only) | next |
 | 7 | compilers over the IR; `generator.ts` refactored to a compiler host | planned |
 | 8 | `agentfile eval` with deterministic assertions in a sandbox | planned |
 | 9 | optional AI judge | not started |
@@ -951,7 +951,112 @@ appears on disk.
 
 ---
 
-## 15. Sources
+## 15. Phase 5 as built
+
+### 15.1 Validating against a standard, not a format
+
+`packages/core/src/skills/spec.ts` holds every published constraint and imports
+nothing. That is deliberate: it is the leaf of the dependency graph, so both the
+skills module and `analysis/context.ts` can read the same numbers without a
+cycle, and there is exactly one place to check when the specification moves.
+
+The specification's own distinction between *must* and *recommended* becomes the
+severity. A name over 64 characters breaks a requirement, so it is an error. A
+body over 5000 tokens exceeds a recommendation, so it is a warning. Nothing in
+this module upgrades a recommendation into a rule.
+
+| Area (brief §16) | Code | Severity | Basis |
+|---|---|---|---|
+| Structure | `AGF101` / `AGF102` | error | specification requirement |
+| Resources — broken references | `AGF004` | error | the file does not exist |
+| Routing | `AGF103` | warning | agentfile threshold, stated in the finding |
+| Context | `AGF104` | warning | specification recommendation |
+| Resources — layout | `AGF105` | info | may be intentional |
+| Portability | `AGF106` | warning | documented platform constraint |
+| Security | `AGF501` | per pattern | documented risk pattern |
+
+### 15.2 No score
+
+The brief requires any scoring system to be explainable and forbids arbitrary
+scores. A skill score would have to combine six unrelated signals — a name
+mismatch, a thin description, an oversized body, a deep resource, a non-spec
+key, a `sudo` in a script — into one number. That number cannot be explained,
+only argued with, and it would hide which of the six actually needs attention.
+So there is none. Each finding carries its own threshold and its own reason.
+
+### 15.3 One judgement of routing quality
+
+Phase 2 put a quick description check in `analysis/context.ts` for `doctor`.
+Phase 5 needed the same judgement as a diagnostic. Writing it twice is precisely
+the drift this project exists to remove, so instead:
+
+* `analyzeSkillRouting` is the single judgement, now returning structured
+  problems (`{ kind, message }`) rather than strings
+* `routingDiagnostics` maps those problems to `AGF103`
+* specification *violations* were removed from it — an over-length description is
+  `AGF101` from `validateSkills`, not a routing signal, and reporting it under
+  both codes would make one of them noise
+
+`doctor` renders the signals; `lint` and `validate` render the diagnostics. They
+cannot disagree, because there is one function.
+
+### 15.4 The measurable half of "overly broad"
+
+The brief lists "overly broad descriptions" under routing. Whether a description
+is broad in the abstract is a judgement agentfile would have to fake. Whether two
+skills in the same repository give an agent any basis to choose between them is a
+comparison — so that is what is measured, with the same Jaccard machinery Phase 3
+built for near-duplicate instructions.
+
+### 15.5 Static inspection
+
+Two rules, both from the brief, are enforced in code rather than stated in a
+comment:
+
+1. **Nothing is executed.** Files are read as text and matched against patterns.
+   No shell is spawned, no interpreter is invoked, no file is made executable —
+   even when the whole point of the file is to be run.
+2. **Risk is described; safety is never claimed.** A clean result means "no
+   pattern in this list matched". The explanation on every finding says it came
+   from reading text and cannot see intent, and files that could not be inspected
+   (too large, unreadable) are returned in `skipped` rather than passed over.
+
+The pattern set is deliberately small — eleven entries, each naming a concrete
+mechanism and carrying a stated reason. A large fuzzy set produces findings a
+developer learns to ignore, which is worse than no findings at all. Severity
+follows the mechanism: piping a download into a shell is an error, `sudo` is a
+warning, and making network calls at all is `info`, recorded so that what a skill
+reaches out to is visible without reading every script.
+
+Comment lines are skipped: a shell comment is documentation, not an instruction.
+
+### 15.6 One rule reads from disk, and says so
+
+`RuleContext` gained `root` and `fs`. Every other rule is a pure function of the
+configuration; `skill-scripts` has to read files discovery deliberately did not
+load, because a bundled script's contents have no business in the IR. Access is
+in the context rather than smuggled in through a module import, so which rules
+touch the disk is visible at the type level.
+
+The `security` layer therefore has a rule, and `validate` covers it. `check`
+still runs structural and resolution only, which keeps the pre-commit path free
+of file reads — measured at **≈133 ms** on the Phase 5 fixture, unchanged.
+
+### 15.7 Verified
+
+On a deliberately broken skill — name/directory mismatch, two-word description,
+a link to a missing file, a resource two levels deep, two non-spec keys, and a
+script that pipes `curl -k` into `sh`, runs `sudo rm -rf` on a variable, and
+copies `~/.aws/credentials` — `validate` reports twelve findings across six
+codes, each located, each with a reason. `check` reports the two structural ones;
+`lint` reports the four quality ones. Nothing was executed.
+
+656 tests (561 core, 95 CLI). Build and typecheck clean; lint unchanged from
+baseline.
+
+---
+
+## 16. Sources
 
 - <https://agents.md/>
 - <https://code.claude.com/docs/en/memory>

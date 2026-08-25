@@ -44,6 +44,11 @@ export function normalizePath(input: string): string {
 }
 
 /** Directory portion of a path. Returns ROOT_PATH for a top-level file. */
+/** Last path segment. `""` for the root. */
+export function basenameOf(path: string): string {
+  return path.slice(path.lastIndexOf("/") + 1);
+}
+
 export function dirnameOf(path: string): string {
   const normalized = normalizePath(path);
   const index = normalized.lastIndexOf("/");

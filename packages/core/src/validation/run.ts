@@ -9,7 +9,7 @@
 import type { TargetId } from "../capabilities/index.js";
 import { type Diagnostic, type DiagnosticSummary, sortDiagnostics, summarize } from "../diagnostics/index.js";
 import { type DiscoveryResult, discover } from "../discovery/index.js";
-import type { FileSystem } from "../fs/index.js";
+import { type FileSystem, nodeFileSystem } from "../fs/index.js";
 import { findRule, RULES } from "./rules.js";
 import { IMPLEMENTED_LAYERS, type Rule, type RuleSkip, type ValidationLayer } from "./types.js";
 
@@ -98,6 +98,8 @@ export function runValidation(options: ValidationOptions): ValidationResult {
 
   const context = {
     configuration: discovery.configuration,
+    root: options.root,
+    fs: options.fs ?? nodeFileSystem,
     discoveryDiagnostics: discovery.diagnostics,
     files: discovery.scan.files,
     targets: options.targets ?? [],

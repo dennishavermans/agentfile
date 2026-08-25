@@ -19,6 +19,7 @@ import {
 } from "../analysis/index.js";
 import { compatibilityDiagnostics } from "../capabilities/index.js";
 import { repositoryResolutionDiagnostics, unreachableDiagnostics } from "../resolver/index.js";
+import { analyzeSkillQuality, checkSkillReferences, inspectSkillResources, validateSkills } from "../skills/index.js";
 import type { Rule } from "./types.js";
 
 /**
@@ -120,15 +121,72 @@ const targetCompatibility: Rule = {
   },
 };
 
+/**
+ * `SKILL.md` is an external standard, so this checks the configuration against
+ * the published specification rather than against an agentfile format. Every
+ * constraint it enforces has a source recorded in `skills/spec.ts`.
+ */
+const skillSpecification: Rule = {
+  id: "skill-specification",
+  layer: "structural",
+  description: "Skills checked against the published Agent Skills specification",
+  emits: ["AGF101", "AGF102", "AGF004"],
+  run: (context) => ({
+    diagnostics: [
+      ...validateSkills(context.configuration),
+      ...checkSkillReferences(context.configuration, context.files),
+    ],
+  }),
+};
+
+const skillQuality: Rule = {
+  id: "skill-quality",
+  layer: "quality",
+  description: "Skills that are valid but hard to route on, oversized, or not portable",
+  emits: ["AGF103", "AGF104", "AGF105", "AGF106"],
+  run: (context) => ({ diagnostics: analyzeSkillQuality(context.configuration) }),
+};
+
+/**
+ * Static inspection of the files a skill bundles.
+ *
+ * This is the only rule that reads from disk, and it never executes anything it
+ * reads. Files it could not inspect are reported rather than passed over, so a
+ * clean result means "these files were checked against these patterns" and not
+ * "nothing was found".
+ */
+const skillScripts: Rule = {
+  id: "skill-scripts",
+  layer: "security",
+  description: "Bundled scripts matched against documented risk patterns, never executed",
+  emits: ["AGF501"],
+  run: (context) => {
+    const result = inspectSkillResources(context.configuration, { root: context.root, fs: context.fs });
+    const unreadable = result.skipped.filter((entry) => entry.reason !== "not executable content");
+
+    return {
+      diagnostics: result.diagnostics,
+      skipped: unreadable.length
+        ? `${unreadable.length} bundled file(s) could not be inspected: ${unreadable
+            .map((entry) => `${entry.file} (${entry.reason})`)
+            .join(", ")}`
+        : undefined,
+    };
+  },
+};
+
 /** Every rule, in a stable order. */
 export const RULES: readonly Rule[] = [
   configurationIntegrity,
+  skillSpecification,
   duplicateInstructions,
   unreachableConfiguration,
   inconsistentScope,
   nearDuplicateInstructions,
   contextBudget,
+  skillQuality,
   targetCompatibility,
+  skillScripts,
 ];
 
 export function findRule(id: string): Rule | undefined {

@@ -4,7 +4,7 @@
 
 import type { Applicability, ConfigScope, PlatformId, Provenance } from "../ir/index.js";
 import { ALWAYS, appliesToDirectory } from "../ir/index.js";
-import { dirnameOf, ROOT_PATH } from "../paths/index.js";
+import { basenameOf, dirnameOf, ROOT_PATH } from "../paths/index.js";
 
 /**
  * Configuration directory names whose *parent* is the directory the
@@ -110,10 +110,7 @@ export function findImports(markdown: string): string[] {
   return [...found].sort();
 }
 
-/** Extension-insensitive basename of a path. */
-export function basenameOf(path: string): string {
-  return path.slice(path.lastIndexOf("/") + 1);
-}
+export { basenameOf } from "../paths/index.js";
 
 /** Immediate parent directory name of a path, or "" at the root. */
 export function parentDirectoryName(path: string): string {

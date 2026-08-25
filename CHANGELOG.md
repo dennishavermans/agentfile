@@ -120,8 +120,71 @@ resolution does another.
   outranks it there. `--kind` narrows an ambiguous query. A query that matches
   too much lists the candidates instead of printing forty explanations.
 
+### Added — skills: specification validation, quality analysis, static inspection
+
+`SKILL.md` is an external standard
+(<https://agentskills.io/specification>). Agentfile validates against it and does
+not extend it or invent a replacement. Every constraint enforced has its source
+recorded in `packages/core/src/skills/spec.ts`, and the specification's own
+distinction between *must* and *recommended* is preserved in the severities.
+
+There is deliberately **no skill score**. A single number rolled up from six
+unrelated signals cannot be explained, only argued with. Each finding stands on
+its own and carries its own threshold.
+
+- **Specification validation** (`AGF101`, `AGF102`) — names outside the allowed
+  character set or length, a name that does not match its parent directory,
+  over-length `description` or `compatibility`, two skills sharing a name, and
+  the two required fields. A name/directory mismatch is not cosmetic: platforms
+  locate a skill by directory, so the skill loads under a name its own
+  frontmatter disagrees with.
+- **Broken skill links** (`AGF004`) — a body promising `references/api.md` and
+  shipping without it does not fail. The agent looks, finds nothing, and carries
+  on with less than the skill said it would have.
+- **Routing quality** (`AGF103`) — descriptions too short to choose on, or that
+  never say when to use the skill. Also reports two skills whose descriptions are
+  similar enough that nothing tells an agent which to pick — the one "overly
+  broad" signal that can be measured rather than guessed.
+- **Context bloat** (`AGF104`) — bodies over the specification's recommended
+  5000 tokens or 500 lines, and code blocks long enough to belong in a resource
+  file. Skills exist for progressive disclosure; a body this large defeats it.
+- **Resource layout** (`AGF105`, info) — files nested deeper than one level, and
+  files the body never mentions. Info severity because a platform may list a
+  directory rather than follow links, so an unreferenced file is worth knowing
+  about and not worth failing a build over.
+- **Portability** (`AGF106`) — frontmatter outside the specification, named key
+  by key with whose extension each is. Not a mistake, a constraint: claude.ai
+  uploads and the Skills API accept only the specification's fields. Also reports
+  routing metadata over Claude Code's documented 1,536-character listing limit.
+- **Static inspection of bundled scripts** (`AGF501`) — a small, documented set
+  of risk patterns, each with a stated reason: piping a download into a shell,
+  decoding text and executing it, evaluating a variable as a command, hardcoded
+  keys and credentials, recursive force-deletes, privilege escalation,
+  credential-path access, disabled certificate verification, world-writable
+  permissions, and outbound network calls recorded as information.
+
+  **Nothing is executed.** Files are read as text and matched against patterns —
+  no shell, no interpreter — even when the whole point of the file is to be run.
+  A clean result means "no pattern in this list matched", which is far weaker
+  than "safe", and the wording says so. Files that could not be inspected are
+  reported rather than passed over.
+
+- **New validation rules** — `skill-specification` (structural),
+  `skill-quality` (quality), `skill-scripts` (security). The `security` layer now
+  has a rule, so `validate` covers it; `check` still runs structural and
+  resolution only, keeping the pre-commit path free of file reads.
+- `agentfile doctor` now reports skill specification breaches, since those are
+  errors nothing else in the toolchain surfaces.
+
 ### Changed
 
+- `analyzeSkillRouting` returns structured problems (`{ kind, message }`) instead
+  of strings, and no longer judges specification violations — an over-length
+  description is `AGF101`, not a routing signal. It is now the single judgement
+  of routing quality, and the `AGF103` diagnostic is built from it, so `doctor`
+  and `validate` cannot disagree about the same skill.
+- `basenameOf` moved from `discovery/` to `paths/`, where it belongs. Still
+  exported under the same name.
 - `SkillEntry` now carries a stable `id`, like every other IR node. This is what
   lets `explain` match a node exactly rather than by label — two nested
   `AGENTS.md` files share a label but are different configuration.

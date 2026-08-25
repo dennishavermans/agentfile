@@ -152,6 +152,29 @@ rather than assuming a target and failing your build over it.
 they report gaps in agentfile's own capability registry, and an unverified
 combination should not fail your CI.
 
+### Skills
+
+Every `SKILL.md` is validated against the
+[Agent Skills specification](https://agentskills.io/specification) — agentfile
+validates against that standard rather than inventing a replacement. `check`
+reports the specification breaches: a name outside the allowed characters, a name
+that does not match its directory (platforms locate skills by directory, so the
+skill loads under a name its own frontmatter disagrees with), and links to files
+that do not exist. `lint` reports the rest: descriptions too thin to route on,
+two skills an agent has no basis to choose between, bodies past the recommended
+size, resources the body never mentions, and frontmatter that will not survive
+being shared through claude.ai or the Skills API.
+
+`validate` additionally inspects the scripts a skill bundles against a documented
+set of risk patterns — piping a download into a shell, evaluating a variable as a
+command, hardcoded credentials, `sudo`, credential-path access, and others.
+
+**Nothing found in the repository is ever executed.** Files are read as text and
+matched against patterns, even when the whole point of the file is to be run. A
+clean result means "no pattern in this list matched", which is a much weaker
+statement than "this is safe" — and files that could not be inspected are
+reported rather than passed over.
+
 ```bash
 npx @agentfile/cli migrate --from .github/copilot-instructions.md --from CLAUDE.md
 ```

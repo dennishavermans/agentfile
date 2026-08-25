@@ -178,12 +178,13 @@ describe("analyzeSkillRouting", () => {
 
   it("flags a missing description", () => {
     const [signal] = analyzeSkillRouting(configurationWith({ skills: [skill("deploy", "")] }));
-    expect(signal.problems[0]).toContain("no description");
+    expect(signal.problems.map((problem) => problem.kind)).toEqual(["missing-description"]);
+    expect(signal.problems[0].message).toContain("no description");
   });
 
   it("flags a description too short to distinguish the skill", () => {
     const [signal] = analyzeSkillRouting(configurationWith({ skills: [skill("deploy", "Deploys stuff.")] }));
-    expect(signal.problems.some((problem) => problem.includes("too short"))).toBe(true);
+    expect(signal.problems.map((problem) => problem.kind)).toContain("too-short");
   });
 
   it("flags a description that never says when to use the skill", () => {
@@ -193,13 +194,16 @@ describe("analyzeSkillRouting", () => {
       }),
     );
 
-    expect(signal.problems.some((problem) => problem.includes("not when to use it"))).toBe(true);
+    expect(signal.problems.map((problem) => problem.kind)).toContain("no-when-clause");
   });
 
-  it("flags a description over the specification limit", () => {
+  it("leaves specification violations to skill validation, so nothing is reported twice", () => {
+    // An over-length description breaks a published constraint, which is AGF101.
+    // Routing analysis only answers whether an agent can choose on it.
     const [signal] = analyzeSkillRouting(configurationWith({ skills: [skill("big", `Use when ${"x".repeat(1100)}`)] }));
 
-    expect(signal.problems.some((problem) => problem.includes("1024-character"))).toBe(true);
+    expect(signal.problems).toEqual([]);
+    expect(signal.descriptionLength).toBeGreaterThan(1024);
   });
 });
 

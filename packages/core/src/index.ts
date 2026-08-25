@@ -122,6 +122,8 @@ export type {
   OverlapOptions,
   ScopeMismatch,
   ScopeOptions,
+  SkillRoutingProblem,
+  SkillRoutingProblemKind,
   SkillRoutingSignal,
 } from "./analysis/index.js";
 export {
@@ -294,6 +296,7 @@ export {
 export type { GlobSpecificity } from "./paths/index.js";
 export {
   ancestorDirectories,
+  basenameOf,
   compareGlobSpecificity,
   dirnameOf,
   expandDirectoryPattern,
@@ -342,6 +345,37 @@ export {
   unreachableDiagnostics,
   verdictAt,
 } from "./resolver/index.js";
+// ─── Skills ────────────────────────────────────────────────────────────────
+export type { NameProblem, RiskPattern, SkillSecurityOptions, SkillSecurityResult } from "./skills/index.js";
+export {
+  AMBIGUOUS_DESCRIPTION_SIMILARITY,
+  ambiguousRoutingDiagnostics,
+  analyzeSkillQuality,
+  CLAUDE_EXTENSION_FIELDS,
+  CLAUDE_LISTING_LIMIT,
+  CURSOR_EXTENSION_FIELDS,
+  checkName,
+  checkSkillReferences,
+  contextDiagnostics,
+  describeNameProblem,
+  inspectSkillResources,
+  MAX_COMPATIBILITY_LENGTH,
+  MAX_INLINE_BLOCK_LINES,
+  MAX_INSPECTED_BYTES,
+  MAX_NAME_LENGTH,
+  MAX_RESOURCE_DEPTH,
+  NAME_PATTERN,
+  portabilityDiagnostics,
+  RECOMMENDED_BODY_LINES,
+  RECOMMENDED_BODY_TOKENS,
+  RISK_PATTERNS,
+  resourceDepth,
+  resourceDiagnostics,
+  routingDiagnostics,
+  SPEC_FIELDS,
+  skillDirectoryName,
+  validateSkills,
+} from "./skills/index.js";
 // ─── Validation ────────────────────────────────────────────────────────────
 export type {
   Rule,

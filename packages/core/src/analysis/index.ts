@@ -1,4 +1,11 @@
-export type { AlwaysLoadedContext, ContextBudgetOptions, ContextEstimate, SkillRoutingSignal } from "./context.js";
+export type {
+  AlwaysLoadedContext,
+  ContextBudgetOptions,
+  ContextEstimate,
+  SkillRoutingProblem,
+  SkillRoutingProblemKind,
+  SkillRoutingSignal,
+} from "./context.js";
 export {
   alwaysLoadedContext,
   analyzeSkillRouting,
