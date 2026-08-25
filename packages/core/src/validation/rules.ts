@@ -19,6 +19,7 @@ import {
 } from "../analysis/index.js";
 import { compatibilityDiagnostics } from "../capabilities/index.js";
 import { repositoryResolutionDiagnostics, unreachableDiagnostics } from "../resolver/index.js";
+import { auditHooks, auditInstructionText, auditMcpServers, auditPermissions } from "../security/index.js";
 import { analyzeSkillQuality, checkSkillReferences, inspectSkillResources, validateSkills } from "../skills/index.js";
 import type { Rule } from "./types.js";
 
@@ -175,6 +176,50 @@ const skillScripts: Rule = {
   },
 };
 
+/**
+ * Hooks, the one piece of configuration that runs on its own.
+ *
+ * Nobody approves a hook at the moment it fires; committing the file was the
+ * approval. Commands are read as text and never executed — reading a hook is
+ * exactly the moment not to run it.
+ */
+const hookCommands: Rule = {
+  id: "hook-commands",
+  layer: "security",
+  description: "Hooks that run automatically, matched against risk patterns and checked for missing scripts",
+  emits: ["AGF502", "AGF504", "AGF004", "AGF001"],
+  run: (context) => ({ diagnostics: auditHooks(context.configuration, { files: context.files }) }),
+};
+
+const mcpServers: Rule = {
+  id: "mcp-servers",
+  layer: "security",
+  description: "MCP servers that are unpinned, unencrypted, or carry a credential in committed configuration",
+  emits: ["AGF503", "AGF504"],
+  run: (context) => ({ diagnostics: auditMcpServers(context.configuration) }),
+};
+
+/**
+ * Permission rules, checked against Claude Code's documented evaluation
+ * mechanics rather than against a style preference. The value of this rule is
+ * that it knows the rules a developer reasonably would not.
+ */
+const permissionRules: Rule = {
+  id: "permission-rules",
+  layer: "security",
+  description: "Permission rules that grant more, less, or nothing compared to how they read",
+  emits: ["AGF506"],
+  run: (context) => ({ diagnostics: auditPermissions(context.configuration) }),
+};
+
+const promptInjection: Rule = {
+  id: "prompt-injection",
+  layer: "security",
+  description: "Instruction text with invisible characters or wording that addresses the agent's instructions",
+  emits: ["AGF505"],
+  run: (context) => ({ diagnostics: auditInstructionText(context.configuration) }),
+};
+
 /** Every rule, in a stable order. */
 export const RULES: readonly Rule[] = [
   configurationIntegrity,
@@ -187,6 +232,10 @@ export const RULES: readonly Rule[] = [
   skillQuality,
   targetCompatibility,
   skillScripts,
+  hookCommands,
+  mcpServers,
+  permissionRules,
+  promptInjection,
 ];
 
 export function findRule(id: string): Rule | undefined {

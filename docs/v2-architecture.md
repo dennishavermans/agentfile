@@ -536,7 +536,7 @@ backward compatibility verified.
 | 3 | `agentfile check` / hardened `validate` / `lint` on shared primitives | **done** — see §13 |
 | 4 | `agentfile context <path>` / `agentfile explain` | **done** — see §14 |
 | 5 | `SKILL.md` parsing, validation, linting, analysis | **done** — see §15 |
-| 6 | `agentfile audit` (static only) | next |
+| 6 | `agentfile audit` (static only) | **done** — see §16 |
 | 7 | compilers over the IR; `generator.ts` refactored to a compiler host | planned |
 | 8 | `agentfile eval` with deterministic assertions in a sandbox | planned |
 | 9 | optional AI judge | not started |
@@ -1056,7 +1056,78 @@ baseline.
 
 ---
 
-## 16. Sources
+## 16. Phase 6 as built
+
+### 16.1 One pattern set, three surfaces
+
+Phase 5's risk patterns moved from `skills/security.ts` to `security/patterns.ts`,
+because a bundled script, a hook command, and an MCP server's argv are the same
+kind of text with the same failure modes. Two copies of the list would drift, and
+the copy that drifted would be the one that missed something. The skills module
+now imports the shared set; its behaviour and its `AGF501` findings are unchanged.
+
+New codes are append-only, per §7.3:
+
+| Code | Name | Surface |
+|---|---|---|
+| `AGF502` | dangerous-hook | hook commands, plain-HTTP endpoints |
+| `AGF503` | untrusted-mcp-server | unpinned packages, unencrypted transports |
+| `AGF504` | secret-in-configuration | literal credentials in env, headers |
+| `AGF505` | prompt-injection-indicator | invisible characters, hidden comments, override wording |
+| `AGF506` | permission-rule-problem | rules that do not grant what they appear to |
+
+### 16.2 Settings discovery
+
+Hooks and permission rules live in `.claude/settings.json`, not in markdown, so
+discovery gained `discovery/settings.ts`. It reads the two repository-scoped
+files (`settings.json`, `settings.local.json`) and deliberately not the user or
+managed scopes: agentfile analyses what a repository commits, and reaching into a
+developer's home directory would make the same repository report differently for
+different people.
+
+`HookEntry` grew the documented handler shapes (`command`, `http`, `mcp_tool`,
+`prompt`, `agent` — left open, because an unrecognised kind must be reportable
+rather than dropped), and the IR gained `SettingEntry` for the handful of settings
+keys whose value changes what an agent is allowed to do, starting with
+`permissions.defaultMode`.
+
+### 16.3 Documented mechanics, not opinions
+
+Every permission finding is a documented mechanic of the platform's permission
+syntax, with the documentation linked in the finding: `Bash(ls*)` matching `lsof`,
+`:*` being literal anywhere but the end, unanchored allow-globs approving nothing,
+deny→ask→allow evaluation making shadowed allow rules dead, and
+`bypassPermissions` in a committed file. The value of the check is that it knows
+rules a developer reasonably would not; a style opinion here would be noise.
+
+Injection indicators are split by how objective they are. Invisible characters
+(zero-width, bidi overrides) have no legitimate place in an instruction file and
+are reported plainly. Override wording ("ignore all previous instructions") is
+very often a document *about* prompt injection, so it is `info`, deduplicated per
+indicator per file, and every finding says exactly that — except when the same
+wording hides inside an HTML comment, invisible in rendered markdown, which is
+the shape that matters and is reported as such.
+
+### 16.4 Coverage is part of the result
+
+`auditConfiguration` returns the surfaces it analysed with counts, the files it
+read, and the files it could not read with reasons. The command prints all three
+before any finding, and every rendering of a clean result carries the same
+caveat: no findings means no pattern matched what could be read — not that the
+configuration is safe. Nothing found in the repository is executed; skills,
+hooks, scripts, and MCP configuration are read as text (REWORK §33).
+
+### 16.5 Verified
+
+On a fixture with a `curl | sh` hook, an unpinned MCP package, a committed
+`ghp_` token, `bypassPermissions`, a boundary-less allow rule, a shadowed allow
+rule, and an override hidden in an HTML comment, `audit` reports all seven with
+locations and reasons, exits 1, and names the one informational finding it
+withheld. 718 tests (614 core, 104 CLI). Build and typecheck clean.
+
+---
+
+## 17. Sources
 
 - <https://agents.md/>
 - <https://code.claude.com/docs/en/memory>

@@ -9,8 +9,8 @@ export {
   routingDiagnostics,
 } from "./quality.js";
 export { checkSkillReferences } from "./references.js";
-export type { RiskPattern, SkillSecurityOptions, SkillSecurityResult } from "./security.js";
-export { inspectSkillResources, MAX_INSPECTED_BYTES, RISK_PATTERNS } from "./security.js";
+export type { SkillSecurityOptions, SkillSecurityResult } from "./security.js";
+export { inspectSkillResources, MAX_INSPECTED_BYTES } from "./security.js";
 export type { NameProblem } from "./spec.js";
 export {
   CLAUDE_EXTENSION_FIELDS,

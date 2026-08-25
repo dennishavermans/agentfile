@@ -17,3 +17,5 @@ export { DEFAULT_IGNORED_DIRECTORIES, filesNamed, filesUnder, scanRepository } f
 export { findImports, governedDirectory } from "./shared.js";
 export type { DiscoveredSkills } from "./skills.js";
 export { discoverSkills, SKILL_DIRECTORIES, SKILL_SPEC_FIELDS } from "./skills.js";
+export type { DiscoveredSettings } from "./settings.js";
+export { discoverSettings, REPORTED_SETTINGS_KEYS, SETTINGS_FILES } from "./settings.js";

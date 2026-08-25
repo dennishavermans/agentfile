@@ -167,15 +167,61 @@ export interface SubagentEntry {
 }
 
 /**
- * A lifecycle hook. The `command` is DATA — it is recorded and analysed
- * statically and is never executed by any static-analysis code path.
+ * Handler kinds a hook can use.
+ *
+ * Claude Code documents `command`, `http`, `mcp_tool`, `prompt`, and `agent`.
+ * Left open because platforms add kinds, and an unrecognised kind must be
+ * reportable rather than silently dropped.
+ */
+export type HookHandlerType = "command" | "http" | "mcp_tool" | "prompt" | "agent" | (string & {});
+
+/**
+ * A lifecycle hook.
+ *
+ * `command` is DATA. It is recorded and analysed statically and is never
+ * executed by any static-analysis code path, which is the whole point: a hook
+ * runs automatically when its event fires, so reading one is exactly the moment
+ * not to run it.
  */
 export interface HookEntry {
   /** Platform event name, e.g. "PreToolUse". Not an enum: platforms differ. */
   event: string;
-  /** Tool/matcher expression the hook is scoped to, when the platform has one. */
+  /**
+   * Filter the hook is scoped to. Absent, `""`, or `"*"` means every occurrence
+   * of the event.
+   */
   matcher?: string;
-  command: string;
+  type: HookHandlerType;
+  /** `command` handlers. Never executed. */
+  command?: string;
+  args?: string[];
+  /** `http` handlers: the endpoint the hook payload is posted to. */
+  url?: string;
+  headers?: Record<string, string>;
+  /** `mcp_tool` handlers. */
+  server?: string;
+  tool?: string;
+  /** `prompt` and `agent` handlers. */
+  prompt?: string;
+  /** Extra gating expression, Claude Code's `if`. */
+  condition?: string;
+  timeoutMs?: number;
+  provenance: Provenance;
+}
+
+/**
+ * A settings key agentfile reports on, with where it was set.
+ *
+ * Deliberately untyped beyond a key path and a stringified value. Modelling
+ * every key of every platform's settings file would be a maintenance burden with
+ * no payoff — agentfile only needs the handful whose value changes what an agent
+ * is allowed to do, and it needs to know which file set them.
+ */
+export interface SettingEntry {
+  /** Dotted key path as authored, e.g. `permissions.defaultMode`. */
+  key: string;
+  /** Value as authored, stringified. */
+  value: string;
   provenance: Provenance;
 }
 
@@ -260,6 +306,7 @@ export interface AgentConfiguration {
   hooks: HookEntry[];
   mcpServers: McpServerEntry[];
   permissions: PermissionRule[];
+  settings: SettingEntry[];
   artifacts: ArtifactEntry[];
   docs: DocEntry[];
   sources: SourceFile[];

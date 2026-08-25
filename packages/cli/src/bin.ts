@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /// <reference types="node" />
 import { Command } from "commander";
+import { auditCommand } from "./commands/audit.js";
 import { checkCommand } from "./commands/check.js";
 import { cleanCommand } from "./commands/clean.js";
 import { contextCommand } from "./commands/context.js";
@@ -90,6 +91,15 @@ program
   .action((options: { root?: string; format?: string; target?: string[]; strict?: boolean; listRules?: boolean }) =>
     validateCommand(options),
   );
+
+program
+  .command("audit")
+  .description("Security and trust analysis of hooks, skills, MCP servers, and permissions")
+  .option("--root <path>", "Directory to audit instead of the current working directory")
+  .option("--format <format>", "Output format: human or json", "human")
+  .option("--strict", "Treat warnings as errors")
+  .option("--all", "Include informational findings, which record rather than flag")
+  .action((options: { root?: string; format?: string; strict?: boolean; all?: boolean }) => auditCommand(options));
 
 program
   .command("lint")

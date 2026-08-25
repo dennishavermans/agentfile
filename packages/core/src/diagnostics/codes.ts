@@ -199,6 +199,42 @@ export const DIAGNOSTIC_CODES = {
     status: "active",
   },
 
+  AGF502: {
+    name: "dangerous-hook",
+    title: "Hook runs automatically and carries risk",
+    band: "security",
+    defaultSeverity: "warning",
+    status: "active",
+  },
+  AGF503: {
+    name: "untrusted-mcp-server",
+    title: "MCP server is not pinned or not encrypted",
+    band: "security",
+    defaultSeverity: "warning",
+    status: "active",
+  },
+  AGF504: {
+    name: "secret-in-configuration",
+    title: "Committed configuration contains a credential",
+    band: "security",
+    defaultSeverity: "error",
+    status: "active",
+  },
+  AGF505: {
+    name: "prompt-injection-indicator",
+    title: "Instruction text contains hidden or overriding content",
+    band: "security",
+    defaultSeverity: "warning",
+    status: "active",
+  },
+  AGF506: {
+    name: "permission-rule-problem",
+    title: "Permission rule does not grant what it appears to",
+    band: "security",
+    defaultSeverity: "warning",
+    status: "active",
+  },
+
   // ─── AGF6xx — behavioral evaluation ─────────────────────────────────────
   AGF601: {
     name: "behavioral-regression",

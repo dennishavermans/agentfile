@@ -25,6 +25,7 @@ import {
   discoverLegacyCursorRules,
 } from "./instructions.js";
 import { type RepositoryScan, type ScanOptions, scanRepository } from "./scan.js";
+import { discoverSettings } from "./settings.js";
 import { discoverSkills } from "./skills.js";
 
 export interface DiscoverOptions extends ScanOptions {
@@ -109,6 +110,15 @@ export function discover(options: DiscoverOptions): DiscoveryResult {
   configuration.mcpServers.push(...mcp.mcpServers);
   configuration.sources.push(...mcp.sources);
   diagnostics.push(...mcp.diagnostics);
+
+  // Hooks and permission rules: the two surfaces where configuration stops
+  // describing what an agent should do and starts deciding what it may do.
+  const settings = discoverSettings(root, scan, fs);
+  configuration.hooks.push(...settings.hooks);
+  configuration.permissions.push(...settings.permissions);
+  configuration.settings.push(...settings.settings);
+  configuration.sources.push(...settings.sources);
+  diagnostics.push(...settings.diagnostics);
 
   // The agentfile contract, when there is one. Its absence is not a finding
   // here: discovery is expected to run on repositories that have never used

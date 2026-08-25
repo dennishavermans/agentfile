@@ -346,7 +346,7 @@ export {
   verdictAt,
 } from "./resolver/index.js";
 // ─── Skills ────────────────────────────────────────────────────────────────
-export type { NameProblem, RiskPattern, SkillSecurityOptions, SkillSecurityResult } from "./skills/index.js";
+export type { NameProblem, SkillSecurityOptions, SkillSecurityResult } from "./skills/index.js";
 export {
   AMBIGUOUS_DESCRIPTION_SIMILARITY,
   ambiguousRoutingDiagnostics,
@@ -368,7 +368,6 @@ export {
   portabilityDiagnostics,
   RECOMMENDED_BODY_LINES,
   RECOMMENDED_BODY_TOKENS,
-  RISK_PATTERNS,
   resourceDepth,
   resourceDiagnostics,
   routingDiagnostics,
@@ -376,6 +375,32 @@ export {
   skillDirectoryName,
   validateSkills,
 } from "./skills/index.js";
+// ─── Static security analysis ──────────────────────────────────────────────
+export type {
+  AuditOptions,
+  AuditResult,
+  AuditSurface,
+  HookAuditOptions,
+  RiskMatch,
+  RiskPattern,
+} from "./security/index.js";
+export {
+  auditConfiguration,
+  auditHooks,
+  auditInstructionText,
+  auditMcpServers,
+  auditPermissions,
+  INJECTION_INDICATORS,
+  INVISIBLE_CHARACTER_NAMES,
+  isVariableReference,
+  NO_FINDINGS_CAVEAT,
+  parsePermissionRule,
+  RISK_PATTERNS,
+  scanExpression,
+  scanSecretValue,
+  scanText,
+  SECRET_VALUE_PATTERNS,
+} from "./security/index.js";
 // ─── Validation ────────────────────────────────────────────────────────────
 export type {
   Rule,

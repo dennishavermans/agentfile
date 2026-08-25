@@ -18,7 +18,15 @@ import type { AgentConfiguration, Applicability, Provenance } from "../ir/index.
 import { normalizePath } from "../paths/index.js";
 import { type ResolutionRank, resolveForPath } from "./resolve.js";
 
-export type ExplainKind = "instruction" | "rule" | "skill" | "subagent" | "hook" | "mcp-server" | "permission";
+export type ExplainKind =
+  | "instruction"
+  | "rule"
+  | "skill"
+  | "subagent"
+  | "hook"
+  | "mcp-server"
+  | "permission"
+  | "setting";
 
 /** How a query found a node. Shown so an ambiguous query is obvious. */
 export type MatchedBy = "id" | "file" | "name" | "text";
@@ -139,8 +147,9 @@ function allTargets(configuration: AgentConfiguration): Omit<ExplainTarget, "mat
       kind: "hook",
       label: `${hook.event}${hook.matcher ? ` (${hook.matcher})` : ""}`,
       provenance: hook.provenance,
-      // The command is data. It is displayed and never executed.
-      detail: hook.command,
+      // Data, shown and never executed. Which field carries the payload depends
+      // on the handler type, so all of them are candidates.
+      detail: hook.command ?? hook.url ?? hook.prompt ?? `${hook.type} hook`,
     });
   }
 
@@ -151,6 +160,16 @@ function allTargets(configuration: AgentConfiguration): Omit<ExplainTarget, "mat
       label: server.name,
       provenance: server.provenance,
       detail: server.transport === "stdio" ? (server.command ?? "") : (server.url ?? ""),
+    });
+  }
+
+  for (const setting of configuration.settings) {
+    targets.push({
+      id: `setting:${setting.key}:${setting.provenance.file}`,
+      kind: "setting",
+      label: setting.key,
+      provenance: setting.provenance,
+      detail: setting.value,
     });
   }
 

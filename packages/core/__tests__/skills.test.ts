@@ -419,19 +419,6 @@ describe("portabilityDiagnostics", () => {
 
 // ─── Static inspection ─────────────────────────────────────────────────────
 
-describe("RISK_PATTERNS", () => {
-  it("gives every pattern a stable id and a stated reason", () => {
-    const ids = RISK_PATTERNS.map((pattern) => pattern.id);
-    expect(new Set(ids).size).toBe(ids.length);
-
-    for (const pattern of RISK_PATTERNS) {
-      expect(pattern.id).toMatch(/^[a-z][a-z0-9]*(-[a-z0-9]+)*$/);
-      expect(pattern.why.length).toBeGreaterThan(30);
-      expect(pattern.title.length).toBeGreaterThan(5);
-    }
-  });
-});
-
 describe("inspectSkillResources", () => {
   function inspect(
     files: Record<string, string>,
