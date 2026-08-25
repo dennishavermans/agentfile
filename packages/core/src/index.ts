@@ -401,6 +401,26 @@ export {
   scanText,
   SECRET_VALUE_PATTERNS,
 } from "./security/index.js";
+// ─── Compilers over the IR ──────────────────────────────────────────────────
+export type {
+  CompilationPlan,
+  CompiledFile,
+  CompilePlan,
+  FileAction,
+  NotCarried,
+  PlanOptions,
+  PlannedFile,
+  TargetCompiler,
+} from "./compilers/index.js";
+export {
+  applyCompilation,
+  COMPILE_TARGETS,
+  COMPILERS,
+  compilerFor,
+  driftedFiles,
+  planCompilation,
+  selectSources,
+} from "./compilers/index.js";
 // ─── Validation ────────────────────────────────────────────────────────────
 export type {
   Rule,

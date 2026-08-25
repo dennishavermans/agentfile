@@ -23,7 +23,7 @@ import {
 import { booleanField, globListField, parseFrontmatter, stringField } from "../parsers/frontmatter.js";
 import { normalizePath } from "../paths/index.js";
 import { filesNamed, filesUnder, type RepositoryScan } from "./scan.js";
-import { basenameOf, findImports, governedDirectory, hierarchicalApplicability, provenanceOf } from "./shared.js";
+import { basenameOf, findImports, governedDirectory, hierarchicalApplicability, originFor, provenanceOf } from "./shared.js";
 
 export interface DiscoveredInstructions {
   instructions: Instruction[];
@@ -67,7 +67,7 @@ export function discoverAgentsMd(root: string, scan: RepositoryScan, fs: FileSys
     const text = readFile(fs, root, file);
     if (text === undefined) continue;
 
-    const provenance = provenanceOf(file, "agents-md");
+    const provenance = provenanceOf(file, "agents-md", { origin: originFor(text) });
     result.instructions.push({
       id: nodeId("instruction", provenance, "agents-md"),
       title: file,
@@ -102,7 +102,7 @@ export function discoverClaudeMd(root: string, scan: RepositoryScan, fs: FileSys
     const text = readFile(fs, root, file);
     if (text === undefined) continue;
 
-    const provenance = provenanceOf(file, "claude", { scope });
+    const provenance = provenanceOf(file, "claude", { scope, origin: originFor(text) });
     const imports = findImports(text);
 
     result.instructions.push({
@@ -136,7 +136,7 @@ export function discoverClaudeRules(root: string, scan: RepositoryScan, fs: File
     result.diagnostics.push(...parsed.diagnostics);
 
     const paths = globListField(parsed.data, "paths");
-    const provenance = provenanceOf(file, "claude");
+    const provenance = provenanceOf(file, "claude", { origin: originFor(text) });
 
     result.instructions.push({
       id: nodeId("instruction", provenance, slugify(basenameOf(file))),
@@ -186,7 +186,7 @@ export function discoverCursorRules(root: string, scan: RepositoryScan, fs: File
           ? MODEL_SELECTED
           : MANUAL;
 
-    const provenance = provenanceOf(file, "cursor");
+    const provenance = provenanceOf(file, "cursor", { origin: originFor(text) });
     result.instructions.push({
       id: nodeId("instruction", provenance, slugify(basenameOf(file))),
       title: description ?? file,
@@ -209,7 +209,7 @@ export function discoverLegacyCursorRules(root: string, scan: RepositoryScan, fs
     const text = readFile(fs, root, file);
     if (text === undefined) continue;
 
-    const provenance = provenanceOf(file, "cursor");
+    const provenance = provenanceOf(file, "cursor", { origin: originFor(text) });
     result.instructions.push({
       id: nodeId("instruction", provenance, "cursorrules"),
       title: file,
@@ -240,7 +240,7 @@ export function discoverCopilotInstructions(
     const text = readFile(fs, root, file);
     if (text === undefined) continue;
 
-    const provenance = provenanceOf(file, "copilot");
+    const provenance = provenanceOf(file, "copilot", { origin: originFor(text) });
     result.instructions.push({
       id: nodeId("instruction", provenance, "copilot-instructions"),
       title: file,
@@ -260,7 +260,7 @@ export function discoverCopilotInstructions(
 
     // Copilot documents applyTo as comma-separated glob patterns.
     const applyTo = globListField(parsed.data, "applyTo");
-    const provenance = provenanceOf(file, "copilot");
+    const provenance = provenanceOf(file, "copilot", { origin: originFor(text) });
 
     result.instructions.push({
       id: nodeId("instruction", provenance, slugify(basenameOf(file))),

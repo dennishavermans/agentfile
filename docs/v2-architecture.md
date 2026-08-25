@@ -537,7 +537,7 @@ backward compatibility verified.
 | 4 | `agentfile context <path>` / `agentfile explain` | **done** — see §14 |
 | 5 | `SKILL.md` parsing, validation, linting, analysis | **done** — see §15 |
 | 6 | `agentfile audit` (static only) | **done** — see §16 |
-| 7 | compilers over the IR; `generator.ts` refactored to a compiler host | planned |
+| 7 | compilers over the IR + `agentfile compile` | **done** — see §17 |
 | 8 | `agentfile eval` with deterministic assertions in a sandbox | planned |
 | 9 | optional AI judge | not started |
 
@@ -1127,7 +1127,78 @@ withheld. 718 tests (614 core, 104 CLI). Build and typecheck clean.
 
 ---
 
-## 17. Sources
+## 17. Phase 7 as built
+
+### 17.1 Compilation is downstream, and the legacy path is intact
+
+`agentfile compile` runs the REWORK §22 pipeline: discovery → IR → compilers →
+target files. Whatever the repository's source of truth is — AGENTS.md,
+CLAUDE.md, an agentfile contract — the same normalized configuration feeds every
+target. The template-driven v1 path (`generate()`, `sync`, `ai/agents/`
+templates) is untouched: repositories that own templates keep exactly the
+behaviour they had.
+
+The shape is the one multi-target generators converge on (OpenAPI Generator,
+GraphQL codegen, Terraform providers): compilers are pure — `compile(IR) →
+{files, diagnostics, notCarried}` — and one host owns markers, drift detection,
+overwrite safety, writing, and the manifest. A compiler cannot write a file, so
+no compiler can bypass a safety rule.
+
+### 17.2 Two kinds of loss, never conflated
+
+* **The target cannot express it** → `AGF201`/`AGF202`/`AGF203` through the same
+  `diagnoseCapability` the validation rule uses, backed by a registry row with a
+  documentation URL. A path-scoped rule compiled to AGENTS.md is an `AGF201`
+  with the source location, not a silent drop and not a fold into the root file
+  where it would apply more broadly than its author scoped it.
+* **agentfile does not translate it (yet)** → a `notCarried` entry with the real
+  reason. Cursor supports skills; agentfile not compiling them is agentfile's
+  limitation, and blaming the target would point the developer at the wrong fix.
+
+### 17.3 What the compilers emit
+
+Only file shapes with verified registry rows. agents-md: root and nested
+AGENTS.md. claude: CLAUDE.md files plus `.claude/rules/*.md` with `paths:`.
+copilot: `.github/copilot-instructions.md` plus `applyTo` instruction files
+(degraded → `AGF202`); nested scopes are named as the agents-md target's job.
+cursor: `alwaysApply` and `globs` rules. codex is refused with a pointer at
+agents-md, because that is all its verified rows say.
+
+Selection is the same for every target: never the target's own files, never
+`origin: generated` files, never `local`-scoped files, exact-duplicate bodies
+dropped and recorded. Discovery now stamps `origin: "generated"` on any file
+carrying the marker, which is what makes compile-discover-compile a fixed point
+instead of a feedback loop.
+
+### 17.4 Determinism and safety
+
+Same tree in, same bytes out: sources sorted by path and line, files sorted by
+path, no timestamps in content (the manifest carries `generatedAt`). The
+overwrite rule is one function: a file that exists without a marker, without a
+manifest entry, and without `--force` is refused with `AGF204` — a hand-written
+CLAUDE.md is someone's work, not drift. `--check` verifies without writing and
+exits 0/1/2 (clean/drift/error), the prettier contract, so CI can gate on it.
+
+### 17.5 A marker bug the round-trip test caught
+
+`addMarker` used to prepend the HTML comment unconditionally — above YAML
+frontmatter, where it stops the frontmatter being frontmatter and silently
+unscopes every generated rule file (legacy cursor `.mdc` output included). The
+marker now goes after a leading frontmatter block, `hasGeneratedMarker` looks in
+both places, and the fixture proves compile → discover → compile `--check`
+returns exit 0.
+
+### 17.6 Verified
+
+On a CLAUDE.md-first fixture with a path-scoped rule and a nested directory
+file, `compile --target agents-md cursor` emits five files, reports the one
+genuine loss (`AGF201`: AGENTS.md cannot express a path scope), records
+ownership in the manifest, and is idempotent under `--check`. 755 tests
+(641 core, 114 CLI). Build and typecheck clean.
+
+---
+
+## 18. Sources
 
 - <https://agents.md/>
 - <https://code.claude.com/docs/en/memory>

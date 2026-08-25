@@ -4,6 +4,7 @@ import { Command } from "commander";
 import { auditCommand } from "./commands/audit.js";
 import { checkCommand } from "./commands/check.js";
 import { cleanCommand } from "./commands/clean.js";
+import { compileCommand } from "./commands/compile.js";
 import { contextCommand } from "./commands/context.js";
 import { diffCommand } from "./commands/diff.js";
 import { doctorCommand } from "./commands/doctor.js";
@@ -90,6 +91,18 @@ program
   .option("--list-rules", "Print the rule set and exit")
   .action((options: { root?: string; format?: string; target?: string[]; strict?: boolean; listRules?: boolean }) =>
     validateCommand(options),
+  );
+
+program
+  .command("compile")
+  .description("Compile the normalized configuration into native target files")
+  .option("--target <targets...>", "Targets to compile: agents-md, claude, copilot, cursor (repeatable)")
+  .option("--root <path>", "Directory to compile instead of the current working directory")
+  .option("--check", "Verify outputs are up to date instead of writing (exit 1 on drift)")
+  .option("--force", "Overwrite files agentfile does not own")
+  .option("--format <format>", "Output format: human or json", "human")
+  .action((options: { target?: string[]; root?: string; check?: boolean; force?: boolean; format?: string }) =>
+    compileCommand(options),
   );
 
 program

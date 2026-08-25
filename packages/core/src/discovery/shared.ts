@@ -2,8 +2,9 @@
  * Helpers shared by the discovery adapters.
  */
 
-import type { Applicability, ConfigScope, PlatformId, Provenance } from "../ir/index.js";
+import type { Applicability, ConfigOrigin, ConfigScope, PlatformId, Provenance } from "../ir/index.js";
 import { ALWAYS, appliesToDirectory } from "../ir/index.js";
+import { hasGeneratedMarker } from "../manifest.js";
 import { basenameOf, dirnameOf, ROOT_PATH } from "../paths/index.js";
 
 /**
@@ -63,16 +64,28 @@ export function hierarchicalApplicability(file: string): Applicability {
 export function provenanceOf(
   file: string,
   platform: PlatformId,
-  options: { line?: number; scope?: ConfigScope; note?: string } = {},
+  options: { line?: number; scope?: ConfigScope; origin?: ConfigOrigin; note?: string } = {},
 ): Provenance {
   return {
     file,
     line: options.line,
     platform,
     scope: scopeFor(file, options.scope),
-    origin: "declared",
+    origin: options.origin ?? "declared",
     note: options.note,
   };
+}
+
+/**
+ * Origin for a discovered file, from its own first line.
+ *
+ * A file carrying the generated-by-agentfile marker was compiled from other
+ * sources that are also in the configuration. Recording it as `generated` keeps
+ * `explain` truthful and keeps compilers from feeding their own output back
+ * into the next compile.
+ */
+export function originFor(text: string): ConfigOrigin {
+  return hasGeneratedMarker(text) ? "generated" : "declared";
 }
 
 /**

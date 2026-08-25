@@ -148,6 +148,15 @@ Nobody has verified this target's behaviour for this feature against the
 target's documentation. Agentfile reports the gap rather than assuming either
 answer.
 
+### `AGF204` compile-would-overwrite · error · active
+`agentfile compile` planned an output file that already exists, carries no
+generated-by-agentfile marker, and is not recorded in the manifest. That is what
+a hand-written file looks like, and a compiler must not replace someone's work
+silently. The file is left untouched; `--force` overwrites it deliberately.
+
+Emitted by the compile host rather than by a validation rule — it is a fact
+about the disk at compile time, not about the configuration.
+
 ---
 
 ## AGF3xx — instructions and resolution

@@ -50,10 +50,18 @@ describe("the rule set", () => {
 
   it("accounts for every active code, so nothing is emitted by no rule", () => {
     const claimed = new Set(RULES.flatMap((rule) => [...rule.emits]));
+    // Codes emitted by a command outside the validation pipeline. Each entry
+    // must name its emitter — an entry nothing emits belongs in `reserved`.
+    const commandEmitted = new Set([
+      "AGF204", // compile host: overwrite refusal is a fact about the disk, not the configuration
+    ]);
     const active = allDiagnosticCodes().filter((code) => diagnosticMeta(code).status === "active");
 
     for (const code of active) {
-      expect(claimed.has(code), `${code} is active but no rule emits it`).toBe(true);
+      expect(
+        claimed.has(code) || commandEmitted.has(code),
+        `${code} is active but no rule or command emits it`,
+      ).toBe(true);
     }
   });
 

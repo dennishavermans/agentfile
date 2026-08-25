@@ -143,6 +143,13 @@ export const DIAGNOSTIC_CODES = {
     defaultSeverity: "info",
     status: "active",
   },
+  AGF204: {
+    name: "compile-would-overwrite",
+    title: "Compilation output would overwrite a file agentfile does not own",
+    band: "targets",
+    defaultSeverity: "error",
+    status: "active",
+  },
 
   // ─── AGF3xx — instructions & resolution ─────────────────────────────────
   AGF301: {
