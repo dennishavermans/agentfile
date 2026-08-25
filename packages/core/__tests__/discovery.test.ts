@@ -16,6 +16,7 @@ import {
   governedDirectory,
   scanRepository,
 } from "../src/discovery/index.ts";
+import { alwaysLoadedContext, findInstructionOverlap } from "../src/analysis/index.ts";
 import { memoryFileSystem } from "../src/fs/index.ts";
 import { resolveForPath } from "../src/resolver/index.ts";
 
@@ -760,5 +761,74 @@ describe("discover", () => {
     const result = discover({ root: ROOT, fs, scan });
 
     expect(result.scan).toBe(scan);
+  });
+});
+
+// ─── Symlinked instruction files ────────────────────────────────────────────
+
+describe("symlinked instruction files", () => {
+  /** A memory filesystem where CLAUDE.md is a symlink to AGENTS.md. */
+  function linkedFs(body: string) {
+    const inner = memoryFileSystem({ "/repo/AGENTS.md": body, "/repo/CLAUDE.md": body });
+    return {
+      ...inner,
+      realPath: (path: string) => (path === "/repo/CLAUDE.md" ? "/repo/AGENTS.md" : inner.realPath(path)),
+    };
+  }
+
+  const body = "- Use pnpm as the package manager, never npm or yarn.\n- Never commit directly to main; open a PR.\n";
+
+  it("marks the link with its real file and keeps both nodes for resolution", () => {
+    const result = discover({ root: ROOT, fs: linkedFs(body) });
+
+    const claude = result.configuration.instructions.find((entry) => entry.provenance.file === "CLAUDE.md");
+    const agents = result.configuration.instructions.find((entry) => entry.provenance.file === "AGENTS.md");
+
+    expect(claude?.provenance.realFile).toBe("AGENTS.md");
+    expect(claude?.provenance.note).toContain("symlink");
+    expect(agents?.provenance.realFile).toBeUndefined();
+  });
+
+  it("does not report a file as duplicating its own symlink", () => {
+    const result = discover({ root: ROOT, fs: linkedFs(body) });
+    const overlaps = findInstructionOverlap(result.configuration.instructions);
+    expect(overlaps).toHaveLength(0);
+  });
+
+  it("counts the shared text once in always-loaded context and derived rules", () => {
+    const linked = discover({ root: ROOT, fs: linkedFs(body) });
+    const copied = discover({
+      root: ROOT,
+      fs: memoryFileSystem({ "/repo/AGENTS.md": body, "/repo/CLAUDE.md": body }),
+    });
+
+    const linkedAlways = alwaysLoadedContext(linked.configuration);
+    const copiedAlways = alwaysLoadedContext(copied.configuration);
+
+    expect(linkedAlways.files).toEqual(["AGENTS.md"]);
+    expect(linkedAlways.estimate.characters).toBe(body.length);
+    // A genuine copy still counts twice, because a session genuinely loads both.
+    expect(copiedAlways.estimate.characters).toBe(body.length * 2);
+    expect(linked.configuration.directives.length).toBe(copied.configuration.directives.length / 2);
+  });
+
+  it("still reports genuine copies as duplication", () => {
+    const result = discover({
+      root: ROOT,
+      fs: memoryFileSystem({ "/repo/AGENTS.md": body, "/repo/CLAUDE.md": body }),
+    });
+    expect(findInstructionOverlap(result.configuration.instructions).length).toBeGreaterThan(0);
+  });
+
+  it("leaves a symlink alone when its target is not a discovered instruction file", () => {
+    const inner = memoryFileSystem({ "/repo/AGENTS.md": body });
+    const fs = {
+      ...inner,
+      realPath: (path: string) => (path === "/repo/AGENTS.md" ? "/somewhere/else/AGENTS.md" : inner.realPath(path)),
+    };
+
+    const result = discover({ root: ROOT, fs });
+    const agents = result.configuration.instructions.find((entry) => entry.provenance.file === "AGENTS.md");
+    expect(agents?.provenance.realFile).toBeUndefined();
   });
 });

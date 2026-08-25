@@ -10,7 +10,7 @@
  * Grow it when a caller needs more, not in anticipation.
  */
 
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
 
 export interface DirectoryEntry {
   name: string;
@@ -28,6 +28,11 @@ export interface FileSystem {
   readDirectory(path: string): DirectoryEntry[];
   /** True when the path exists and is a directory. Must not throw. */
   isDirectory(path: string): boolean;
+  /**
+   * Resolves symlinks to the real path. Returns the input unchanged when the
+   * path does not exist or cannot be resolved. Must not throw.
+   */
+  realPath(path: string): string;
 }
 
 /** The real filesystem. */
@@ -56,6 +61,13 @@ export const nodeFileSystem: FileSystem = {
       return statSync(path).isDirectory();
     } catch {
       return false;
+    }
+  },
+  realPath(path) {
+    try {
+      return realpathSync(path);
+    } catch {
+      return path;
     }
   },
 };
@@ -116,6 +128,10 @@ export function memoryFileSystem(files: Readonly<Record<string, string>>): FileS
       for (const candidate of directories) consider(candidate, true);
 
       return [...seen.values()].sort((a, b) => a.name.localeCompare(b.name));
+    },
+    // The memory filesystem has no symlinks, so every path is already real.
+    realPath(path) {
+      return clean(path);
     },
   };
 }

@@ -18,7 +18,7 @@
  */
 
 import type { TargetId } from "../capabilities/index.js";
-import type { AgentConfiguration, Instruction } from "../ir/index.js";
+import { type AgentConfiguration, type Instruction, withoutAliases } from "../ir/index.js";
 
 export interface SelectedSources {
   /** Instructions that apply unconditionally, in deterministic order. */
@@ -58,7 +58,10 @@ export function selectSources(configuration: AgentConfiguration, target: TargetI
   };
 
   const seen = new Map<string, string>();
-  const candidates = configuration.instructions.filter((entry) => isCompileSource(entry, target)).sort(order);
+  // Symlink twins first: a file and its link are one source, not a duplicate.
+  const candidates = withoutAliases(configuration.instructions)
+    .filter((entry) => isCompileSource(entry, target))
+    .sort(order);
 
   for (const instruction of candidates) {
     const key = instruction.body.trim();

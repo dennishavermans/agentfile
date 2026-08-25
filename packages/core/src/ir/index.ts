@@ -9,6 +9,7 @@ export {
   mergeConfigurations,
   nodeId,
   slugify,
+  withoutAliases,
 } from "./build.js";
 export type {
   AgentConfiguration,

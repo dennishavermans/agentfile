@@ -8,7 +8,7 @@
  * both import it.
  */
 
-import type { Instruction } from "../ir/index.js";
+import { type Instruction, withoutAliases } from "../ir/index.js";
 
 /**
  * Shortest line worth comparing.
@@ -79,7 +79,9 @@ export function instructionLines(instructions: readonly Instruction[], options: 
   const minimumLength = options.minimumLength ?? MINIMUM_OVERLAP_LINE_LENGTH;
   const result: InstructionLine[] = [];
 
-  for (const instruction of instructions) {
+  // A symlink twin is the same text under a second name. Comparing it against
+  // its own target would report a file as duplicating itself.
+  for (const instruction of withoutAliases(instructions)) {
     const startLine = instruction.bodyLine ?? 1;
     const lines = instruction.body.split("\n");
     const seenInThisFile = new Set<string>();

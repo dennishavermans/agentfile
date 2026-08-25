@@ -10,7 +10,7 @@
  * code every other command uses. Nothing about applicability is recomputed.
  */
 
-import { alwaysLoadedContext, discover, estimateContext, resolveForPath } from "@agentfile/core";
+import { alwaysLoadedContext, discover, estimateContext, resolveForPath, withoutAliases } from "@agentfile/core";
 import chalk from "chalk";
 import { logger } from "../logger.js";
 import { parseFormat, printJson, rejectFormat } from "../report.js";
@@ -44,7 +44,8 @@ export async function contextCommand(targetPath: string, options: ContextOptions
   const discovery = discover({ root });
   const effective = resolveForPath(discovery.configuration, targetPath);
 
-  const contextEstimate = estimateContext(effective.instructions.map((entry) => entry.node.body));
+  // Symlink twins (CLAUDE.md → AGENTS.md) load one text, so they cost it once.
+  const contextEstimate = estimateContext(withoutAliases(effective.instructions.map((entry) => entry.node)).map((node) => node.body));
 
   if (format === "json") {
     printJson({

@@ -2,6 +2,7 @@ import { normalizePath } from "../paths/index.js";
 import {
   type AgentConfiguration,
   type Applicability,
+  type Instruction,
   IR_VERSION,
   type ProjectMetadata,
   type Provenance,
@@ -38,6 +39,24 @@ export function emptyConfiguration(root: string): AgentConfiguration {
 export function nodeId(kind: string, provenance: Provenance, discriminator: string): string {
   const position = provenance.line === undefined ? "" : `:${provenance.line}`;
   return `${kind}:${normalizePath(provenance.file)}${position}#${discriminator}`;
+}
+
+/**
+ * Instructions with symlink twins removed.
+ *
+ * An instruction whose file resolves to another discovered instruction file is
+ * the same text under a second name — `CLAUDE.md → AGENTS.md` is the documented
+ * way to share one file between platforms. Counting or comparing both would
+ * double every figure and report a file as duplicating itself, so anything that
+ * measures text (overlap, similarity, context cost, compile sources) reads
+ * through this filter. Resolution does not: each platform genuinely loads its
+ * own path, and load order must say so.
+ */
+export function withoutAliases(instructions: readonly Instruction[]): Instruction[] {
+  const authored = new Set(instructions.map((instruction) => instruction.provenance.file));
+  return instructions.filter(
+    (instruction) => !(instruction.provenance.realFile && authored.has(instruction.provenance.realFile)),
+  );
 }
 
 /** Slugifies a label for use as a node-id discriminator. */

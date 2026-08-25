@@ -12,7 +12,7 @@
  */
 
 import { type Diagnostic, diagnostic } from "../diagnostics/index.js";
-import type { AgentConfiguration, Instruction } from "../ir/index.js";
+import { type AgentConfiguration, type Instruction, withoutAliases } from "../ir/index.js";
 import { ROOT_PATH } from "../paths/index.js";
 
 /**
@@ -81,7 +81,8 @@ export interface AlwaysLoadedContext {
 
 /** Summarises what a repository loads into every session, unconditionally. */
 export function alwaysLoadedContext(configuration: AgentConfiguration): AlwaysLoadedContext {
-  const instructions = configuration.instructions.filter(isAlwaysLoaded);
+  // Symlink twins count once: a session loads the text, not the directory entry.
+  const instructions = withoutAliases(configuration.instructions).filter(isAlwaysLoaded);
 
   const alwaysLoadedDirectives = configuration.directives.filter((directive) => {
     if (directive.applies.kind === "always") return true;

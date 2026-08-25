@@ -47,6 +47,13 @@ export type ConfigOrigin =
 export interface Provenance {
   /** Project-relative POSIX path of the file this came from. */
   file: string;
+  /**
+   * Project-relative path this file resolves to when it is a symlink to
+   * another discovered file. `CLAUDE.md → AGENTS.md` is the documented way to
+   * share one instruction file between platforms, and treating the pair as two
+   * texts would double every count and report a file as duplicating itself.
+   */
+  realFile?: string;
   /** 1-based line, when the source format supports position tracking. */
   line?: number;
   /** 1-based column. */

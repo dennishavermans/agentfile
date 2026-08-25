@@ -8,11 +8,13 @@
  * The v1 contract is one source among the rest, not a precondition.
  */
 
+import { join, relative } from "node:path";
 import { CONTRACT_PATH, loadConfigurationFromContract, OVERRIDE_PATH } from "../adapters/contract-v1.js";
 import { deriveAllDirectives } from "../analysis/derive.js";
 import { type Diagnostic, diagnostic } from "../diagnostics/index.js";
 import { type FileSystem, nodeFileSystem } from "../fs/index.js";
-import { type AgentConfiguration, emptyConfiguration, type PlatformId } from "../ir/index.js";
+import { type AgentConfiguration, emptyConfiguration, type PlatformId, withoutAliases } from "../ir/index.js";
+import { normalizePath } from "../paths/index.js";
 import { discoverMcpServers, discoverSubagents } from "./agents-mcp.js";
 import {
   checkInstructionImports,
@@ -151,13 +153,46 @@ export function discover(options: DiscoverOptions): DiscoveryResult {
     diagnostics.push(...checkInstructionImports(root, configuration.instructions, fs));
   }
 
+  // A file that symlinks to another discovered instruction file is the same
+  // text under a second name (CLAUDE.md → AGENTS.md is the documented pattern).
+  // Marked before directives are derived, so the derived copies inherit it.
+  markAliasedInstructions(configuration, root, fs);
+
   // Derived last, so it sees every discovered instruction including the
-  // contract's override blocks.
+  // contract's override blocks. Alias twins are excluded: deriving the same
+  // bullet twice would double every rule count downstream.
   if (options.deriveDirectives !== false) {
-    configuration.directives.push(...deriveAllDirectives(configuration.instructions));
+    configuration.directives.push(...deriveAllDirectives(withoutAliases(configuration.instructions)));
   }
 
   const platforms = [...new Set(configuration.sources.map((source) => source.platform))].sort();
 
   return { configuration, diagnostics, scan, platforms, hasContract };
+}
+
+/**
+ * Sets `provenance.realFile` on instructions whose file is a symlink to another
+ * discovered instruction file, so downstream analysis can treat the pair as one
+ * text. A symlink to a file agentfile did not discover is left alone — there is
+ * no twin to double-count.
+ */
+function markAliasedInstructions(configuration: AgentConfiguration, root: string, fs: FileSystem): void {
+  const authored = new Set(configuration.instructions.map((instruction) => instruction.provenance.file));
+  const resolved = new Map<string, string>();
+
+  for (const instruction of configuration.instructions) {
+    const file = instruction.provenance.file;
+
+    let real = resolved.get(file);
+    if (real === undefined) {
+      const relativePath = normalizePath(relative(root, fs.realPath(join(root, file))));
+      real = relativePath.startsWith("..") ? file : relativePath;
+      resolved.set(file, real);
+    }
+
+    if (real !== file && authored.has(real)) {
+      instruction.provenance.realFile = real;
+      instruction.provenance.note ??= `symlink to ${real}`;
+    }
+  }
 }

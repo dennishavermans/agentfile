@@ -280,6 +280,7 @@ export {
   mergeConfigurations,
   nodeId,
   slugify,
+  withoutAliases,
 } from "./ir/index.js";
 // ─── Frontmatter parsing ───────────────────────────────────────────────────
 export type { ParsedFrontmatter } from "./parsers/index.js";
