@@ -91,6 +91,8 @@ export interface Applied<T> {
 }
 
 export interface Excluded {
+  /** Stable id of the node, so `explain` can match exactly rather than by label. */
+  id: string;
   /** Node kind, e.g. "instruction" or "skill". */
   kind: string;
   /** Short label identifying the node in output. */
@@ -249,6 +251,7 @@ function compareApplied(a: ResolutionRank, b: ResolutionRank): number {
 }
 
 interface Selectable {
+  id: string;
   applies: Applicability;
   provenance: Provenance;
 }
@@ -273,7 +276,13 @@ function select<T extends Selectable>(
         rank: rankOf(node.applies, node.provenance, evaluation, order),
       });
     } else {
-      excluded.push({ kind, label: label(node), provenance: node.provenance, reason: evaluation.reason });
+      excluded.push({
+        id: node.id,
+        kind,
+        label: label(node),
+        provenance: node.provenance,
+        reason: evaluation.reason,
+      });
     }
   }
 

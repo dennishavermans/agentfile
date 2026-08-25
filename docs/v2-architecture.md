@@ -534,8 +534,8 @@ backward compatibility verified.
 | **1** | `diagnostics/`, `paths/`, `ir/`, `capabilities/`, `resolver/`, `adapters/contract-v1`, tests | **done** — see §11 |
 | 2 | `discovery/` + `agentfile doctor` | **done** — see §12 |
 | 3 | `agentfile check` / hardened `validate` / `lint` on shared primitives | **done** — see §13 |
-| 4 | `agentfile context <path>` / `agentfile explain` | next |
-| 5 | `SKILL.md` parsing, validation, linting, analysis | planned |
+| 4 | `agentfile context <path>` / `agentfile explain` | **done** — see §14 |
+| 5 | `SKILL.md` parsing, validation, linting, analysis | next |
 | 6 | `agentfile audit` (static only) | planned |
 | 7 | compilers over the IR; `generator.ts` refactored to a compiler host | planned |
 | 8 | `agentfile eval` with deterministic assertions in a sandbox | planned |
@@ -877,7 +877,81 @@ baseline.
 
 ---
 
-## 14. Sources
+## 14. Phase 4 as built
+
+### 14.1 Two directions on one primitive
+
+`context` and `explain` are the two directions of the same question, and both are
+projections of `resolveForPath`:
+
+| Command | Question | Input |
+|---|---|---|
+| `context <path>` | what applies here, in what order, and why | a path |
+| `explain <target>` | where does this come from, when does it apply, what beats it | a node |
+
+Neither recomputes applicability. `verdictAt` calls the resolver and reads the
+answer out of `applied` or `excluded`; every reason string a developer sees is
+the resolver's own `MatchReason.detail` or `ExclusionReason.detail`, not a second
+description of the same rule written for display. That is the difference between
+observability and a plausible-looking second opinion.
+
+### 14.2 Addressing a node
+
+`explain` takes what a developer already has in front of them, so the query is
+resolved by how precisely it identifies something: exact id, then source file,
+then exact name, then substring. **The first strategy that matches anything
+wins** — a query naming a file is not also run as a substring search, which would
+bury the answer under coincidental matches.
+
+Several matches are all returned rather than one being picked, because a file
+query legitimately matches everything that file contributes. Above five matches
+the command lists candidates compactly and says how to narrow, instead of
+printing forty explanations.
+
+### 14.3 One IR change: skills got an id
+
+`Instruction` and `Directive` carried a stable `id`; `SkillEntry` did not. That
+gap only became visible here, because matching a node by *label* is wrong in a
+way that is easy to miss: two nested `AGENTS.md` files share a label and are
+different configuration. `Excluded` gained an `id` for the same reason, so a
+"why does this not apply" answer is exact rather than a best guess.
+
+Both are additive. The only construction sites were the skills discovery adapter
+and the contract adapter.
+
+### 14.4 What "the same thing" means
+
+`explain` reports where else the same configuration is declared, and per node
+kind that means what a developer would call the same thing:
+
+* a **rule** — another directive with the same normalised text
+* a **skill** — another skill with the same name, in a different file
+* an **instruction** — another instruction file that shares lines with it,
+  computed by reusing `findInstructionOverlap` rather than re-deriving what
+  "shared" means
+
+### 14.5 Honesty carried into the output
+
+* Nodes no verified platform scopes by path — subagents, hooks, MCP servers,
+  permissions — report exactly that, rather than being given a fabricated scope.
+* Directives read out of prose are marked `(read from prose)` in `context`, and
+  their `derived` origin and note appear in `explain`. Agentfile's reading of a
+  bullet is never presented as something the author declared.
+* Token figures repeat the estimate caveat, and `context` splits the number into
+  what loads in every session and what is specific to the path — because those
+  two costs lead to different decisions.
+* `context` says how many pieces of configuration did *not* apply even without
+  `--excluded`, so the count is never silently zero.
+
+### 14.6 Verified
+
+603 tests (508 core, 95 CLI). Build and typecheck clean; lint unchanged from
+baseline. Both commands are read-only and pinned by a test that asserts nothing
+appears on disk.
+
+---
+
+## 15. Sources
 
 - <https://agents.md/>
 - <https://code.claude.com/docs/en/memory>

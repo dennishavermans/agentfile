@@ -3,8 +3,10 @@
 import { Command } from "commander";
 import { checkCommand } from "./commands/check.js";
 import { cleanCommand } from "./commands/clean.js";
+import { contextCommand } from "./commands/context.js";
 import { diffCommand } from "./commands/diff.js";
 import { doctorCommand } from "./commands/doctor.js";
+import { explainCommand } from "./commands/explain.js";
 import { initCommand } from "./commands/init.js";
 import { lintCommand } from "./commands/lint.js";
 import { migrateCommand } from "./commands/migrate.js";
@@ -99,6 +101,29 @@ program
   .option("--strict", "Treat warnings as errors")
   .action((options: { root?: string; format?: string; budget?: string; similarity?: string; strict?: boolean }) =>
     lintCommand(options),
+  );
+
+program
+  .command("context")
+  .argument("<path>", "File or directory to resolve the effective configuration for")
+  .description("Show which configuration applies to a path, in load order, and why")
+  .option("--root <path>", "Directory to resolve against instead of the current working directory")
+  .option("--format <format>", "Output format: human or json", "human")
+  .option("--excluded", "List everything that did not apply, with the reason")
+  .action((path: string, options: { root?: string; format?: string; excluded?: boolean }) =>
+    contextCommand(path, options),
+  );
+
+program
+  .command("explain")
+  .argument("<target>", "A file path, a skill or subagent name, or part of a rule's text")
+  .description("Explain where a piece of configuration comes from and when it applies")
+  .option("--root <path>", "Directory to resolve against instead of the current working directory")
+  .option("--format <format>", "Output format: human or json", "human")
+  .option("--at <path>", "Ask whether it applies to a specific file")
+  .option("--kind <kind>", "Restrict to one kind when the target is ambiguous")
+  .action((target: string, options: { root?: string; format?: string; at?: string; kind?: string }) =>
+    explainCommand(target, options),
   );
 
 program.command("watch").description("Watch ai/ for changes and sync automatically").action(watchCommand);

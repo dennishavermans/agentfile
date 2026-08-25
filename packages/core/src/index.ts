@@ -314,8 +314,15 @@ export type {
   EffectiveConfiguration,
   Excluded,
   ExclusionReason,
+  ExplainKind,
+  ExplainOptions,
+  ExplainTarget,
   Explanation,
+  FindOptions,
+  MatchedBy,
   MatchReason,
+  NodeExplanation,
+  PathVerdict,
   ReachabilityOptions,
   ResolutionRank,
   ResolveOptions,
@@ -323,13 +330,17 @@ export type {
 export {
   configuredDirectories,
   deadPatterns,
+  describeApplicability,
   explainInstruction,
+  explainTarget,
+  findExplainTargets,
   normalizeDirectiveText,
   probePaths,
   repositoryResolutionDiagnostics,
   resolveForPath,
   SCOPE_RANK,
   unreachableDiagnostics,
+  verdictAt,
 } from "./resolver/index.js";
 // ─── Validation ────────────────────────────────────────────────────────────
 export type {

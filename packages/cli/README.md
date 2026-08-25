@@ -51,6 +51,47 @@ npx @agentfile/cli sync
 Reads your personal `.ai-agents` file and generates the correct instruction file for each agent in its native format.
 
 ```bash
+npx @agentfile/cli context src/api/handler.ts
+```
+
+What configuration actually applies to a file, in load order, with the reason for
+each entry. Every instruction with its platform and why it matched, the rules and
+skills available there, repository-wide configuration, and the context cost at
+that path — separating what loads in every session from what is specific to the
+path.
+
+```bash
+npx @agentfile/cli context src/api/handler.ts --excluded   # and why the rest did not
+npx @agentfile/cli context src/api/handler.ts --format json
+```
+
+`--excluded` is usually the interesting half: it lists everything that did *not*
+apply and the reason, which is what you want when a rule you wrote is not
+reaching the agent.
+
+```bash
+npx @agentfile/cli explain <target>
+```
+
+The inverse question. A target can be a file path, a skill or subagent name, or
+part of a rule's text.
+
+```bash
+npx @agentfile/cli explain .cursor/rules/api.mdc
+npx @agentfile/cli explain deploy
+npx @agentfile/cli explain "use pnpm" --at src/api/handler.ts
+npx @agentfile/cli explain "use pnpm" --kind rule
+```
+
+It reports where the configuration was declared, which platform it belongs to,
+when it applies, and where else the same thing is declared. With `--at`, it also
+answers whether it applies to that specific file, why or why not, and what
+outranks it there.
+
+Both commands read from the same resolver every other command uses, so neither
+can claim one thing while validation does another.
+
+```bash
 npx @agentfile/cli check
 ```
 

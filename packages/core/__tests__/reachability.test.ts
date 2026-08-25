@@ -78,6 +78,7 @@ describe("unreachableDiagnostics", () => {
       origin: "declared" as const,
     };
     configuration.skills.push({
+      id: nodeId("skill", provenance, "migrate-legacy"),
       name: "migrate-legacy",
       description: "Migrate a legacy screen",
       body: "",

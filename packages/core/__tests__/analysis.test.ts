@@ -13,7 +13,14 @@ import {
   overlapDiagnostics,
 } from "../src/analysis/index.ts";
 import type { AgentConfiguration, Instruction, PlatformId, SkillEntry } from "../src/ir/index.ts";
-import { ALWAYS, appliesToDirectory, appliesToPaths, emptyConfiguration, MODEL_SELECTED } from "../src/ir/index.ts";
+import {
+  ALWAYS,
+  appliesToDirectory,
+  appliesToPaths,
+  emptyConfiguration,
+  MODEL_SELECTED,
+  nodeId,
+} from "../src/ir/index.ts";
 
 const ROOT = "/repo";
 
@@ -136,13 +143,20 @@ describe("alwaysLoadedContext", () => {
 // ─── Skill routing ─────────────────────────────────────────────────────────
 
 function skill(name: string, description: string): SkillEntry {
+  const provenance = {
+    file: `.claude/skills/${name}/SKILL.md`,
+    platform: "claude" as const,
+    scope: "project" as const,
+    origin: "declared" as const,
+  };
   return {
+    id: nodeId("skill", provenance, name),
     name,
     description,
     body: "",
     resources: [],
     applies: MODEL_SELECTED,
-    provenance: { file: `.claude/skills/${name}/SKILL.md`, platform: "claude", scope: "project", origin: "declared" },
+    provenance,
   };
 }
 

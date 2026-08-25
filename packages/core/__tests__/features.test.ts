@@ -56,6 +56,7 @@ function configuration() {
 
   const skill = provenance(".claude/skills/deploy/SKILL.md", "claude");
   config.skills.push({
+    id: nodeId("skill", skill, "deploy"),
     name: "deploy",
     description: "Deploy the service when a release is cut",
     body: "",
@@ -131,6 +132,7 @@ describe("compatibilityDiagnostics", () => {
     const config = emptyConfiguration("/repo");
     for (const name of ["one", "two", "three"]) {
       config.skills.push({
+        id: nodeId("skill", provenance(`.claude/skills/${name}/SKILL.md`, "claude"), name),
         name,
         description: `Skill ${name}`,
         body: "",

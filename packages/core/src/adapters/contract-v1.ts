@@ -101,6 +101,7 @@ function mapSkills(contract: Contract, file: string, directory: string, source?:
     const provenance = provenanceFor(file, location?.line, directory);
 
     return {
+      id: nodeId("skill", provenance, skill.name),
       name: skill.name,
       description: skill.description,
       // The v1 contract expresses a skill as structured steps. Rendering it with

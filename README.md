@@ -150,6 +150,27 @@ It reads `AGENTS.md`, `CLAUDE.md`, `.claude/rules/`, `.claude/skills/`, `.claude
 
 `doctor` runs no model, makes no network calls, and never executes a hook, script, or MCP command it finds. It exits non-zero on errors, so it can gate CI.
 
+### `npx @agentfile/cli context <path>`
+What configuration actually applies to a file — in load order, with the reason for each.
+
+```bash
+npx @agentfile/cli context src/api/handler.ts
+npx @agentfile/cli context src/api/handler.ts --excluded   # and why the rest did not
+```
+
+When an agent behaves unexpectedly, the question is never "what does the configuration say" — it is *which of these nine files reached this request, and which one won*. This answers that: every instruction in load order with its platform and the reason it matched, the rules and skills available there, and the context cost at that path, separating what loads in every session from what is specific to the path.
+
+### `npx @agentfile/cli explain <target>`
+The inverse question: where does this piece of configuration come from, and when does it apply?
+
+```bash
+npx @agentfile/cli explain .cursor/rules/api.mdc
+npx @agentfile/cli explain deploy                            # a skill by name
+npx @agentfile/cli explain "use pnpm" --at src/api/handler.ts
+```
+
+A target can be a file path, a skill or subagent name, or part of a rule's text. With `--at`, it answers whether the rule applies to that file, **why or why not**, and what outranks it there. It also names the other files declaring the same thing.
+
 ### `npx @agentfile/cli check`
 Fast deterministic validation, built for pre-commit hooks and editors. A full run takes around 140 ms including Node startup.
 

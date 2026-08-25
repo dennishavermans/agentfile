@@ -14,6 +14,7 @@ import {
   appliesToPaths,
   MANUAL,
   MODEL_SELECTED,
+  nodeId,
   type PlatformId,
   type SkillEntry,
   type SkillResource,
@@ -138,8 +139,11 @@ export function discoverSkills(root: string, scan: RepositoryScan, fs: FileSyste
           ? MODEL_SELECTED
           : appliesToPaths([`${governing}/**`]);
 
+    const skillName = declaredName ?? directoryName;
+
     result.skills.push({
-      name: declaredName ?? directoryName,
+      id: nodeId("skill", provenance, skillName),
+      name: skillName,
       description: description ?? "",
       license: stringField(parsed.data, "license"),
       compatibility: stringField(parsed.data, "compatibility"),

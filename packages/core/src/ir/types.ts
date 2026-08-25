@@ -130,6 +130,8 @@ export interface SkillResource {
  * `extensions` so nothing is lost and portability can be reported on.
  */
 export interface SkillEntry {
+  /** Stable identifier, derived from provenance. Used by `explain`. */
+  id: string;
   /** Spec: 1–64 chars, lowercase alphanumerics and single hyphens. */
   name: string;
   /** Spec: 1–1024 chars. */

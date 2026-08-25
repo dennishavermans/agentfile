@@ -99,8 +99,32 @@ something is a problem. `agentfile validate --list-rules` prints the set.
   inconsistent scope, `AGF305` near-duplicate instruction. `AGF401` context
   overload is now emitted. All documented in `docs/diagnostics.md`.
 
+### Added — observability: `context` and `explain`
+
+Source-map information for agent configuration. When an agent behaves
+unexpectedly the question is never "what does the configuration say" — it is
+"which of these nine files reached this request, and which one won". Both
+commands answer that from the resolver, so neither can claim one thing while
+resolution does another.
+
+- **`agentfile context <path>`** — what applies at a path, in load order, with
+  the reason for each entry, where it came from, and which platform it belongs
+  to. Reports rules, available skills, repository-wide configuration, and the
+  context cost at that path — separating what loads in every session from what
+  is specific to the path. `--excluded` lists everything that did *not* apply
+  and why, which is usually the question being asked.
+- **`agentfile explain <target>`** — where one piece of configuration comes from,
+  when it applies, and where else the same thing is declared. A target can be a
+  file path, a skill or subagent name, or part of a rule's text; `--at <path>`
+  answers whether it applies to a specific file, why or why not, and what
+  outranks it there. `--kind` narrows an ambiguous query. A query that matches
+  too much lists the candidates instead of printing forty explanations.
+
 ### Changed
 
+- `SkillEntry` now carries a stable `id`, like every other IR node. This is what
+  lets `explain` match a node exactly rather than by label — two nested
+  `AGENTS.md` files share a label but are different configuration.
 - **`agentfile validate` can now fail on findings from outside the contract.**
   The v1 behaviour is otherwise preserved exactly: when `ai/contract.yaml` is
   present it is validated first and reported in the same words, and a schema

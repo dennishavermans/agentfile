@@ -7,6 +7,7 @@ import {
   emptyConfiguration,
   MANUAL,
   MODEL_SELECTED,
+  nodeId,
 } from "../src/ir/index.ts";
 import { explainInstruction, normalizeDirectiveText, resolveForPath, SCOPE_RANK } from "../src/resolver/index.ts";
 
@@ -39,13 +40,20 @@ function directive(text: string, file: string, applies: Applicability = ALWAYS, 
 }
 
 function skill(name: string, applies: Applicability): SkillEntry {
+  const provenance = {
+    file: `skills/${name}/SKILL.md`,
+    platform: "claude" as const,
+    scope: "project" as const,
+    origin: "declared" as const,
+  };
   return {
+    id: nodeId("skill", provenance, name),
     name,
     description: `does ${name}`,
     body: "",
     resources: [],
     applies,
-    provenance: { file: `skills/${name}/SKILL.md`, platform: "claude", scope: "project", origin: "declared" },
+    provenance,
   };
 }
 
