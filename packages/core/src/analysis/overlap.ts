@@ -117,7 +117,7 @@ export function overlapDiagnostics(overlaps: readonly InstructionOverlap[]): Dia
           : `${count} duplicated instruction lines across ${overlap.files.length} files`,
       explanation,
       suggestion: crossPlatform
-        ? "Keep these rules in one source and generate the per-platform files from it, so they cannot drift apart."
+        ? "Keep these rules in one file. AGENTS.md and CLAUDE.md can share one text through a symlink or an @AGENTS.md import — both documented; formats that cannot share a file can be generated from one source with `agentfile compile`."
         : "Keep the text in one file and reference it from the others.",
       location: { file: primary.file, line: primary.line },
       related: others.map((occurrence) => ({
