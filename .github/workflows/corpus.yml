@@ -35,11 +35,11 @@ jobs:
           - vercel/next.js
           - expo/expo
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           path: agentfile
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -125,7 +125,7 @@ jobs:
 
       - name: Keep the reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: corpus-${{ strategy.job-index }}
           path: out-*.json

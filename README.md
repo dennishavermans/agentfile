@@ -334,7 +334,7 @@ Turning a code `off` in this file is a repository-wide decision, recorded in a c
 ```yaml
 - run: npx @agentfile/cli check --format sarif > agentfile.sarif
   continue-on-error: true
-- uses: github/codeql-action/upload-sarif@v3
+- uses: github/codeql-action/upload-sarif@v4
   with:
     sarif_file: agentfile.sarif
 ```

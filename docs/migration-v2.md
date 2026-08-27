@@ -116,7 +116,7 @@ Or, for findings as annotations on the pull request rather than lines in a log:
 ```yaml
 - run: npx @agentfile/cli check --format sarif > agentfile.sarif
   continue-on-error: true
-- uses: github/codeql-action/upload-sarif@v3
+- uses: github/codeql-action/upload-sarif@v4
   with:
     sarif_file: agentfile.sarif
 ```
