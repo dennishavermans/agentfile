@@ -77,11 +77,11 @@ jobs:
           for command in doctor check lint audit adopt; do
             echo "::group::agentfile $command"
             timeout 120 node "$BIN" "$command" --root subject --format json > "out-$command.json"
-            status=$?
+            exit_code=$?
             echo "::endgroup::"
 
-            if [ "$status" -gt 1 ]; then
-              echo "::error::agentfile $command exited $status on ${{ matrix.repository }}"
+            if [ "$exit_code" -gt 1 ]; then
+              echo "::error::agentfile $command exited $exit_code on ${{ matrix.repository }}"
               failed=1
               continue
             fi
