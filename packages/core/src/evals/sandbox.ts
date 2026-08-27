@@ -184,7 +184,18 @@ export function temporaryDirectorySandbox(options: {
         cleanup(): void {
           if (cleaned) return;
           cleaned = true;
-          rmSync(workspaceRoot, { recursive: true, force: true });
+
+          try {
+            // The retries are for Windows: a process killed by a timeout can
+            // still hold a handle to its working directory for a moment after
+            // it dies, and the removal fails with EBUSY.
+            rmSync(workspaceRoot, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
+          } catch {
+            // A workspace that will not delete is a leaked temporary directory,
+            // not a failed eval. Throwing here would turn a successful run into
+            // an error report about the wrong thing, and the operating system
+            // reclaims the directory either way.
+          }
         },
       };
     },
