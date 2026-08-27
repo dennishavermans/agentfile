@@ -59,9 +59,15 @@ jobs:
           git clone --depth 1 --filter=blob:none --sparse \
             "https://github.com/${{ matrix.repository }}.git" subject
           cd subject
-          git sparse-checkout set \
-            AGENTS.md CLAUDE.md .cursorrules \
-            .claude .cursor .github .agents ai
+
+          # Cone mode takes directories, and always materialises the files in
+          # the repository root — which is where AGENTS.md, CLAUDE.md and
+          # .cursorrules live. Naming those files here would look precise and do
+          # nothing: cone mode would read them as directory names that match no
+          # directory. So the directories are listed, the root comes along, and
+          # this comment is the reason the list looks incomplete.
+          git sparse-checkout set .claude .cursor .github .agents ai
+
           echo "Files fetched:"
           find . -path ./.git -prune -o -type f -print | head -50
 
@@ -98,6 +104,17 @@ jobs:
           timeout 120 node "$BIN" context AGENTS.md --root subject --format json > out-context.json
           test $? -le 1 || failed=1
           echo "::endgroup::"
+
+          # A checkout that brought no configuration would let every command
+          # above pass by analysing nothing. These repositories are in the
+          # corpus precisely because they ship agent configuration, so finding
+          # none means the clone changed, not that they stopped having any.
+          sources=$(node -e 'const d=require("./out-doctor.json"); console.log(d.sources?.length ?? 0)' 2>/dev/null || echo 0)
+          echo "configuration files discovered: $sources"
+          if [ "$sources" -lt 1 ]; then
+            echo "::error::no configuration was discovered in ${{ matrix.repository }} — the sparse checkout is probably wrong"
+            failed=1
+          fi
 
           exit "$failed"
 
