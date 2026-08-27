@@ -211,6 +211,9 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<void> 
             files: result.scan.files.length,
             ignored: result.scan.ignored,
             truncated: result.scan.truncated,
+            // The human output says why; a machine consumer deciding whether to
+            // trust an incomplete report needs the same sentence.
+            truncationReason: result.scan.truncationReason,
           },
           alwaysLoadedContext: {
             files: always.files,

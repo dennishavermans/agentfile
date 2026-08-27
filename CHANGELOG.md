@@ -9,6 +9,30 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.0.0-beta.2] — 2026-08-27
+
+### Fixed
+
+- **A bounded scan proved absence, and it cannot.** The repository scan stops
+  after 20,000 files so a huge repository degrades into a reported truncation
+  rather than a hang. Every skill link and hook script pointing past that cut
+  was reported as a missing file — 65 findings in PostHog alone, whose 47,010
+  files do not fit, and every one of them was wrong. Absence is now settled
+  against the disk; presence in the file list is still checked first because it
+  is free and answers most cases. Instruction imports were never affected,
+  because they already checked the disk.
+
+  PostHog goes from 74 findings to 41, and its two remaining broken links are
+  real: one skill link is missing its `../../../` and resolves inside the skill
+  directory, and one points at a tool that is not in the repository.
+
+  Found while recording a demo, which showed the tool reporting files that were
+  plainly there.
+
+- `doctor --format json` now carries `scan.truncationReason`. The human output
+  already said why a scan stopped early; a machine consumer deciding whether to
+  trust an incomplete report needs the same sentence.
+
 ## [2.0.0-beta.1] — 2026-08-27
 
 The v2 rework, in one release. See [docs/migration-v2.md](docs/migration-v2.md)
