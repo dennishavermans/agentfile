@@ -35,7 +35,7 @@
     "agentfile"
   ],
   "engines": {
-    "node": ">=24.0.0"
+    "node": ">=22.0.0"
   },
   "publishConfig": {
     "access": "public"
@@ -44,7 +44,7 @@
     "@agentfile/cli": "^0.4.0"
   },
   "devDependencies": {
-    "@types/node": "^25.5.0",
+    "@types/node": "^22.19.0",
     "typescript": "^6.0.2"
   }
 }

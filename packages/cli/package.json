@@ -38,7 +38,7 @@
     "url": "https://github.com/dennishavermans/agentfile/issues"
   },
   "engines": {
-    "node": ">=24.0.0"
+    "node": ">=22.0.0"
   },
   "publishConfig": {
     "access": "public"
@@ -51,7 +51,7 @@
     "enquirer": "^2.4.1"
   },
   "devDependencies": {
-    "@types/node": "^25.5.0",
+    "@types/node": "^22.19.0",
     "tsx": "^4.21.0",
     "typescript": "^6.0.2",
     "vitest": "^4.1.0"

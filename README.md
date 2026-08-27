@@ -125,7 +125,7 @@ Add to `package.json`:
 }
 ```
 
-> **Requires Node.js >=24.0.0.**
+> **Requires Node.js >=22.0.0.**
 
 ---
 
@@ -255,6 +255,44 @@ npx @agentfile/cli eval evals/button.eval.yaml --keep-workspace
 
 Nothing executes in your working tree, no agent runs unless you name one, and results are cached against the repository state so unchanged evals are not re-run. Exit codes: 0 passed, 1 assertions failed, 2 harness error.
 
+## Generated-file utilities
+
+These work with the manifest that both `compile` and the legacy `sync` write, so
+they apply to either workflow.
+
+### `npx @agentfile/cli diff`
+Checks generated files against `.agentfile-manifest.json` and exits non-zero when drift is detected.
+
+```bash
+npx @agentfile/cli diff
+npx @agentfile/cli diff --files CLAUDE.md,.github/copilot-instructions.md
+```
+
+### `npx @agentfile/cli clean`
+Removes generated files that can be regenerated and updates manifest ownership records.
+
+```bash
+npx @agentfile/cli clean --dry-run
+npx @agentfile/cli clean
+```
+
+### `npx @agentfile/cli rollback`
+Restores files from `.agentfile-backup/`.
+
+```bash
+npx @agentfile/cli rollback --list
+npx @agentfile/cli rollback --tag migrate-1700000000000
+```
+
+## Legacy: the v1 contract workflow
+
+The commands below generate files from an `ai/contract.yaml` that a repository
+has to adopt first. They still work, are still tested, and nothing about their
+output has changed — but they are no longer the recommended entry point. The v2
+commands above read the configuration a repository already has and need no
+adoption step, and `agentfile adopt` is the supported route from one to the
+other.
+
 ### `npx @agentfile/cli init`
 Interactive setup. Scaffolds `ai/contract.yaml`, agent templates, `.ai-agents.example`, and a CI workflow. Safe to run in existing projects — never overwrites existing files.
 
@@ -290,33 +328,6 @@ Reads your personal `.ai-agents` file and generates the corresponding instructio
 ```bash
 npx @agentfile/cli sync             # generate files
 npx @agentfile/cli sync --dry-run   # render without writing — used in CI
-```
-
-### `npx @agentfile/cli validate`
-Validates `ai/contract.yaml` against the schema. Fast, exits 0 or 1. Designed for CI.
-
-### `npx @agentfile/cli diff`
-Checks generated files against `.agentfile-manifest.json` and exits non-zero when drift is detected.
-
-```bash
-npx @agentfile/cli diff
-npx @agentfile/cli diff --files CLAUDE.md,.github/copilot-instructions.md
-```
-
-### `npx @agentfile/cli clean`
-Removes generated files that can be regenerated and updates manifest ownership records.
-
-```bash
-npx @agentfile/cli clean --dry-run
-npx @agentfile/cli clean
-```
-
-### `npx @agentfile/cli rollback`
-Restores files from `.agentfile-backup/`.
-
-```bash
-npx @agentfile/cli rollback --list
-npx @agentfile/cli rollback --tag migrate-1700000000000
 ```
 
 ### `npx @agentfile/cli ui`

@@ -18,7 +18,7 @@ Everything below was verified against a clean checkout before any v2 work starte
 | Build | `npm run build` | all 5 packages build |
 | Typecheck | `npm run typecheck` | clean |
 | Lint | `npm run lint` | 3 warnings, 47 infos, 0 errors |
-| Node | `engines` | `>=24.0.0` (verified on v26.4.0) |
+| Node | `engines` | `>=22.0.0` — the active LTS floor. `@types/node` is pinned to the same line so the compiler enforces it rather than the field merely claiming it. Verified on v26.4.0. |
 
 The baseline is green. Every phase below must keep it green.
 
