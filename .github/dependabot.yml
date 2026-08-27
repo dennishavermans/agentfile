@@ -1,0 +1,26 @@
+version: 2
+updates:
+  # Actions pinned to a stale major is how a workflow ends up forced onto a
+  # deprecated runtime without anyone noticing.
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: monthly
+    groups:
+      actions:
+        patterns: ["*"]
+
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 5
+    groups:
+      dev-dependencies:
+        dependency-type: development
+        patterns: ["*"]
+    ignore:
+      # Pinned to the minimum supported Node line on purpose, so the compiler
+      # enforces the engines floor instead of the field merely claiming it.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]

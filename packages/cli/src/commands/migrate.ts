@@ -1,8 +1,8 @@
 /// <reference types="node" />
 
+import { existsSync, mkdirSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
+import { dirname, join, relative, resolve } from "node:path";
 import { captureBackup, writeBackup } from "@agentfile/core";
-import { existsSync, mkdirSync, renameSync, unlinkSync, writeFileSync } from "fs";
-import { dirname, join, relative, resolve } from "path";
 import { logger } from "../logger.js";
 import { filterSourcesByTarget } from "./migrate/filter.js";
 import { mergeFiles } from "./migrate/merge.js";

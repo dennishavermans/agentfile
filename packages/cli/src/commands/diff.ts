@@ -1,8 +1,8 @@
 /// <reference types="node" />
 
 import { existsSync } from "node:fs";
+import { join } from "node:path";
 import { detectDrift, MANIFEST_FILE, ownedPaths, readManifest } from "@agentfile/core";
-import { join } from "path";
 import { logger } from "../logger.js";
 
 export interface DiffOptions {

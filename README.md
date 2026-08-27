@@ -1,114 +1,93 @@
 # agentfile
 
-> One contract. Every AI agent. Zero clutter.
+> Find what is wrong with the AI agent configuration your repository already has.
 
-Your team uses GitHub Copilot, Claude, Cursor — each expecting its own instruction file, in its own format, in its own location. `agentfile` lets you define your rules once and generate the right file for each agent automatically.
+Your team uses Claude Code, Copilot, Cursor, Codex — each with its own instruction file, in its own format, in its own place. Nobody reads all of them at once, so they drift, contradict each other, and quietly cost context in every session.
 
-Generated files are **never committed**. Each developer only generates what they personally use.
+`agentfile` reads them as they are and tells you what is wrong.
+
+```bash
+npx @agentfile/cli doctor
+```
+
+No setup. No file to adopt first. Nothing written to disk. **Nothing it finds is ever executed** — hooks, skills, commands and MCP configuration are read as text, and a clean result says "no pattern matched", never "this is safe".
 
 ---
 
 ## The problem
 
-Without agentfile, you maintain the same rules in multiple places — and they drift:
+The same rule, maintained in four places, drifting apart:
 
 ```
-CLAUDE.md                        ← manually written
-.github/copilot-instructions.md  ← manually written, probably out of date
-.cursor/rules/main.mdc           ← manually written, different format
-.windsurfrules                   ← someone forgot to update this one
+AGENTS.md                        ← the one that is current
+CLAUDE.md                        ← a copy, edited last month
+.github/copilot-instructions.md  ← a copy, probably out of date
+.cursor/rules/main.mdc           ← different format, different rules
 ```
 
-Every rule change means touching four files. Every new team member copies the wrong one. Every new agent means another file to maintain forever.
+Symlinks solve the copying. They do not tell you that two of these disagree about the package manager, that a hook points at a script nobody committed, that a `.mcp.json` server will silently fail to load, or that 10,000 tokens load into every session before anyone types a word.
 
 ---
 
-## The solution
+## What it does
 
-You write your rules once in `ai/contract.yaml`:
-
-```yaml
-version: 1
-
-project:
-  name: My Project
-  stack: [typescript, react, nextjs]
-
-rules:
-  coding:
-    - Prefer small composable functions
-    - Avoid unnecessary abstractions
-  architecture:
-    - Follow feature-based folder structure
-
-skills:
-  - name: create-component
-    description: Creates a new React component with tests
-    steps:
-      - Create /src/components/{feature}/{Name}.tsx
-      - Create matching test file
-      - Export from index.ts
-```
-
-Then run one command:
+Nine questions, one command each. Run them in this order the first time:
 
 ```bash
-npx @agentfile/cli sync
+npx @agentfile/cli doctor              # what is here, and what is wrong with it
+npx @agentfile/cli context src/api.ts  # which configuration applies here, and why
+npx @agentfile/cli audit               # what a hook, skill or MCP server could do
+npx @agentfile/cli adopt               # plan a single source of truth
 ```
 
-And every agent gets the right file in the right format:
+Then, once it is part of the build:
 
-```
-✔ claude     → CLAUDE.md
-✔ copilot    → .github/copilot-instructions.md
-✔ cursor     → .cursor/rules/main.mdc
-✔ cursor:skill:create-component → .cursor/rules/skills/create-component.mdc
-✔ agents-md  → AGENTS.md
+```bash
+npx @agentfile/cli check               # fast enough for a pre-commit hook
+npx @agentfile/cli validate --strict   # every layer, in CI
+npx @agentfile/cli lint                # drifted copies, duplication, context cost
+npx @agentfile/cli compile --check     # generated files still match their source
+npx @agentfile/cli eval                # did the agent actually comply
 ```
 
-Each agent receives its rules in its own native format — Claude gets readable markdown, Cursor gets structured `.mdc` with frontmatter, Copilot gets compact inline context. The contract is the same. The output adapts.
+Everything is deterministic: no model, no network, same tree in, same findings out. Every finding carries a stable code, a location, why it matters, and what to do about it.
 
 ---
 
 ## How it works
 
-```
-ai/contract.yaml        ← your team's rules, committed once
-ai/agents/              ← agent templates, committed once
+agentfile reads whatever is there, normalises it into one representation with full provenance, and answers every question from that:
 
-CLAUDE.md               ← gitignored, generated per-developer
-.cursor/rules/main.mdc  ← gitignored, generated per-developer
-.github/copilot-instructions.md  ← gitignored, generated per-developer
-AGENTS.md               ← gitignored, generated per-developer
 ```
+AGENTS.md, CLAUDE.md, .cursorrules          ┐
+.claude/{rules,skills,agents,commands}/     │
+.cursor/{rules,commands}/                   ├─→  one normalized model  ─→  doctor
+.github/copilot-instructions.md             │      every node knows          check
+.github/instructions/, .agents/skills/      │      its file, line,           lint
+.claude/settings.json, .mcp.json            ┘      platform and scope        audit
+                                                                             context
+                                                                             compile
+```
+
+Because there is one resolver, `context` and `compile` cannot disagree about what applies where.
+
+If you would rather keep one source and generate the rest, `adopt` plans that and `compile` maintains it. That is a choice, not a prerequisite.
 
 ---
 
 ## Getting started
 
-```bash
-npx @agentfile/cli init
-```
-
-The `init` command walks you through your project name, stack, and which agents your team uses — then scaffolds everything.
-
-After init, generate your personal agent files:
+Point it at any repository:
 
 ```bash
-npx @agentfile/cli sync
+npx @agentfile/cli doctor
 ```
+
+It needs nothing from you. If it finds nothing, it says what it looked for.
 
 ---
 
 ## Installation
-
-For teams that want `agentfile` as a project dependency:
-
-```bash
-npm install --save-dev @agentfile/agentfile
-```
-
-Or use the scoped CLI package directly:
 
 ```bash
 npm install --save-dev @agentfile/cli
@@ -119,17 +98,263 @@ Add to `package.json`:
 ```json
 {
   "scripts": {
-    "ai:sync":     "agentfile sync",
-    "ai:validate": "agentfile validate"
+    "ai:check":    "agentfile check",
+    "ai:validate": "agentfile validate --strict"
   }
 }
 ```
 
-> **Requires Node.js >=24.0.0.**
+> **Requires Node.js >=22.0.0.**
+
+The local dashboard is a separate install, because it ships an HTTP server most projects never want: `npm install --save-dev @agentfile/ui`.
+
+---
+
+## Documentation
+
+- [Diagnostic codes](docs/diagnostics.md) — every `AGFxxx`, what it means, and how to configure it
+- [What is stable](docs/stability.md) — what CI and editors may depend on
+- [Moving to v2](docs/migration-v2.md) — nothing you have breaks; here is what is new
+- [Security](SECURITY.md) — what agentfile promises about execution, and what it does not promise about safety
+- [Contributing](CONTRIBUTING.md) — the rules the code follows, and why
 
 ---
 
 ## Commands
+
+### `npx @agentfile/cli doctor`
+Analyses the AI agent configuration your repository already has — no setup required, nothing written to disk.
+
+```bash
+npx @agentfile/cli doctor
+npx @agentfile/cli doctor --verbose      # list every file found
+npx @agentfile/cli doctor --format json  # machine-readable, for CI
+```
+
+It reads `AGENTS.md`, `CLAUDE.md`, `.claude/rules/`, `.claude/skills/`, `.claude/agents/`, `.claude/commands/`, `.cursor/rules/`, `.cursor/commands/`, `.github/copilot-instructions.md`, `.github/instructions/`, and `.mcp.json`, then reports:
+
+- what configuration exists, per platform, and where it lives
+- how much context loads into **every** session (an estimate, clearly labelled)
+- rules duplicated across platforms — the drift the rest of agentfile prevents
+- skills whose description is too thin for an agent to route on
+- misconfigurations such as an MCP server that will silently fail to load, or an instruction file importing a path that does not exist
+
+`doctor` runs no model, makes no network calls, and never executes a hook, script, or MCP command it finds. It exits non-zero on errors, so it can gate CI.
+
+### `npx @agentfile/cli adopt`
+Proposes a single source of truth for the configuration you already have, and shows the plan before touching anything.
+
+```bash
+npx @agentfile/cli adopt                  # plan only — writes nothing
+npx @agentfile/cli adopt --apply          # carry it out, after confirming
+npx @agentfile/cli adopt --source claude  # consolidate into CLAUDE.md instead
+```
+
+Adoption happens in two phases, and the order is not cosmetic. A compiler never carries a target's own file into that target, so generating `CLAUDE.md` while `CLAUDE.md` still holds text nothing else has would lose that text. So:
+
+1. **Consolidate.** Everything every platform says is gathered into one file — `AGENTS.md` by default, because it is the cross-tool standard — which stays hand-written. Bodies are appended whole under a heading naming where they came from: nothing is rewritten, reordered, or summarised, and a file the source already says everything from is skipped rather than copied again.
+2. **Generate.** The other platforms' files become compiler output of that source.
+
+Nothing is written without `--apply`, and `--apply` confirms first. A hand-written file is overwritten only once its own text is already in the source — anything else is still refused, exactly as `compile` refuses it. Skills, subagents, commands, hooks, MCP servers and permission rules are left alone, and the plan says so rather than leaving you to notice.
+
+Asking `compile` to do both phases at once is reported as `AGF205`: with two hand-written targets each becomes the other's source, and under `--force` their contents swap.
+
+### `npx @agentfile/cli rule [code]`
+What a diagnostic code means, from the same registry that produces it.
+
+```bash
+npx @agentfile/cli rule            # every code, grouped by band
+npx @agentfile/cli rule AGF302     # one code in full
+```
+
+### `npx @agentfile/cli context <path>`
+What configuration actually applies to a file — in load order, with the reason for each.
+
+```bash
+npx @agentfile/cli context src/api/handler.ts
+npx @agentfile/cli context src/api/handler.ts --excluded   # and why the rest did not
+```
+
+When an agent behaves unexpectedly, the question is never "what does the configuration say" — it is *which of these nine files reached this request, and which one won*. This answers that: every instruction in load order with its platform and the reason it matched, the rules and skills available there, and the context cost at that path, separating what loads in every session from what is specific to the path.
+
+### `npx @agentfile/cli explain <target>`
+The inverse question: where does this piece of configuration come from, and when does it apply?
+
+```bash
+npx @agentfile/cli explain .cursor/rules/api.mdc
+npx @agentfile/cli explain deploy                            # a skill by name
+npx @agentfile/cli explain "use pnpm" --at src/api/handler.ts
+```
+
+A target can be a file path, a skill or subagent name, or part of a rule's text. With `--at`, it answers whether the rule applies to that file, **why or why not**, and what outranks it there. It also names the other files declaring the same thing.
+
+### `npx @agentfile/cli check`
+Fast deterministic validation, built for pre-commit hooks and editors. A full run takes around 140 ms including Node startup.
+
+```bash
+npx @agentfile/cli check
+npx @agentfile/cli check --strict        # warnings fail the run
+npx @agentfile/cli check --format json
+```
+
+Runs the structural and resolution checks: files that will not parse, references that point at nothing, the same rule maintained in several places, glob-scoped rules that match no file, and rules whose scope differs between platforms. No network, no model, nothing executed.
+
+#### Silencing a finding you have already decided about
+
+A finding you have reviewed and accepted is silenced with a comment in the file itself, in whatever comment syntax that file already uses:
+
+```markdown
+<!-- agentfile-disable-next-line AGF302 mirrored deliberately for the audit trail -->
+```
+
+`agentfile-disable-next-line` covers the following line, `agentfile-disable-line` its own line, and `agentfile-disable` the whole file. Name no codes and it silences everything on that line.
+
+Two things keep this from becoming a way to hide problems. Suppressed findings are **counted, not discarded** — every command says how many it silenced, and `--format json` carries each one with the directive responsible, so `--no-suppressions` is never needed to find out what a repository has chosen not to see. And a directive that silences nothing is reported as `AGF005`, so a suppression cannot quietly outlive the problem it was written for.
+
+### `npx @agentfile/cli lint`
+Quality analysis — the things that are not wrong but are costing you.
+
+```bash
+npx @agentfile/cli lint
+npx @agentfile/cli lint --budget 2000       # tighten the context budget
+npx @agentfile/cli lint --similarity 0.75   # loosen near-duplicate detection
+```
+
+Finds copies of a rule that have **drifted apart** — exact comparison goes quiet at exactly the moment someone edits one copy and not the others — and measures always-loaded context against a budget, naming the largest contributors. Similarity is measured on words, not meaning, and the output says so.
+
+For skills, it reports descriptions too thin for an agent to route on, two skills an agent has no basis to choose between, bodies past the size the specification recommends, and frontmatter that will not survive being shared through claude.ai or the Skills API.
+
+### `npx @agentfile/cli validate`
+Strict validation across every layer. Designed for CI.
+
+```bash
+npx @agentfile/cli validate
+npx @agentfile/cli validate --target claude    # what would compiling to Claude Code lose?
+npx @agentfile/cli validate --target all
+npx @agentfile/cli validate --strict
+npx @agentfile/cli validate --list-rules       # print the rule set
+```
+
+With `--target`, it checks the features your configuration uses against what that platform actually supports, and every finding cites the platform's own documentation. Without `--target` it says compatibility was not checked, rather than assuming a target and failing your build over it.
+
+It also validates every `SKILL.md` against the [Agent Skills specification](https://agentskills.io/specification) — agentfile validates against that standard rather than inventing a replacement — and statically inspects the scripts a skill bundles against a documented set of risk patterns. **Nothing found in the repository is ever executed**, and a clean result says "no pattern matched", never "this is safe".
+
+`ai/contract.yaml` is still validated first and reported exactly as before, and a schema failure is still an immediate exit 1.
+
+### `npx @agentfile/cli audit`
+Security and trust analysis of hooks, skills, MCP servers, and permission rules.
+
+```bash
+npx @agentfile/cli audit
+npx @agentfile/cli audit --all      # include informational findings
+npx @agentfile/cli audit --strict   # treat warnings as errors
+```
+
+Reads everything as text and executes nothing. Reports risky hook commands, unpinned MCP packages, committed credentials, permission rules that do not grant what they appear to, and prompt-injection indicators — each finding with the reason and, where it applies, the platform documentation that backs it. The output names every surface analysed and every file it could not read, and a clean result says what it means: no pattern matched, **not** "this is safe".
+
+### `npx @agentfile/cli compile`
+Compiles the normalized configuration into native target files.
+
+```bash
+npx @agentfile/cli compile --target claude cursor    # from whatever your source of truth is
+npx @agentfile/cli compile --target agents-md --check  # CI: exit 1 on drift, writes nothing
+```
+
+Whatever the repository maintains — AGENTS.md, CLAUDE.md, an agentfile contract — becomes the input; the requested targets get their documented file shapes (AGENTS.md files, CLAUDE.md plus `.claude/rules`, Copilot instruction files, Cursor `.mdc` rules). What a target cannot express is reported (`AGF201`–`AGF203`) instead of silently dropped, output is deterministic and marker-stamped, and a file agentfile does not own is never overwritten without `--force`.
+
+### `npx @agentfile/cli eval`
+Behavioral evaluation: run an agent task in an isolated workspace, judge the result with deterministic assertions. See [docs/evals.md](docs/evals.md).
+
+```bash
+npx @agentfile/cli eval --agent "claude -p {prompt}"
+npx @agentfile/cli eval evals/button.eval.yaml --keep-workspace
+```
+
+Nothing executes in your working tree, no agent runs unless you name one, and results are cached against the repository state so unchanged evals are not re-run. Exit codes: 0 passed, 1 assertions failed, 2 harness error.
+
+## Generated-file utilities
+
+These work with the manifest that both `compile` and the legacy `sync` write, so
+they apply to either workflow.
+
+### `npx @agentfile/cli diff`
+Checks generated files against `.agentfile-manifest.json` and exits non-zero when drift is detected.
+
+```bash
+npx @agentfile/cli diff
+npx @agentfile/cli diff --files CLAUDE.md,.github/copilot-instructions.md
+```
+
+### `npx @agentfile/cli clean`
+Removes generated files that can be regenerated and updates manifest ownership records.
+
+```bash
+npx @agentfile/cli clean --dry-run
+npx @agentfile/cli clean
+```
+
+### `npx @agentfile/cli rollback`
+Restores files from `.agentfile-backup/`.
+
+```bash
+npx @agentfile/cli rollback --list
+npx @agentfile/cli rollback --tag migrate-1700000000000
+```
+
+## Configuring agentfile
+
+Everything below is also a flag, and a repository that never writes this file loses nothing. What the file buys is agreement: a pre-commit hook, a CI job and an editor cannot each spell out the same `--budget 2000 --similarity 0.75`, and a tool arguing for one source of truth should not need its own settings in three places.
+
+`agentfile.yaml`, at the repository root, every key optional:
+
+```yaml
+# Directory names to skip, added to the built-in list
+ignore:
+  - fixtures
+
+# Per-code severity. `off` silences a code repository-wide
+severity:
+  AGF302: info
+  AGF501: error
+  AGF203: off
+
+budget: 2000        # always-loaded context budget, in estimated tokens
+similarity: 0.75    # near-duplicate threshold
+targets: [claude, copilot]
+maxWarnings: 0      # fail when warnings exceed this
+suppressions: true  # honour agentfile-disable directives
+```
+
+A key nobody recognises is an error, not a shrug — a silently ignored `sevrity:` block is a setting the team believes is applied and is not, which is the failure agentfile exists to report. And a file that does not validate is reported and then **ignored entirely**: a half-applied configuration is worse than none, because the half that applied looks like the whole. A flag always beats the file.
+
+Turning a code `off` in this file is a repository-wide decision, recorded in a committed file. It is a different thing from an `agentfile-disable` comment, which silences one finding at one line and is reported when it goes stale.
+
+## CI output
+
+`check`, `validate`, `lint` and `audit` emit **SARIF 2.1.0** with `--format sarif`, which GitHub code scanning reads:
+
+```yaml
+- run: npx @agentfile/cli check --format sarif > agentfile.sarif
+  continue-on-error: true
+- uses: github/codeql-action/upload-sarif@v4
+  with:
+    sarif_file: agentfile.sarif
+```
+
+Findings then appear as annotations on the pull request that introduced them instead of in a job log. Every code is declared with a documentation link, and findings are fingerprinted without their line number, so editing a file above a finding does not close the alert and open an identical new one.
+
+`--max-warnings <n>` is the ratchet for working a warning count down: it fails the run when warnings exceed the ceiling, without `--strict`'s claim that every warning is an error.
+
+---
+
+## Legacy: the v1 contract workflow
+
+The commands below generate files from an `ai/contract.yaml` that a repository
+has to adopt first. They still work, are still tested, and nothing about their
+output has changed — but they are no longer the recommended entry point. The v2
+commands above read the configuration a repository already has and need no
+adoption step, and `agentfile adopt` is the supported route from one to the
+other.
 
 ### `npx @agentfile/cli init`
 Interactive setup. Scaffolds `ai/contract.yaml`, agent templates, `.ai-agents.example`, and a CI workflow. Safe to run in existing projects — never overwrites existing files.
@@ -168,33 +393,6 @@ npx @agentfile/cli sync             # generate files
 npx @agentfile/cli sync --dry-run   # render without writing — used in CI
 ```
 
-### `npx @agentfile/cli validate`
-Validates `ai/contract.yaml` against the schema. Fast, exits 0 or 1. Designed for CI.
-
-### `npx @agentfile/cli diff`
-Checks generated files against `.agentfile-manifest.json` and exits non-zero when drift is detected.
-
-```bash
-npx @agentfile/cli diff
-npx @agentfile/cli diff --files CLAUDE.md,.github/copilot-instructions.md
-```
-
-### `npx @agentfile/cli clean`
-Removes generated files that can be regenerated and updates manifest ownership records.
-
-```bash
-npx @agentfile/cli clean --dry-run
-npx @agentfile/cli clean
-```
-
-### `npx @agentfile/cli rollback`
-Restores files from `.agentfile-backup/`.
-
-```bash
-npx @agentfile/cli rollback --list
-npx @agentfile/cli rollback --tag migrate-1700000000000
-```
-
 ### `npx @agentfile/cli ui`
 Starts a local dashboard in your browser for inspecting your contract, previewing generated files, and monitoring drift.
 
@@ -203,6 +401,8 @@ npx @agentfile/cli ui                        # open dashboard on default port 43
 npx @agentfile/cli ui --port 3000            # custom port
 npx @agentfile/cli ui --root ./packages/app  # inspect a specific directory
 ```
+
+Needs `@agentfile/ui` installed alongside the CLI (`npm install --save-dev @agentfile/ui`); it is not pulled in by default, because it ships an HTTP server and a built front end that most installs never use.
 
 ---
 
@@ -451,52 +651,60 @@ for (const r of result.results) {
 
 ## Contributing
 
-agentfile is in early development. Issues and PRs welcome.
+agentfile is in early development. Issues and pull requests are welcome,
+including the ones that say a finding is wrong — that is the most useful kind of
+report, and it has already changed the tool once.
 
-1. Clone the repo
-2. `npm install` from the root
-3. `npm run build` to build all packages
-4. `npm test` to run all tests
+```bash
+npm install    # from the root
+npm run build  # the CLI typechecks against core's built types, so build first
+npm test
+npm run lint
+```
+
+[CONTRIBUTING.md](CONTRIBUTING.md) has the rest: the rules the code follows and
+why, how to add a diagnostic, and what makes a false-positive report
+actionable.
 
 ---
 
 ## Release process
 
-### npm packages
+Publishing happens in GitHub Actions, not on a laptop, so every package carries
+[npm provenance](https://docs.npmjs.com/generating-provenance-statements) — a
+signed statement of which commit and which workflow built it. For a tool that
+tells people what is unsafe in their configuration, publishing without that
+would be the wrong way round.
 
-1. Update versions in all package manifests (`packages/core`, `packages/cli`, `packages/agentfile`, `packages/ui`)
-2. Update `CHANGELOG.md`
-3. Build and test from repo root:
-
-```bash
-npm run build
-npm run test
-```
-
-4. Publish all npm packages:
-
-```bash
-npm run publish:all
-```
-
-Recommended order is `core` → `cli` → `agentfile` → `ui` (already encoded in `publish:all`).
-
-### VS Code extension
-
-The extension is published separately to the VS Code Marketplace and Open VSX Registry:
+1. Update the version in `packages/core`, `packages/cli` and
+   `packages/agentfile`, keeping the internal `@agentfile/*` dependency ranges
+   in step. The release workflow refuses to publish if the tag and the manifests
+   disagree.
+2. Add the section to `CHANGELOG.md`. It becomes the release notes; the workflow
+   fails if there is no section for the version being tagged.
+3. Tag and push:
 
 ```bash
-# Build and package the .vsix
-npm run package:extension
-
-# Publish to VS Code Marketplace (requires VSCE_PAT env var)
-npm run publish:extension
-
-# Publish to Open VSX Registry (requires OVSX_PAT env var)
-cd packages/extension && npx ovsx publish *.vsix
+git tag v2.0.0-beta.1
+git push origin v2.0.0-beta.1
 ```
 
-The extension version is managed independently in `packages/extension/package.json`.
+That runs lint, build and the full test suite, publishes `core` → `cli` →
+`agentfile` in that order, and creates the GitHub release. A version with a
+hyphen in it is treated as a pre-release: it goes out under the `next` dist-tag
+and is marked as a pre-release on GitHub, so `npm install @agentfile/cli` keeps
+resolving to the last stable version.
+
+`workflow_dispatch` runs the same thing as a dry run, which is worth doing once
+before the first real tag.
+
+### One-time setup
+
+- An `NPM_TOKEN` secret with publish rights, in a repository environment named
+  `release`.
+- Better, if you can: [npm trusted
+  publishing](https://docs.npmjs.com/trusted-publishers), which drops the token
+  entirely and authenticates the workflow itself.
 
 ---
 

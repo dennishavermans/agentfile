@@ -1,6 +1,6 @@
+import { existsSync, readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { generate, ValidationError, validateContract } from "@agentfile/core";
-import { existsSync, readFileSync } from "fs";
-import { dirname, join } from "path";
 import * as vscode from "vscode";
 import { parseDocument } from "yaml";
 

@@ -1,7 +1,7 @@
 {
   "name": "@agentfile/cli",
-  "version": "0.4.0",
-  "description": "CLI for agentfile — init, migrate, sync, validate, watch, diff, clean, rollback, and ui",
+  "version": "2.0.0-beta.1",
+  "description": "Find what is wrong with the AI agent configuration your repository already has \u2014 doctor, check, lint, audit, adopt, compile, eval",
   "type": "module",
   "main": "./dist/bin.js",
   "bin": {
@@ -31,29 +31,39 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/dennishavermans/agentfile.git"
+    "url": "git+https://github.com/dennishavermans/agentfile.git",
+    "directory": "packages/cli"
   },
   "homepage": "https://github.com/dennishavermans/agentfile#readme",
   "bugs": {
     "url": "https://github.com/dennishavermans/agentfile/issues"
   },
   "engines": {
-    "node": ">=24.0.0"
+    "node": ">=22.0.0"
   },
   "publishConfig": {
     "access": "public"
   },
   "dependencies": {
-    "@agentfile/core": "^0.4.0",
-    "@agentfile/ui": "^0.1.0-beta.0",
+    "@agentfile/core": "^2.0.0-beta.1",
     "chalk": "^5.6.2",
     "commander": "^14.0.3",
     "enquirer": "^2.4.1"
   },
   "devDependencies": {
-    "@types/node": "^25.5.0",
+    "@agentfile/ui": "^0.1.0-beta.0",
+    "@types/node": "^22.19.0",
     "tsx": "^4.21.0",
     "typescript": "^6.0.2",
     "vitest": "^4.1.0"
-  }
+  },
+  "peerDependencies": {
+    "@agentfile/ui": "^0.1.0-beta.0"
+  },
+  "peerDependenciesMeta": {
+    "@agentfile/ui": {
+      "optional": true
+    }
+  },
+  "author": "Dennis Havermans"
 }

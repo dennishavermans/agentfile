@@ -1,6 +1,6 @@
 /// <reference types="node" />
-import { existsSync, mkdirSync, writeFileSync } from "fs";
-import { join } from "path";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { logger } from "../logger.js";
 
 // ─── Scaffolding Templates ─────────────────────────────────────────────────

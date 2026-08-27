@@ -1,6 +1,6 @@
 /// <reference types="node" />
-import { readFileSync } from "fs";
-import { basename } from "path";
+import { readFileSync } from "node:fs";
+import { basename } from "node:path";
 import type { ParsedFile, ParsedSkill, RuleCategory, Section } from "./types.js";
 
 const RULE_HEADING_PATTERNS: [RegExp, RuleCategory][] = [

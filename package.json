@@ -22,7 +22,7 @@
     "publish:all": "npm run publish:core && npm run publish:cli && npm run publish:wrapper && npm run publish:ui"
   },
   "engines": {
-    "node": ">=24.0.0"
+    "node": ">=22.0.0"
   },
   "dependencies": {
     "typescript": "^6.0.2"

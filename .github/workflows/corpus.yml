@@ -1,0 +1,149 @@
+name: Corpus
+
+# Every product bug found in agentfile so far was found by running it against a
+# real repository, not by a unit test. Real configuration is misspelled,
+# symlinked, half-migrated and enormous in ways fixtures are not, so this runs
+# the analysis commands against public repositories that actually ship agent
+# configuration.
+#
+# It is deliberately not part of CI: it clones from GitHub, so it must never be
+# able to fail a pull request because someone else's repository changed. It runs
+# on a schedule and on demand, and what it guards against is a crash, a hang, or
+# a command that stops producing output — not a particular finding count.
+on:
+  schedule:
+    # Mondays, 05:00 UTC.
+    - cron: "0 5 * * 1"
+  workflow_dispatch:
+    inputs:
+      repository:
+        description: "owner/name to analyse instead of the default set"
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  corpus:
+    name: Analyse ${{ matrix.repository }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        repository:
+          - PostHog/posthog
+          - vercel/next.js
+          - expo/expo
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: agentfile
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: agentfile/package-lock.json
+
+      - name: Build
+        working-directory: agentfile
+        run: |
+          npm ci
+          npm run build
+
+      - name: Fetch only the configuration from ${{ matrix.repository }}
+        run: |
+          set -euo pipefail
+          # A blobless, sparse clone: these repositories are enormous and the
+          # only thing being analysed is their agent configuration.
+          git clone --depth 1 --filter=blob:none --sparse \
+            "https://github.com/${{ matrix.repository }}.git" subject
+          cd subject
+
+          # Cone mode takes directories, and always materialises the files in
+          # the repository root — which is where AGENTS.md, CLAUDE.md and
+          # .cursorrules live. Naming those files here would look precise and do
+          # nothing: cone mode would read them as directory names that match no
+          # directory. So the directories are listed, the root comes along, and
+          # this comment is the reason the list looks incomplete.
+          git sparse-checkout set .claude .cursor .github .agents ai
+
+          echo "Files fetched:"
+          find . -path ./.git -prune -o -type f -print | head -50
+
+      - name: Analyse
+        run: |
+          set -uo pipefail
+          BIN="$GITHUB_WORKSPACE/agentfile/packages/cli/dist/bin.js"
+          failed=0
+
+          # Exit 1 means findings, which is the expected outcome on real
+          # repositories. Anything above that is a crash and is a bug in
+          # agentfile regardless of what the repository contains.
+          for command in doctor check lint audit adopt; do
+            echo "::group::agentfile $command"
+            timeout 120 node "$BIN" "$command" --root subject --format json > "out-$command.json"
+            exit_code=$?
+            echo "::endgroup::"
+
+            if [ "$exit_code" -gt 1 ]; then
+              echo "::error::agentfile $command exited $exit_code on ${{ matrix.repository }}"
+              failed=1
+              continue
+            fi
+
+            # Silence is the failure mode a green exit code hides: a command
+            # that stopped analysing anything still exits 0.
+            if [ ! -s "out-$command.json" ]; then
+              echo "::error::agentfile $command produced no output on ${{ matrix.repository }}"
+              failed=1
+            fi
+          done
+
+          echo "::group::agentfile context"
+          timeout 120 node "$BIN" context AGENTS.md --root subject --format json > out-context.json
+          test $? -le 1 || failed=1
+          echo "::endgroup::"
+
+          # A checkout that brought no configuration would let every command
+          # above pass by analysing nothing. These repositories are in the
+          # corpus precisely because they ship agent configuration, so finding
+          # none means the clone changed, not that they stopped having any.
+          sources=$(node -e 'const d=require("./out-doctor.json"); console.log(d.sources?.length ?? 0)' 2>/dev/null || echo 0)
+          echo "configuration files discovered: $sources"
+          if [ "$sources" -lt 1 ]; then
+            echo "::error::no configuration was discovered in ${{ matrix.repository }} — the sparse checkout is probably wrong"
+            failed=1
+          fi
+
+          exit "$failed"
+
+      - name: Summarise what was found
+        if: always()
+        run: |
+          set -uo pipefail
+          {
+            echo "### ${{ matrix.repository }}"
+            echo
+            for file in out-*.json; do
+              [ -s "$file" ] || continue
+              node -e '
+                const report = require("fs").readFileSync(process.argv[1], "utf8");
+                let parsed;
+                try { parsed = JSON.parse(report); } catch { console.log("- " + process.argv[1] + ": unparsable output"); process.exit(0); }
+                const summary = parsed.report?.summary;
+                const label = process.argv[1].replace(/^out-|\.json$/g, "");
+                console.log(summary
+                  ? `- \`${label}\`: ${summary.errors} error(s), ${summary.warnings} warning(s), ${summary.infos} info`
+                  : `- \`${label}\`: ok`);
+              ' "$file"
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Keep the reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: corpus-${{ strategy.job-index }}
+          path: out-*.json
+          if-no-files-found: ignore

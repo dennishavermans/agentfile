@@ -1,0 +1,126 @@
+name: CI
+
+# agentfile is a static-analysis tool whose whole argument is that configuration
+# nobody verifies drifts. Shipping it without CI would be the same failure in a
+# different file, so this runs on every push and every pull request.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  # Manual runs matter most before the first pull request, when nobody yet knows
+  # whether the workflow itself is correct.
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # Line endings are normalised by .gitattributes; make the runner agree rather
+  # than depending on whatever the image was configured with.
+  GIT_CONFIG_PARAMETERS: "'core.autocrlf=false'"
+
+jobs:
+  lint:
+    name: Lint and typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      # The CLI typechecks against core's built .d.ts, so a fresh checkout has
+      # to build before it can typecheck. This passed locally only because dist
+      # was already there.
+      - run: npm run build
+      - run: npm run typecheck
+
+  test:
+    name: Test — ${{ matrix.os }}, Node ${{ matrix.node }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      # One platform failing should not hide the others: Windows is the least
+      # exercised path in this codebase and its failures are the informative ones.
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        # 22 is the engines floor and is what @types/node is pinned to; 24 is
+        # what the maintainers actually develop against.
+        node: [22, 24]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npm test
+
+  smoke:
+    name: Install from a tarball and run
+    runs-on: ubuntu-latest
+    # The classic day-one npm failures are invisible to unit tests: a dist file
+    # missing from `files`, a bin without its shebang, a dependency that only
+    # resolved because the monorepo hoisted it. This installs the packed
+    # tarballs into a bare directory and runs the CLI the way a user would.
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+
+      - name: Pack the published packages
+        run: |
+          mkdir -p /tmp/tarballs
+          npm pack --workspace @agentfile/core --pack-destination /tmp/tarballs
+          npm pack --workspace @agentfile/cli  --pack-destination /tmp/tarballs
+
+      - name: Install into a clean project
+        run: |
+          mkdir -p /tmp/smoke && cd /tmp/smoke
+          npm init -y >/dev/null
+          npm install /tmp/tarballs/agentfile-core-*.tgz /tmp/tarballs/agentfile-cli-*.tgz
+
+      - name: Run against a repository with real configuration
+        working-directory: /tmp/smoke
+        run: |
+          set -euo pipefail
+          mkdir -p .github .claude/commands
+          printf -- '# Rules\n\n- Use pnpm as the package manager, never npm\n' > AGENTS.md
+          printf -- '# Claude\n\n- Use pnpm as the package manager, never npm\n' > CLAUDE.md
+          printf -- 'Cut a release. Status: !`git status --short`\n' > .claude/commands/release.md
+
+          run() { echo "::group::agentfile $*"; npx agentfile "$@"; echo "::endgroup::"; }
+
+          run --version
+          run doctor --format json > /dev/null
+          run adopt --format json > /dev/null
+          run audit --format json > /dev/null
+          run context AGENTS.md --format json > /dev/null
+
+          # The duplicated rule must be found: a smoke test that only checks for
+          # a zero exit would pass just as happily against a tool that found
+          # nothing at all.
+          echo "::group::agentfile check"
+          npx agentfile check --format json > check.json || true
+          echo "::endgroup::"
+          grep -q AGF302 check.json || { echo "expected AGF302 for the duplicated rule"; cat check.json; exit 1; }
+
+      - name: An unrecognised option fails rather than guessing
+        working-directory: /tmp/smoke
+        run: |
+          set -uo pipefail
+          if npx agentfile doctor --format nonsense >/dev/null 2>&1; then
+            echo "an unknown --format must not exit 0"
+            exit 1
+          fi

@@ -1,7 +1,7 @@
 {
   "name": "@agentfile/agentfile",
-  "version": "0.4.0",
-  "description": "One contract. Every AI agent. Zero clutter.",
+  "version": "2.0.0-beta.1",
+  "description": "Find what is wrong with the AI agent configuration your repository already has",
   "type": "module",
   "bin": {
     "agentfile": "dist/bin.js"
@@ -18,7 +18,8 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/dennishavermans/agentfile.git"
+    "url": "git+https://github.com/dennishavermans/agentfile.git",
+    "directory": "packages/agentfile"
   },
   "homepage": "https://github.com/dennishavermans/agentfile#readme",
   "bugs": {
@@ -35,16 +36,17 @@
     "agentfile"
   ],
   "engines": {
-    "node": ">=24.0.0"
+    "node": ">=22.0.0"
   },
   "publishConfig": {
     "access": "public"
   },
   "dependencies": {
-    "@agentfile/cli": "^0.4.0"
+    "@agentfile/cli": "^2.0.0-beta.1"
   },
   "devDependencies": {
-    "@types/node": "^25.5.0",
+    "@types/node": "^22.19.0",
     "typescript": "^6.0.2"
-  }
+  },
+  "author": "Dennis Havermans"
 }

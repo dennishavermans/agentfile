@@ -1,16 +1,23 @@
 # @agentfile/agentfile
 
-> One contract. Every AI agent. Zero clutter.
+> Find what is wrong with the AI agent configuration your repository already has.
 
 This is the convenience wrapper package. It re-exports the full CLI from [`@agentfile/cli`](https://www.npmjs.com/package/@agentfile/cli).
 
 ## Quick start
 
+Point it at any repository. No setup, nothing written to disk:
+
 ```bash
-npx @agentfile/agentfile init
-npx @agentfile/agentfile migrate --from CLAUDE.md
-npx @agentfile/agentfile sync
-npx @agentfile/agentfile diff
+npx @agentfile/agentfile doctor
+```
+
+Then:
+
+```bash
+npx @agentfile/agentfile check      # fast enough for a pre-commit hook
+npx @agentfile/agentfile audit      # what hooks, skills and MCP servers could do
+npx @agentfile/agentfile adopt      # plan a single source of truth
 ```
 
 Available commands mirror `@agentfile/cli`:

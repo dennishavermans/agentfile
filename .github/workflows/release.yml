@@ -1,0 +1,168 @@
+name: Release
+
+# Publishing happens here rather than from someone's laptop, for one reason that
+# matters more than convenience: npm provenance. A package published from a
+# GitHub Actions run with an OIDC token carries a signed, verifiable statement of
+# which commit and which workflow produced it, and npm shows that on the package
+# page. A package published from a laptop carries nobody's word but the
+# publisher's — which, for a tool that reads other people's configuration and
+# tells them what is unsafe, is the wrong way round.
+#
+# Triggered by pushing a tag. The tag is the decision; everything here is
+# mechanical.
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: "Build and pack, but do not publish"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Verify the tag
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: The tag and the manifests must agree
+        id: version
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME#v}"
+          echo "tag says: $tag"
+
+          for package in core cli agentfile; do
+            manifest=$(node -p "require('./packages/$package/package.json').version")
+            if [ "$manifest" != "$tag" ]; then
+              echo "::error::packages/$package is $manifest but the tag says $tag"
+              exit 1
+            fi
+          done
+
+          # Anything with a hyphen is a pre-release: 2.0.0-beta.1 goes out under
+          # the `next` dist-tag so `npm install @agentfile/cli` keeps resolving
+          # to the last stable version.
+          case "$tag" in
+            *-*) prerelease=true ;;
+            *)   prerelease=false ;;
+          esac
+
+          echo "version=$tag" >> "$GITHUB_OUTPUT"
+          echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
+
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build
+      - run: npm test
+
+  publish:
+    name: Publish to npm
+    needs: verify
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: read
+      # Required for npm provenance: the OIDC token is what signs the
+      # attestation linking this package to this commit.
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          registry-url: "https://registry.npmjs.org"
+
+      - run: npm ci
+      - run: npm run build
+
+      - name: Publish
+        if: ${{ github.event_name == 'push' || inputs.dry-run == false }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          TAG: ${{ needs.verify.outputs.prerelease == 'true' && 'next' || 'latest' }}
+        run: |
+          set -euo pipefail
+          # Order matters: each package's dependency must exist on the registry
+          # before the package that depends on it is installable.
+          for package in core cli agentfile; do
+            echo "::group::publish @agentfile/$package under --tag $TAG"
+            npm publish --workspace "packages/$package" --provenance --access public --tag "$TAG"
+            echo "::endgroup::"
+          done
+
+      - name: Dry run
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.dry-run }}
+        run: |
+          set -euo pipefail
+          for package in core cli agentfile; do
+            npm publish --workspace "packages/$package" --dry-run --access public
+          done
+
+  github-release:
+    name: GitHub release
+    needs: [verify, publish]
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Release notes from the changelog
+        run: |
+          set -euo pipefail
+          version="${{ needs.verify.outputs.version }}"
+
+          # The changelog is the release notes. Keeping a second copy in the
+          # release body is how the two drift apart.
+          awk -v v="$version" '
+            $0 ~ "^## \\[" v "\\]" { inside = 1; next }
+            inside && /^## \[/      { exit }
+            inside                  { print }
+          ' CHANGELOG.md > notes.md
+
+          if [ ! -s notes.md ]; then
+            echo "::error::CHANGELOG.md has no section for $version"
+            exit 1
+          fi
+
+          {
+            echo
+            echo "---"
+            echo
+            echo "Published to npm with provenance:"
+            echo
+            echo '```bash'
+            if [ "${{ needs.verify.outputs.prerelease }}" = "true" ]; then
+              echo "npm install --save-dev @agentfile/cli@next"
+            else
+              echo "npm install --save-dev @agentfile/cli"
+            fi
+            echo '```'
+          } >> notes.md
+
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --title "$GITHUB_REF_NAME" \
+            --notes-file notes.md \
+            ${{ needs.verify.outputs.prerelease == 'true' && '--prerelease' || '' }}

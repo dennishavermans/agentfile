@@ -1,4 +1,4 @@
-import { relative } from "path";
+import { relative } from "node:path";
 import type { MigrateReportEntry } from "./types.js";
 
 export function detectIDE(filePath: string): string | null {

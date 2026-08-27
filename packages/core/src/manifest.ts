@@ -7,9 +7,10 @@
  * clean, diff, rollback, and CI enforcement.
  */
 
-import { createHash } from "crypto";
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "fs";
-import { dirname, join, relative } from "path";
+import { createHash } from "node:crypto";
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, join, relative } from "node:path";
+import { normalizePath } from "./paths/index.js";
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -63,21 +64,42 @@ export function generatedMarker(filePath: string): string | null {
 }
 
 /**
- * Returns true if the content starts with a generated-by-agentfile marker.
+ * Length of a leading YAML frontmatter block, or 0 when there is none.
+ *
+ * Frontmatter is only frontmatter on the very first line — that is how every
+ * consumer (Cursor, Claude rules, Copilot, our own parser) treats it, so a
+ * marker must never be inserted above it.
  */
-export function hasGeneratedMarker(content: string): boolean {
-  return content.trimStart().startsWith(`<!-- ${MARKER_PREFIX}`);
+function frontmatterLength(content: string): number {
+  const match = content.match(/^---\r?\n[\s\S]*?\r?\n---\r?\n/);
+  return match ? match[0].length : 0;
 }
 
 /**
- * Prepends the generated marker to content, if the file type supports it.
+ * Returns true if the content carries a generated-by-agentfile marker — at the
+ * top of the file, or directly after a leading frontmatter block.
+ */
+export function hasGeneratedMarker(content: string): boolean {
+  const body = content.slice(frontmatterLength(content));
+  return body.trimStart().startsWith(`<!-- ${MARKER_PREFIX}`);
+}
+
+/**
+ * Adds the generated marker to content, if the file type supports it.
+ *
+ * The marker goes after a leading frontmatter block, never above it: an HTML
+ * comment on line one would stop the frontmatter being frontmatter, silently
+ * unscoping every generated rule file.
  * If the marker is already present, returns content unchanged.
  */
 export function addMarker(filePath: string, content: string): string {
   const marker = generatedMarker(filePath);
   if (!marker) return content;
   if (hasGeneratedMarker(content)) return content;
-  return marker + content;
+
+  const offset = frontmatterLength(content);
+  if (offset === 0) return marker + content;
+  return content.slice(0, offset) + marker + content.slice(offset);
 }
 
 // ─── Read / Write ──────────────────────────────────────────────────────────
@@ -238,7 +260,9 @@ export function readBackup(root: string, tag: string): BackupEntry[] {
       if (dirent.isDirectory()) {
         walk(full);
       } else {
-        const relPath = relative(backupRoot, full);
+        // Normalised, like every other path agentfile reports: a backup written
+        // on Windows and read anywhere else must describe the same file.
+        const relPath = normalizePath(relative(backupRoot, full));
         entries.push({ path: relPath, content: readFileSync(full, "utf-8") });
       }
     }

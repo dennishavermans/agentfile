@@ -1,0 +1,109 @@
+/**
+ * Links in a skill body that point at nothing.
+ *
+ * A skill promising `see references/api.md` and shipping without that file does
+ * not fail — the agent looks, finds nothing, and carries on with less
+ * information than the skill said it would have. Nothing reports it, which is
+ * exactly the class of silent failure this project exists to surface.
+ *
+ * Reported as AGF004, the same code as any other broken reference: it is the
+ * same problem, and consumers matching on the code should not have to learn a
+ * second one for skills.
+ */
+
+import { type Diagnostic, diagnostic } from "../diagnostics/index.js";
+import type { AgentConfiguration, SkillEntry } from "../ir/index.js";
+import { basenameOf, normalizePath } from "../paths/index.js";
+
+/** A link that is a path inside the repository, rather than a URL or an anchor. */
+function isLocalPath(target: string): boolean {
+  if (!target) return false;
+  if (/^[a-z][a-z0-9+.-]*:/i.test(target)) return false; // http:, mailto:, file:
+  if (target.startsWith("#")) return false;
+  if (target.startsWith("/")) return false; // absolute: not ours to resolve
+  return true;
+}
+
+/** Resolves a relative link against a directory, collapsing `.` and `..`. */
+function resolveRelative(directory: string, target: string): string | undefined {
+  const segments = directory ? directory.split("/") : [];
+
+  for (const segment of target.split("/")) {
+    if (!segment || segment === ".") continue;
+    if (segment === "..") {
+      if (!segments.length) return undefined; // escapes the repository root
+      segments.pop();
+      continue;
+    }
+    segments.push(segment);
+  }
+
+  return segments.join("/");
+}
+
+interface BodyLink {
+  target: string;
+  line: number;
+}
+
+/** Markdown links in a body, with the line each sits on. */
+function bodyLinks(skill: SkillEntry): BodyLink[] {
+  const lines = skill.body.split("\n");
+  const startLine = 1;
+  const links: BodyLink[] = [];
+
+  for (let offset = 0; offset < lines.length; offset++) {
+    for (const match of lines[offset].matchAll(/\[[^\]]*\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g)) {
+      links.push({ target: match[1].trim(), line: startLine + offset });
+    }
+  }
+
+  return links;
+}
+
+/**
+ * AGF004 for every skill link that resolves to no file.
+ *
+ * Resolution is against the scan's file list, so a link is only reported when
+ * the repository genuinely does not contain it — a link pointing outside the
+ * repository is skipped rather than guessed at.
+ */
+export function checkSkillReferences(configuration: AgentConfiguration, files: readonly string[]): Diagnostic[] {
+  const present = new Set(files.map(normalizePath));
+  const diagnostics: Diagnostic[] = [];
+
+  for (const skill of configuration.skills) {
+    const directory = skill.directory;
+    if (!directory) continue;
+
+    for (const link of bodyLinks(skill)) {
+      if (!isLocalPath(link.target)) continue;
+
+      // Strip a fragment: `references/api.md#errors` points at the file.
+      const target = link.target.split("#")[0];
+      if (!target) continue;
+
+      const resolved = resolveRelative(directory, target);
+      if (resolved === undefined) continue; // escapes the root; not ours to check
+      if (present.has(resolved)) continue;
+
+      // A link to a directory is satisfied by anything inside it.
+      if ([...present].some((file) => file.startsWith(`${resolved}/`))) continue;
+
+      diagnostics.push(
+        diagnostic({
+          code: "AGF004",
+          message: `Skill "${skill.name || basenameOf(skill.provenance.file)}" links to ${target}, which does not exist`,
+          explanation:
+            `Resolved to ${resolved}, and no such file is in the repository. ` +
+            "The agent will follow the link, find nothing, and continue with less information than the skill said it would have — without reporting anything.",
+          suggestion: `Add ${resolved}, or correct the link.`,
+          location: { file: skill.provenance.file, line: link.line },
+          data: { skill: skill.name, target, resolved },
+        }),
+      );
+    }
+  }
+
+  return diagnostics;
+}
