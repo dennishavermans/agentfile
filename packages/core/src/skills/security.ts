@@ -23,7 +23,6 @@ import type { AgentConfiguration, SkillEntry } from "../ir/index.js";
 import { basenameOf } from "../paths/index.js";
 import { type RiskMatch, scanText } from "../security/patterns.js";
 
-
 /**
  * Largest file worth reading.
  *

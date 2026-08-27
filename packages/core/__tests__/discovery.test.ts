@@ -1,15 +1,16 @@
 import { describe, expect, it } from "vitest";
+import { alwaysLoadedContext, findInstructionOverlap } from "../src/analysis/index.ts";
 import {
   DEFAULT_IGNORED_DIRECTORIES,
   discover,
   discoverAgentsMd,
   discoverClaudeMd,
   discoverClaudeRules,
+  discoverCommands,
   discoverCopilotInstructions,
   discoverCursorRules,
   discoverMcpServers,
   discoverSkills,
-  discoverCommands,
   discoverSubagents,
   filesNamed,
   filesUnder,
@@ -17,7 +18,6 @@ import {
   governedDirectory,
   scanRepository,
 } from "../src/discovery/index.ts";
-import { alwaysLoadedContext, findInstructionOverlap } from "../src/analysis/index.ts";
 import { memoryFileSystem } from "../src/fs/index.ts";
 import { resolveForPath } from "../src/resolver/index.ts";
 

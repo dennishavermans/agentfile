@@ -1,6 +1,6 @@
 /// <reference types="node" />
-import { existsSync, readFileSync, rmSync } from "fs";
-import { join } from "path";
+import { existsSync, readFileSync, rmSync } from "node:fs";
+import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // ─── Test Directory ────────────────────────────────────────────────────────
@@ -42,7 +42,7 @@ describe("init command", () => {
     cleanup();
     // Run init inside the test directory by temporarily changing cwd
     vi.spyOn(process, "cwd").mockReturnValue(TEST_DIR);
-    require("fs").mkdirSync(TEST_DIR, { recursive: true });
+    require("node:fs").mkdirSync(TEST_DIR, { recursive: true });
   });
 
   afterEach(() => {
@@ -104,7 +104,7 @@ describe("init command", () => {
 
     // Mutate the contract file
     const contractPath = join(TEST_DIR, "ai/contract.yaml");
-    require("fs").writeFileSync(contractPath, "version: 1\n# custom content", "utf-8");
+    require("node:fs").writeFileSync(contractPath, "version: 1\n# custom content", "utf-8");
 
     // Run init again
     await initCommand();

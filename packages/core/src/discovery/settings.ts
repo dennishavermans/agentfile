@@ -13,14 +13,7 @@
 import { join } from "node:path";
 import { type Diagnostic, diagnostic } from "../diagnostics/index.js";
 import type { FileSystem } from "../fs/index.js";
-import type {
-  ConfigScope,
-  HookEntry,
-  PermissionRule,
-  Provenance,
-  SettingEntry,
-  SourceFile,
-} from "../ir/index.js";
+import type { ConfigScope, HookEntry, PermissionRule, Provenance, SettingEntry, SourceFile } from "../ir/index.js";
 import type { RepositoryScan } from "./scan.js";
 
 /**
@@ -85,7 +78,8 @@ function readHooks(value: unknown, provenance: Provenance): { hooks: HookEntry[]
         code: "AGF001",
         message: "`hooks` must be an object keyed by event name",
         explanation: "Claude Code reads hooks as a map from event name to an array of matcher groups.",
-        suggestion: 'Use the documented shape: { "hooks": { "PreToolUse": [ { "matcher": "Bash", "hooks": [...] } ] } }',
+        suggestion:
+          'Use the documented shape: { "hooks": { "PreToolUse": [ { "matcher": "Bash", "hooks": [...] } ] } }',
         location: { file: provenance.file },
       }),
     );
@@ -254,7 +248,13 @@ export function discoverSettings(root: string, scan: RepositoryScan, fs: FileSys
           location: { file: entry.path },
         }),
       );
-      result.sources.push({ path: entry.path, platform: "claude", scope: entry.scope, kind: "settings", bytes: text.length });
+      result.sources.push({
+        path: entry.path,
+        platform: "claude",
+        scope: entry.scope,
+        kind: "settings",
+        bytes: text.length,
+      });
       continue;
     }
 
@@ -268,7 +268,13 @@ export function discoverSettings(root: string, scan: RepositoryScan, fs: FileSys
           location: { file: entry.path },
         }),
       );
-      result.sources.push({ path: entry.path, platform: "claude", scope: entry.scope, kind: "settings", bytes: text.length });
+      result.sources.push({
+        path: entry.path,
+        platform: "claude",
+        scope: entry.scope,
+        kind: "settings",
+        bytes: text.length,
+      });
       continue;
     }
 

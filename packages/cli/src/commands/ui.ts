@@ -1,9 +1,9 @@
 /// <reference types="node" />
 
+import { execSync } from "node:child_process";
+import { existsSync } from "node:fs";
+import { join, resolve } from "node:path";
 import { startUiServer } from "@agentfile/ui";
-import { execSync } from "child_process";
-import { existsSync } from "fs";
-import { join, resolve } from "path";
 import { logger } from "../logger.js";
 
 export async function uiCommand(options: { dev?: boolean; port?: number; root?: string } = {}): Promise<void> {

@@ -1,14 +1,14 @@
 /// <reference types="node" />
 
+import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { type Contract, discoverAgents, generate, loadContract, resolveAgent, validateContract } from "@agentfile/core";
 import { createPatch } from "diff";
 import express from "express";
-import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "fs";
 import yaml from "js-yaml";
 import open from "open";
-import { tmpdir } from "os";
-import { join, resolve } from "path";
-import { fileURLToPath } from "url";
 
 export type AgentStatus = {
   name: string;
@@ -96,7 +96,7 @@ function ensureContractExists(root: string): boolean {
   return existsSync(join(root, "ai", "contract.yaml"));
 }
 
-function validateContractContent(root: string, content: string): void {
+function validateContractContent(_root: string, content: string): void {
   const tmpFolder = mkdtempSync(join(tmpdir(), "agentfile-contract-"));
   const tmpPath = join(tmpFolder, "contract.yaml");
   writeFileSync(tmpPath, content, "utf-8");

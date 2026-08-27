@@ -1,8 +1,8 @@
 /// <reference types="node" />
 
+import { existsSync, unlinkSync } from "node:fs";
+import { join } from "node:path";
 import { MANIFEST_FILE, ownedPaths, readManifest, writeManifest } from "@agentfile/core";
-import { existsSync, unlinkSync } from "fs";
-import { join } from "path";
 import { logger } from "../logger.js";
 
 export interface CleanOptions {

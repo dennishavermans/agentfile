@@ -13,7 +13,6 @@ import {
   portabilityDiagnostics,
   RECOMMENDED_BODY_LINES,
   RECOMMENDED_BODY_TOKENS,
-  RISK_PATTERNS,
   resourceDepth,
   resourceDiagnostics,
   routingDiagnostics,

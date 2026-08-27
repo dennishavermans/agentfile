@@ -144,10 +144,7 @@ describe("audit command", () => {
   });
 
   it("promotes warnings to errors under --strict", async () => {
-    write(
-      ".mcp.json",
-      JSON.stringify({ mcpServers: { gh: { command: "npx", args: ["-y", "@scope/server"] } } }),
-    );
+    write(".mcp.json", JSON.stringify({ mcpServers: { gh: { command: "npx", args: ["-y", "@scope/server"] } } }));
 
     const lenient = captureOutput();
     await auditCommand({ root: TEST_DIR });
@@ -173,10 +170,7 @@ describe("audit command", () => {
   });
 
   it("emits a machine-readable report with surfaces, coverage, and the caveat", async () => {
-    write(
-      ".claude/settings.json",
-      JSON.stringify({ permissions: { allow: ["Bash(ls*)"] } }),
-    );
+    write(".claude/settings.json", JSON.stringify({ permissions: { allow: ["Bash(ls*)"] } }));
 
     const output = captureOutput();
     await auditCommand({ root: TEST_DIR, format: "json" });

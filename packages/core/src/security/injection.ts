@@ -62,12 +62,14 @@ const INVISIBLE_PATTERN = new RegExp(
 const OVERRIDE_PATTERNS: ReadonlyArray<{ id: string; pattern: RegExp; why: string }> = [
   {
     id: "instruction-override",
-    pattern: /\b(ignore|disregard|forget|override)\b[^.\n]{0,30}\b(all\s+)?(your\s+|the\s+|any\s+)?(previous|prior|earlier|above|preceding|system)\b[^.\n]{0,20}\b(instruction|prompt|rule|direction|guideline)/i,
+    pattern:
+      /\b(ignore|disregard|forget|override)\b[^.\n]{0,30}\b(all\s+)?(your\s+|the\s+|any\s+)?(previous|prior|earlier|above|preceding|system)\b[^.\n]{0,20}\b(instruction|prompt|rule|direction|guideline)/i,
     why: "This addresses the agent's instructions rather than the code, which is the shape of an injected override.",
   },
   {
     id: "system-prompt-reference",
-    pattern: /\b(reveal|print|output|repeat|show|disclose)\b[^.\n]{0,30}\b(your\s+)?(system\s+prompt|initial\s+instructions|hidden\s+instructions)\b/i,
+    pattern:
+      /\b(reveal|print|output|repeat|show|disclose)\b[^.\n]{0,30}\b(your\s+)?(system\s+prompt|initial\s+instructions|hidden\s+instructions)\b/i,
     why: "Asking an agent to disclose its own instructions is not a statement about this codebase.",
   },
   {
@@ -145,9 +147,9 @@ function invisibleCharacters(source: TextSource): Diagnostic[] {
   for (let offset = 0; offset < lines.length; offset++) {
     if (!INVISIBLE_PATTERN.test(lines[offset])) continue;
 
-    const names = INVISIBLE_CHARACTERS.filter((entry) =>
-      lines[offset].includes(String.fromCodePoint(entry.code)),
-    ).map((entry) => entry.name);
+    const names = INVISIBLE_CHARACTERS.filter((entry) => lines[offset].includes(String.fromCodePoint(entry.code))).map(
+      (entry) => entry.name,
+    );
 
     found.push({ line: source.startLine + offset, names });
   }

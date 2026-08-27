@@ -12,7 +12,7 @@
  */
 
 import type { TargetId } from "../capabilities/index.js";
-import type { AgentConfiguration, Instruction } from "../ir/index.js";
+import type { AgentConfiguration } from "../ir/index.js";
 import { ROOT_PATH } from "../paths/index.js";
 import { fidelity } from "./fidelity.js";
 import { ensureTrailingNewline, mergeBodies, outputSlug, type SelectedSources, selectSources } from "./sources.js";
@@ -103,7 +103,8 @@ export const claudeCompiler = makeCompiler("claude", (sources) => {
     if (instruction.applies.kind !== "paths") continue;
     files.push({
       path: `.claude/rules/agentfile-${outputSlug(instruction)}.md`,
-      content: frontmatter([yamlList("paths", instruction.applies.patterns)]) + ensureTrailingNewline(instruction.body.trim()),
+      content:
+        frontmatter([yamlList("paths", instruction.applies.patterns)]) + ensureTrailingNewline(instruction.body.trim()),
       source: "claude",
     });
   }

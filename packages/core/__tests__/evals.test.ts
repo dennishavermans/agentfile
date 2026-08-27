@@ -5,8 +5,8 @@ import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   changedFiles,
-  evalCacheKey,
   type EvalDefinition,
+  evalCacheKey,
   parseEvalDefinition,
   runEval,
   shellQuote,
@@ -32,7 +32,7 @@ afterEach(() => {
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
 });
 
-function definition(root: string, files: Record<string, string>, overrides: Partial<EvalDefinition>): EvalDefinition {
+function definition(_root: string, _files: Record<string, string>, overrides: Partial<EvalDefinition>): EvalDefinition {
   return {
     name: "example",
     file: "evals/example.eval.yaml",
@@ -171,10 +171,9 @@ describe("changedFiles", () => {
 describe("runEval", () => {
   it("skips a prompted eval when no agent command is configured, and says why", () => {
     const root = fixture({});
-    const result = runEval(
-      definition(root, {}, { prompt: "Do the thing.", assertions: { files: ["out.txt"] } }),
-      { sandbox: sandboxFor(root, []) },
-    );
+    const result = runEval(definition(root, {}, { prompt: "Do the thing.", assertions: { files: ["out.txt"] } }), {
+      sandbox: sandboxFor(root, []),
+    });
 
     expect(result.status).toBe("skipped");
     expect(result.reason).toContain("--agent");
@@ -187,16 +186,20 @@ describe("runEval", () => {
     );
 
     const result = runEval(
-      definition(root, {}, {
-        prompt: "Create a Button component.",
-        assertions: {
-          files: ["src/Button.tsx"],
-          absent: ["src/Button.js"],
-          contains: ["accessibility"],
-          forbidden: ["eval("],
-          commands: [node("process.exit(0)")],
+      definition(
+        root,
+        {},
+        {
+          prompt: "Create a Button component.",
+          assertions: {
+            files: ["src/Button.tsx"],
+            absent: ["src/Button.js"],
+            contains: ["accessibility"],
+            forbidden: ["eval("],
+            commands: [node("process.exit(0)")],
+          },
         },
-      }),
+      ),
       { sandbox: sandboxFor(root, ["README.md"]), agentCommand: agent },
     );
 
@@ -213,10 +216,14 @@ describe("runEval", () => {
     const agent = node('require("fs").writeFileSync("prompt.txt", process.env.AGENTFILE_EVAL_PROMPT)');
 
     const result = runEval(
-      definition(root, {}, {
-        prompt,
-        assertions: { contains: [{ file: "prompt.txt", text: prompt }] },
-      }),
+      definition(
+        root,
+        {},
+        {
+          prompt,
+          assertions: { contains: [{ file: "prompt.txt", text: prompt }] },
+        },
+      ),
       { sandbox: sandboxFor(root, []), agentCommand: agent },
     );
 
@@ -226,9 +233,13 @@ describe("runEval", () => {
   it("fails with AGF602 findings that carry the observation", () => {
     const root = fixture({});
     const result = runEval(
-      definition(root, {}, {
-        assertions: { files: ["missing.txt"], commands: [node("process.exit(3)")] },
-      }),
+      definition(
+        root,
+        {},
+        {
+          assertions: { files: ["missing.txt"], commands: [node("process.exit(3)")] },
+        },
+      ),
       { sandbox: sandboxFor(root, []) },
     );
 
@@ -245,10 +256,14 @@ describe("runEval", () => {
   it("treats a failing setup command as a harness error, not an eval failure", () => {
     const root = fixture({});
     const result = runEval(
-      definition(root, {}, {
-        setup: [node("process.exit(1)")],
-        assertions: { files: ["x"] },
-      }),
+      definition(
+        root,
+        {},
+        {
+          setup: [node("process.exit(1)")],
+          assertions: { files: ["x"] },
+        },
+      ),
       { sandbox: sandboxFor(root, []) },
     );
 
@@ -261,10 +276,10 @@ describe("runEval", () => {
     const root = fixture({});
     const agent = node('require("fs").writeFileSync("out.txt", "done"); process.exit(1)');
 
-    const result = runEval(
-      definition(root, {}, { prompt: "x", assertions: { files: ["out.txt"] } }),
-      { sandbox: sandboxFor(root, []), agentCommand: agent },
-    );
+    const result = runEval(definition(root, {}, { prompt: "x", assertions: { files: ["out.txt"] } }), {
+      sandbox: sandboxFor(root, []),
+      agentCommand: agent,
+    });
 
     expect(result.agent?.exitCode).toBe(1);
     expect(result.status).toBe("passed");

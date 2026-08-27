@@ -16,6 +16,8 @@
  * 1 assertions failed, 2 the harness itself could not run an eval.
  */
 
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, join, relative } from "node:path";
 import {
   discover,
   EVAL_FILE_SUFFIX,
@@ -31,8 +33,6 @@ import {
   temporaryDirectorySandbox,
 } from "@agentfile/core";
 import chalk from "chalk";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join, relative } from "node:path";
 import { logger } from "../logger.js";
 import { parseFormat, printJson, rejectFormat } from "../report.js";
 

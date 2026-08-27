@@ -111,7 +111,6 @@ export const RISK_PATTERNS: readonly RiskPattern[] = [
   },
 ];
 
-
 /** A line that matched a pattern, with where it was. */
 export interface RiskMatch {
   pattern: RiskPattern;
@@ -176,7 +175,8 @@ export const SECRET_VALUE_PATTERNS: readonly { id: string; pattern: RegExp; why:
   },
   {
     id: "long-opaque-value",
-    pattern: /^(?:[A-Za-z0-9+/]{32,}={0,2}|gh[pousr]_[A-Za-z0-9]{20,}|sk-[A-Za-z0-9]{20,}|xox[baprs]-[A-Za-z0-9-]{10,})$/,
+    pattern:
+      /^(?:[A-Za-z0-9+/]{32,}={0,2}|gh[pousr]_[A-Za-z0-9]{20,}|sk-[A-Za-z0-9]{20,}|xox[baprs]-[A-Za-z0-9-]{10,})$/,
     why: "The value is a long opaque string with no variable reference, which is what a literal credential looks like.",
   },
 ];

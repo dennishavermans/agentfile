@@ -1,6 +1,6 @@
 /// <reference types="node" />
-import { existsSync, watch } from "fs";
-import { join, relative } from "path";
+import { existsSync, watch } from "node:fs";
+import { join, relative } from "node:path";
 import { logger } from "../logger.js";
 import { syncCommand } from "./sync.js";
 

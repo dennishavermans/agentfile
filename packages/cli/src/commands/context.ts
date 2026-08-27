@@ -45,7 +45,9 @@ export async function contextCommand(targetPath: string, options: ContextOptions
   const effective = resolveForPath(discovery.configuration, targetPath);
 
   // Symlink twins (CLAUDE.md → AGENTS.md) load one text, so they cost it once.
-  const contextEstimate = estimateContext(withoutAliases(effective.instructions.map((entry) => entry.node)).map((node) => node.body));
+  const contextEstimate = estimateContext(
+    withoutAliases(effective.instructions.map((entry) => entry.node)).map((node) => node.body),
+  );
 
   if (format === "json") {
     printJson({

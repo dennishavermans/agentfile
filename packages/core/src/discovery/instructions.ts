@@ -23,7 +23,14 @@ import {
 import { booleanField, globListField, parseFrontmatter, stringField } from "../parsers/frontmatter.js";
 import { normalizePath } from "../paths/index.js";
 import { filesNamed, filesUnder, type RepositoryScan } from "./scan.js";
-import { basenameOf, findImports, governedDirectory, hierarchicalApplicability, originFor, provenanceOf } from "./shared.js";
+import {
+  basenameOf,
+  findImports,
+  governedDirectory,
+  hierarchicalApplicability,
+  originFor,
+  provenanceOf,
+} from "./shared.js";
 
 export interface DiscoveredInstructions {
   instructions: Instruction[];

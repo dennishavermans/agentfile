@@ -16,8 +16,8 @@ export {
 } from "./instructions.js";
 export type { RepositoryScan, ScanOptions } from "./scan.js";
 export { DEFAULT_IGNORED_DIRECTORIES, filesNamed, filesUnder, scanRepository } from "./scan.js";
+export type { DiscoveredSettings } from "./settings.js";
+export { discoverSettings, REPORTED_SETTINGS_KEYS, SETTINGS_FILES } from "./settings.js";
 export { findImports, governedDirectory } from "./shared.js";
 export type { DiscoveredSkills } from "./skills.js";
 export { discoverSkills, SKILL_DIRECTORIES, SKILL_SPEC_FIELDS } from "./skills.js";
-export type { DiscoveredSettings } from "./settings.js";
-export { discoverSettings, REPORTED_SETTINGS_KEYS, SETTINGS_FILES } from "./settings.js";

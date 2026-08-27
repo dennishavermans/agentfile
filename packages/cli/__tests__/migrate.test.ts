@@ -1,6 +1,6 @@
 /// <reference types="node" />
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "fs";
-import { join } from "path";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // ─── Test Directory ────────────────────────────────────────────────────────
@@ -116,9 +116,9 @@ vi.mock("enquirer", () => ({
     async prompt(questions: { name: string }[]) {
       const answers: Record<string, unknown> = {};
       for (const q of questions) {
-        if (q.name === "name") answers["name"] = "Prompted Project";
-        if (q.name === "stack") answers["stack"] = ["typescript"];
-        if (q.name === "overwrite") answers["overwrite"] = true;
+        if (q.name === "name") answers.name = "Prompted Project";
+        if (q.name === "stack") answers.stack = ["typescript"];
+        if (q.name === "overwrite") answers.overwrite = true;
       }
       return answers;
     }

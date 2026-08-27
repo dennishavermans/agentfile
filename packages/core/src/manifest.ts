@@ -7,9 +7,9 @@
  * clean, diff, rollback, and CI enforcement.
  */
 
-import { createHash } from "crypto";
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "fs";
-import { dirname, join, relative } from "path";
+import { createHash } from "node:crypto";
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, join, relative } from "node:path";
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 

@@ -60,9 +60,7 @@ function reportTargets(plan: CompilationPlan): void {
     logger.info(`${chalk.cyan(String(target.target).padEnd(10))} ${count} file${count === 1 ? "" : "s"}`);
 
     for (const entry of target.notCarried) {
-      console.log(
-        `  ${chalk.gray(`not carried: ${entry.count} ${entry.kind} — ${entry.reason}`)}`,
-      );
+      console.log(`  ${chalk.gray(`not carried: ${entry.count} ${entry.kind} — ${entry.reason}`)}`);
     }
   }
 }
@@ -79,7 +77,9 @@ export async function compileCommand(options: CompileOptions = {}): Promise<void
   }
   const unknown = targets.filter((target) => !COMPILE_TARGETS.includes(target));
   if (unknown.length) {
-    logger.error(`Unknown target${unknown.length === 1 ? "" : "s"}: ${unknown.join(", ")}. Implemented: ${COMPILE_TARGETS.join(", ")}.`);
+    logger.error(
+      `Unknown target${unknown.length === 1 ? "" : "s"}: ${unknown.join(", ")}. Implemented: ${COMPILE_TARGETS.join(", ")}.`,
+    );
     if (unknown.includes("codex")) logger.info("Codex reads AGENTS.md, so --target agents-md covers it.");
     process.exit(2);
   }
@@ -167,7 +167,9 @@ export async function compileCommand(options: CompileOptions = {}): Promise<void
 
   if (options.check) {
     if (drift.length) {
-      logger.warn(`${drift.length} file${drift.length === 1 ? "" : "s"} out of date. Run \`agentfile compile\` to update.`);
+      logger.warn(
+        `${drift.length} file${drift.length === 1 ? "" : "s"} out of date. Run \`agentfile compile\` to update.`,
+      );
       console.log();
       process.exit(1);
     }
@@ -179,7 +181,9 @@ export async function compileCommand(options: CompileOptions = {}): Promise<void
 
   const written = applyCompilationAndManifest(plan, root, drift.length > 0);
   if (written.length) {
-    logger.success(`${written.length} file${written.length === 1 ? "" : "s"} written. Manifest updated: ${MANIFEST_FILE}`);
+    logger.success(
+      `${written.length} file${written.length === 1 ? "" : "s"} written. Manifest updated: ${MANIFEST_FILE}`,
+    );
   } else {
     logger.success("Everything already up to date.");
   }

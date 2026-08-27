@@ -1,5 +1,7 @@
 /// <reference types="node" />
 
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import {
   buildManifest,
   type GenerateResult,
@@ -9,8 +11,6 @@ import {
   staleFiles,
   writeManifest,
 } from "@agentfile/core";
-import { existsSync, readFileSync } from "fs";
-import { join } from "path";
 import { logger } from "../logger.js";
 
 const AI_AGENTS_FILE = ".ai-agents";

@@ -1,6 +1,6 @@
+import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { discoverAgents, loadContract, resolveAgent } from "@agentfile/core";
-import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from "fs";
-import { join } from "path";
 import type * as vscode from "vscode";
 
 import { AI_AGENTS_FILE } from "./constants.js";

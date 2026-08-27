@@ -165,10 +165,7 @@ describe("compile command", () => {
   });
 
   it("reports fidelity losses for a target that cannot express a scope", async () => {
-    write(
-      ".claude/rules/api.md",
-      ["---", 'paths:', '  - "src/api/**"', "---", "API rules.", ""].join("\n"),
-    );
+    write(".claude/rules/api.md", ["---", "paths:", '  - "src/api/**"', "---", "API rules.", ""].join("\n"));
     write("CLAUDE.md", "Root rules.\n");
 
     const output = captureOutput();

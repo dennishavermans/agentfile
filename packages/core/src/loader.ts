@@ -1,6 +1,6 @@
 /// <reference types="node" />
-import { existsSync, readdirSync, readFileSync } from "fs";
-import { join } from "path";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import { parse } from "yaml";
 import type { z } from "zod";
 

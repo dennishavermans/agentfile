@@ -107,6 +107,16 @@ export {
   OVERRIDE_PATH,
   overrideToInstructions,
 } from "./adapters/index.js";
+// ─── Adoption ──────────────────────────────────────────────────────────────
+export type {
+  AdoptedBody,
+  AdoptionOptions,
+  AdoptionPlan,
+  AdoptionSource,
+  AdoptionTarget,
+  UntouchedSurface,
+} from "./adopt/index.js";
+export { DEFAULT_SOURCE_PLATFORM, planAdoption, sourceOnlyConfiguration } from "./adopt/index.js";
 // ─── Analysis ──────────────────────────────────────────────────────────────
 export type {
   AlwaysLoadedContext,
@@ -182,16 +192,26 @@ export {
   supports,
   targetCapabilities,
 } from "./capabilities/index.js";
-// ─── Adoption ──────────────────────────────────────────────────────────────
+// ─── Compilers over the IR ──────────────────────────────────────────────────
 export type {
-  AdoptedBody,
-  AdoptionOptions,
-  AdoptionPlan,
-  AdoptionSource,
-  AdoptionTarget,
-  UntouchedSurface,
-} from "./adopt/index.js";
-export { DEFAULT_SOURCE_PLATFORM, planAdoption, sourceOnlyConfiguration } from "./adopt/index.js";
+  CompilationPlan,
+  CompiledFile,
+  CompilePlan,
+  FileAction,
+  NotCarried,
+  PlannedFile,
+  PlanOptions,
+  TargetCompiler,
+} from "./compilers/index.js";
+export {
+  applyCompilation,
+  COMPILE_TARGETS,
+  COMPILERS,
+  compilerFor,
+  driftedFiles,
+  planCompilation,
+  selectSources,
+} from "./compilers/index.js";
 // ─── Diagnostics ───────────────────────────────────────────────────────────
 export type {
   CodeStatus,
@@ -243,8 +263,8 @@ export type {
   ScanOptions,
 } from "./discovery/index.js";
 export {
-  checkInstructionImports,
   COMMAND_FIELDS,
+  checkInstructionImports,
   DEFAULT_IGNORED_DIRECTORIES,
   discover,
   discoverAgentsMd,
@@ -266,6 +286,27 @@ export {
   SKILL_SPEC_FIELDS,
   scanRepository,
 } from "./discovery/index.js";
+// ─── Behavioral evaluation ──────────────────────────────────────────────────
+export type {
+  AssertionResult,
+  EvalDefinition,
+  EvalResult,
+  EvalStatus,
+  RunEvalOptions,
+  Sandbox,
+  Workspace,
+} from "./evals/index.js";
+export {
+  EVAL_DIRECTORY,
+  EVAL_FILE_SUFFIX,
+  evalCacheKey,
+  evalFilesIn,
+  gitSeedFiles,
+  gitStateFingerprint,
+  parseEvalDefinition,
+  runEval,
+  temporaryDirectorySandbox,
+} from "./evals/index.js";
 // ─── Filesystem port ───────────────────────────────────────────────────────
 export type { DirectoryEntry, FileSystem } from "./fs/index.js";
 export { memoryFileSystem, nodeFileSystem } from "./fs/index.js";
@@ -371,6 +412,33 @@ export {
   unreachableDiagnostics,
   verdictAt,
 } from "./resolver/index.js";
+// ─── Static security analysis ──────────────────────────────────────────────
+export type {
+  AuditOptions,
+  AuditResult,
+  AuditSurface,
+  HookAuditOptions,
+  RiskMatch,
+  RiskPattern,
+} from "./security/index.js";
+export {
+  auditCommands,
+  auditConfiguration,
+  auditHooks,
+  auditInstructionText,
+  auditMcpServers,
+  auditPermissions,
+  INJECTION_INDICATORS,
+  INVISIBLE_CHARACTER_NAMES,
+  isVariableReference,
+  NO_FINDINGS_CAVEAT,
+  parsePermissionRule,
+  RISK_PATTERNS,
+  SECRET_VALUE_PATTERNS,
+  scanExpression,
+  scanSecretValue,
+  scanText,
+} from "./security/index.js";
 // ─── Skills ────────────────────────────────────────────────────────────────
 export type { NameProblem, SkillSecurityOptions, SkillSecurityResult } from "./skills/index.js";
 export {
@@ -401,74 +469,6 @@ export {
   skillDirectoryName,
   validateSkills,
 } from "./skills/index.js";
-// ─── Static security analysis ──────────────────────────────────────────────
-export type {
-  AuditOptions,
-  AuditResult,
-  AuditSurface,
-  HookAuditOptions,
-  RiskMatch,
-  RiskPattern,
-} from "./security/index.js";
-export {
-  auditCommands,
-  auditConfiguration,
-  auditHooks,
-  auditInstructionText,
-  auditMcpServers,
-  auditPermissions,
-  INJECTION_INDICATORS,
-  INVISIBLE_CHARACTER_NAMES,
-  isVariableReference,
-  NO_FINDINGS_CAVEAT,
-  parsePermissionRule,
-  RISK_PATTERNS,
-  scanExpression,
-  scanSecretValue,
-  scanText,
-  SECRET_VALUE_PATTERNS,
-} from "./security/index.js";
-// ─── Compilers over the IR ──────────────────────────────────────────────────
-export type {
-  CompilationPlan,
-  CompiledFile,
-  CompilePlan,
-  FileAction,
-  NotCarried,
-  PlanOptions,
-  PlannedFile,
-  TargetCompiler,
-} from "./compilers/index.js";
-export {
-  applyCompilation,
-  COMPILE_TARGETS,
-  COMPILERS,
-  compilerFor,
-  driftedFiles,
-  planCompilation,
-  selectSources,
-} from "./compilers/index.js";
-// ─── Behavioral evaluation ──────────────────────────────────────────────────
-export type {
-  AssertionResult,
-  EvalDefinition,
-  EvalResult,
-  EvalStatus,
-  RunEvalOptions,
-  Sandbox,
-  Workspace,
-} from "./evals/index.js";
-export {
-  EVAL_DIRECTORY,
-  EVAL_FILE_SUFFIX,
-  evalCacheKey,
-  evalFilesIn,
-  gitSeedFiles,
-  gitStateFingerprint,
-  parseEvalDefinition,
-  runEval,
-  temporaryDirectorySandbox,
-} from "./evals/index.js";
 // ─── Validation ────────────────────────────────────────────────────────────
 export type {
   Rule,

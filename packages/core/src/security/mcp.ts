@@ -141,28 +141,30 @@ function commandRisks(server: McpServerEntry): Diagnostic[] {
 
   const invocation = [server.command, ...(server.args ?? [])].join(" ");
 
-  return scanExpression(invocation)
-    // A network client is the normal shape of an MCP server, so the outbound
-    // signal says nothing here and would only add noise.
-    .filter((pattern) => pattern.id !== "outbound-network")
-    .map((pattern) =>
-      diagnostic({
-        code: "AGF503",
-        severity: pattern.severity,
-        message: `MCP server "${server.name}" ${pattern.title}`,
-        explanation: [
-          pattern.why,
-          "",
-          `  ${invocation}`,
-          "",
-          "This is a pattern match on the command text. Nothing was executed to produce",
-          "it, and it cannot see intent.",
-        ].join("\n"),
-        suggestion: "Confirm this is what the server is meant to run.",
-        location: locationOf(server),
-        data: { server: server.name, risk: pattern.id, analysis: "static-pattern-match" },
-      }),
-    );
+  return (
+    scanExpression(invocation)
+      // A network client is the normal shape of an MCP server, so the outbound
+      // signal says nothing here and would only add noise.
+      .filter((pattern) => pattern.id !== "outbound-network")
+      .map((pattern) =>
+        diagnostic({
+          code: "AGF503",
+          severity: pattern.severity,
+          message: `MCP server "${server.name}" ${pattern.title}`,
+          explanation: [
+            pattern.why,
+            "",
+            `  ${invocation}`,
+            "",
+            "This is a pattern match on the command text. Nothing was executed to produce",
+            "it, and it cannot see intent.",
+          ].join("\n"),
+          suggestion: "Confirm this is what the server is meant to run.",
+          location: locationOf(server),
+          data: { server: server.name, risk: pattern.id, analysis: "static-pattern-match" },
+        }),
+      )
+  );
 }
 
 /** Every MCP finding for a configuration. */

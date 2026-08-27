@@ -6,9 +6,9 @@ export type { SelectedSources } from "./sources.js";
 export { isCompileSource, mergeBodies, outputSlug, selectSources } from "./sources.js";
 export {
   agentsMdCompiler,
-  claudeCompiler,
   COMPILE_TARGETS,
   COMPILERS,
+  claudeCompiler,
   compilerFor,
   copilotCompiler,
   cursorCompiler,

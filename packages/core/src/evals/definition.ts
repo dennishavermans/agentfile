@@ -34,7 +34,7 @@ const AssertionsSchema = z
     forbidden: z.array(TextAssertionSchema).optional(),
   })
   .refine(
-    (value) => Object.values(value).some((entries) => entries && entries.length),
+    (value) => Object.values(value).some((entries) => entries?.length),
     "at least one assertion is required — an eval that asserts nothing passes vacuously",
   );
 
