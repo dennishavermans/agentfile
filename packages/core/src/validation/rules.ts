@@ -140,7 +140,7 @@ const skillSpecification: Rule = {
   run: (context) => ({
     diagnostics: [
       ...validateSkills(context.configuration),
-      ...checkSkillReferences(context.configuration, context.files),
+      ...checkSkillReferences(context.configuration, context.files, { root: context.root, fs: context.fs }),
     ],
   }),
 };
@@ -193,7 +193,9 @@ const hookCommands: Rule = {
   layer: "security",
   description: "Hooks that run automatically, matched against risk patterns and checked for missing scripts",
   emits: ["AGF502", "AGF504", "AGF004", "AGF001"],
-  run: (context) => ({ diagnostics: auditHooks(context.configuration, { files: context.files }) }),
+  run: (context) => ({
+    diagnostics: auditHooks(context.configuration, { files: context.files, root: context.root, fs: context.fs }),
+  }),
 };
 
 const mcpServers: Rule = {

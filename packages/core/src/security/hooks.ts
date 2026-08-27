@@ -11,7 +11,9 @@
  * semantics, and the fact that hooks merge across every configured source.
  */
 
+import { join } from "node:path";
 import { type Diagnostic, diagnostic, type Location } from "../diagnostics/index.js";
+import type { FileSystem } from "../fs/index.js";
 import type { AgentConfiguration, HookEntry } from "../ir/index.js";
 import { scanExpression, scanSecretValue } from "./patterns.js";
 
@@ -156,7 +158,7 @@ function unknownType(hook: HookEntry): Diagnostic[] {
  * on the event that is either noise in every session or a check the team believes
  * is running and is not.
  */
-function missingScripts(hook: HookEntry, files: readonly string[]): Diagnostic[] {
+function missingScripts(hook: HookEntry, files: readonly string[], options: HookAuditOptions): Diagnostic[] {
   if (hook.type !== "command" || !hook.command) return [];
 
   // Only a repository-relative path can be checked. A bare binary name resolves
@@ -171,6 +173,10 @@ function missingScripts(hook: HookEntry, files: readonly string[]): Diagnostic[]
   // Not a relative path inside the repository: nothing to check.
   if (script.startsWith("/") || script.startsWith("~") || !script.includes("/")) return [];
   if (files.includes(script)) return [];
+  // The scan is bounded, so the file list proves presence and never absence.
+  // Without this, a repository too large to scan in full reports every hook
+  // script beyond the cut as missing.
+  if (options.fs && options.root !== undefined && options.fs.exists(join(options.root, script))) return [];
 
   return [
     diagnostic({
@@ -193,6 +199,13 @@ function missingScripts(hook: HookEntry, files: readonly string[]): Diagnostic[]
 export interface HookAuditOptions {
   /** Project-relative paths of every scanned file, for reference checking. */
   files: readonly string[];
+  /**
+   * Absolute project root and filesystem, so a script the bounded scan did not
+   * reach can still be found. Optional: without them the file list is the only
+   * evidence, which proves presence but not absence.
+   */
+  root?: string;
+  fs?: FileSystem;
 }
 
 /** Every hook finding for a configuration. */
@@ -202,6 +215,6 @@ export function auditHooks(configuration: AgentConfiguration, options: HookAudit
     ...commandRisks(hook),
     ...transportRisks(hook),
     ...headerSecrets(hook),
-    ...missingScripts(hook, options.files),
+    ...missingScripts(hook, options.files, options),
   ]);
 }

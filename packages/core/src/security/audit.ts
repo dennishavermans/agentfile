@@ -64,7 +64,7 @@ export function auditConfiguration(configuration: AgentConfiguration, options: A
   const diagnostics = [
     ...skills.diagnostics,
     ...auditCommands(configuration),
-    ...auditHooks(configuration, { files: options.files }),
+    ...auditHooks(configuration, { files: options.files, root: options.root, fs: options.fs }),
     ...auditMcpServers(configuration),
     ...auditPermissions(configuration),
     ...auditInstructionText(configuration),

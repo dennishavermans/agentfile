@@ -11,7 +11,9 @@
  * second one for skills.
  */
 
+import { join } from "node:path";
 import { type Diagnostic, diagnostic } from "../diagnostics/index.js";
+import type { FileSystem } from "../fs/index.js";
 import type { AgentConfiguration, SkillEntry } from "../ir/index.js";
 import { basenameOf, normalizePath } from "../paths/index.js";
 
@@ -68,9 +70,38 @@ function bodyLinks(skill: SkillEntry): BodyLink[] {
  * the repository genuinely does not contain it — a link pointing outside the
  * repository is skipped rather than guessed at.
  */
-export function checkSkillReferences(configuration: AgentConfiguration, files: readonly string[]): Diagnostic[] {
+export interface SkillReferenceOptions {
+  /** Absolute project root. */
+  root: string;
+  fs: FileSystem;
+}
+
+export function checkSkillReferences(
+  configuration: AgentConfiguration,
+  files: readonly string[],
+  options?: SkillReferenceOptions,
+): Diagnostic[] {
   const present = new Set(files.map(normalizePath));
   const diagnostics: Diagnostic[] = [];
+
+  /**
+   * Whether a resolved path exists.
+   *
+   * The scan is bounded — it stops after 20,000 files so a huge repository
+   * degrades into a reported truncation rather than a hang — which means the
+   * file list proves presence and never proves absence. Concluding "missing"
+   * from it reported 65 phantom broken links in PostHog, whose 47,010 files do
+   * not fit, and every one of them was really there.
+   *
+   * So absence is settled against the disk. Presence in the list is still
+   * checked first, because it is free and answers most cases.
+   */
+  const exists = (path: string): boolean => {
+    if (present.has(path)) return true;
+    if ([...present].some((file) => file.startsWith(`${path}/`))) return true;
+    if (!options) return false;
+    return options.fs.exists(join(options.root, path));
+  };
 
   for (const skill of configuration.skills) {
     const directory = skill.directory;
@@ -85,10 +116,7 @@ export function checkSkillReferences(configuration: AgentConfiguration, files: r
 
       const resolved = resolveRelative(directory, target);
       if (resolved === undefined) continue; // escapes the root; not ours to check
-      if (present.has(resolved)) continue;
-
-      // A link to a directory is satisfied by anything inside it.
-      if ([...present].some((file) => file.startsWith(`${resolved}/`))) continue;
+      if (exists(resolved)) continue;
 
       diagnostics.push(
         diagnostic({

@@ -17,6 +17,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+import { discover } from "../src/discovery/index.ts";
 import { memoryFileSystem } from "../src/fs/index.ts";
 import { IMPLEMENTED_LAYERS, runValidation } from "../src/validation/index.ts";
 
@@ -238,5 +239,49 @@ describe("a clean repository stays quiet", () => {
     });
 
     expect([...codes]).toEqual([]);
+  });
+});
+
+/**
+ * Absence has to be proven against the disk, not against the file list.
+ *
+ * The scan stops after 20,000 files so a huge repository degrades into a
+ * reported truncation rather than a hang. That makes the list evidence of
+ * presence and never of absence — and concluding "missing" from it reported 65
+ * phantom broken links in PostHog, whose 47,010 files do not fit. Every one of
+ * them was really there.
+ */
+describe("a bounded scan never proves a file is missing", () => {
+  const SKILL_BODY =
+    "---\nname: deploy\ndescription: Deploys the service when a release is cut.\n---\n\nSee [types](../../../src/types.ts).\n";
+
+  it("does not report a linked file the scan did not reach", () => {
+    const files = {
+      [`${ROOT}/.agents/skills/deploy/SKILL.md`]: SKILL_BODY,
+      [`${ROOT}/src/types.ts`]: "export type Deploy = never;\n",
+    };
+
+    // A scan small enough to miss src/types.ts, which is nevertheless on disk.
+    const result = runValidation({
+      root: ROOT,
+      fs: memoryFileSystem(files),
+      layers: IMPLEMENTED_LAYERS,
+      discovery: discover({ root: ROOT, fs: memoryFileSystem(files), maxFiles: 1 }),
+    });
+
+    const broken = result.diagnostics.filter((item) => item.code === "AGF004");
+    expect(broken).toHaveLength(0);
+  });
+
+  it("still reports a linked file that is genuinely absent", () => {
+    const files = { [`${ROOT}/.agents/skills/deploy/SKILL.md`]: SKILL_BODY };
+
+    const codes = runValidation({
+      root: ROOT,
+      fs: memoryFileSystem(files),
+      layers: IMPLEMENTED_LAYERS,
+    }).diagnostics.map((item) => item.code);
+
+    expect(codes).toContain("AGF004");
   });
 });
