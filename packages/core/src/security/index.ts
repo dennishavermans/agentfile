@@ -1,5 +1,6 @@
 export type { AuditOptions, AuditResult, AuditSurface } from "./audit.js";
 export { auditConfiguration, NO_FINDINGS_CAVEAT } from "./audit.js";
+export { auditCommands } from "./commands.js";
 export type { HookAuditOptions } from "./hooks.js";
 export { auditHooks } from "./hooks.js";
 export { auditInstructionText, INJECTION_INDICATORS, INVISIBLE_CHARACTER_NAMES } from "./injection.js";

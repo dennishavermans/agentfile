@@ -16,6 +16,7 @@ import { type FileSystem, nodeFileSystem } from "../fs/index.js";
 import { type AgentConfiguration, emptyConfiguration, type PlatformId, withoutAliases } from "../ir/index.js";
 import { normalizePath } from "../paths/index.js";
 import { discoverMcpServers, discoverSubagents } from "./agents-mcp.js";
+import { discoverCommands } from "./commands.js";
 import {
   checkInstructionImports,
   type DiscoveredInstructions,
@@ -107,6 +108,11 @@ export function discover(options: DiscoverOptions): DiscoveryResult {
   configuration.subagents.push(...subagents.subagents);
   configuration.sources.push(...subagents.sources);
   diagnostics.push(...subagents.diagnostics);
+
+  const commands = discoverCommands(root, scan, fs);
+  configuration.commands.push(...commands.commands);
+  configuration.sources.push(...commands.sources);
+  diagnostics.push(...commands.diagnostics);
 
   const mcp = discoverMcpServers(root, scan, fs);
   configuration.mcpServers.push(...mcp.mcpServers);

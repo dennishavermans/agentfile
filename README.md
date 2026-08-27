@@ -140,7 +140,7 @@ npx @agentfile/cli doctor --verbose      # list every file found
 npx @agentfile/cli doctor --format json  # machine-readable, for CI
 ```
 
-It reads `AGENTS.md`, `CLAUDE.md`, `.claude/rules/`, `.claude/skills/`, `.claude/agents/`, `.cursor/rules/`, `.github/copilot-instructions.md`, `.github/instructions/`, and `.mcp.json`, then reports:
+It reads `AGENTS.md`, `CLAUDE.md`, `.claude/rules/`, `.claude/skills/`, `.claude/agents/`, `.claude/commands/`, `.cursor/rules/`, `.cursor/commands/`, `.github/copilot-instructions.md`, `.github/instructions/`, and `.mcp.json`, then reports:
 
 - what configuration exists, per platform, and where it lives
 - how much context loads into **every** session (an estimate, clearly labelled)

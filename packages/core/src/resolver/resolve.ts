@@ -20,6 +20,7 @@ import { type Diagnostic, diagnostic } from "../diagnostics/index.js";
 import type {
   AgentConfiguration,
   Applicability,
+  CommandEntry,
   ConfigScope,
   Directive,
   HookEntry,
@@ -112,6 +113,7 @@ export interface EffectiveConfiguration {
   skills: Applied<SkillEntry>[];
   /** Node kinds that no verified platform scopes by path. */
   subagents: SubagentEntry[];
+  commands: CommandEntry[];
   hooks: HookEntry[];
   mcpServers: McpServerEntry[];
   permissions: PermissionRule[];
@@ -397,6 +399,7 @@ export function resolveForPath(
     directives: directives.applied,
     skills: skills.applied,
     subagents: [...configuration.subagents],
+    commands: [...configuration.commands],
     hooks: [...configuration.hooks],
     mcpServers: [...configuration.mcpServers],
     permissions: [...configuration.permissions],

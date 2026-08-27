@@ -222,6 +222,7 @@ export {
 } from "./diagnostics/index.js";
 // ─── Discovery ─────────────────────────────────────────────────────────────
 export type {
+  DiscoveredCommands,
   DiscoveredInstructions,
   DiscoveredMcpServers,
   DiscoveredSkills,
@@ -233,11 +234,13 @@ export type {
 } from "./discovery/index.js";
 export {
   checkInstructionImports,
+  COMMAND_FIELDS,
   DEFAULT_IGNORED_DIRECTORIES,
   discover,
   discoverAgentsMd,
   discoverClaudeMd,
   discoverClaudeRules,
+  discoverCommands,
   discoverCopilotInstructions,
   discoverCursorRules,
   discoverLegacyCursorRules,
@@ -248,6 +251,7 @@ export {
   filesUnder,
   findImports,
   governedDirectory,
+  inlineCommandsOf,
   SKILL_DIRECTORIES,
   SKILL_SPEC_FIELDS,
   scanRepository,
@@ -260,6 +264,7 @@ export type {
   AgentConfiguration,
   Applicability,
   ArtifactEntry,
+  CommandEntry,
   ConfigOrigin,
   ConfigScope,
   Directive,
@@ -396,6 +401,7 @@ export type {
   RiskPattern,
 } from "./security/index.js";
 export {
+  auditCommands,
   auditConfiguration,
   auditHooks,
   auditInstructionText,

@@ -19,6 +19,7 @@ export function emptyConfiguration(root: string): AgentConfiguration {
     directives: [],
     skills: [],
     subagents: [],
+    commands: [],
     hooks: [],
     mcpServers: [],
     permissions: [],
@@ -126,6 +127,7 @@ export function mergeConfigurations(
     result.directives.push(...configuration.directives);
     result.skills.push(...configuration.skills);
     result.subagents.push(...configuration.subagents);
+    result.commands.push(...configuration.commands);
     result.hooks.push(...configuration.hooks);
     result.mcpServers.push(...configuration.mcpServers);
     result.permissions.push(...configuration.permissions);
@@ -145,6 +147,7 @@ export function countNodes(configuration: AgentConfiguration): number {
     configuration.directives.length +
     configuration.skills.length +
     configuration.subagents.length +
+    configuration.commands.length +
     configuration.hooks.length +
     configuration.mcpServers.length +
     configuration.permissions.length +

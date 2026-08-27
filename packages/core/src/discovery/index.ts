@@ -1,5 +1,7 @@
 export type { DiscoveredMcpServers, DiscoveredSubagents } from "./agents-mcp.js";
 export { discoverMcpServers, discoverSubagents } from "./agents-mcp.js";
+export type { DiscoveredCommands } from "./commands.js";
+export { COMMAND_FIELDS, discoverCommands, inlineCommandsOf } from "./commands.js";
 export type { DiscoverOptions, DiscoveryResult } from "./discover.js";
 export { discover } from "./discover.js";
 export type { DiscoveredInstructions } from "./instructions.js";

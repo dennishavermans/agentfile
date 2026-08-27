@@ -82,6 +82,7 @@ export async function contextCommand(targetPath: string, options: ContextOptions
       })),
       repositoryWide: {
         subagents: effective.subagents.map((entry) => ({ name: entry.name, file: entry.provenance.file })),
+        commands: effective.commands.map((entry) => ({ name: entry.name, file: entry.provenance.file })),
         hooks: effective.hooks.map((entry) => ({ event: entry.event, file: entry.provenance.file })),
         mcpServers: effective.mcpServers.map((entry) => ({ name: entry.name, file: entry.provenance.file })),
         permissions: effective.permissions.map((entry) => ({ rule: entry.rule, effect: entry.effect })),
@@ -170,6 +171,7 @@ export async function contextCommand(targetPath: string, options: ContextOptions
   // ─── Repository-wide ─────────────────────────────────────────────────────
   const repositoryWide = [
     effective.subagents.length ? `${effective.subagents.length} subagent(s)` : "",
+    effective.commands.length ? `${effective.commands.length} command(s)` : "",
     effective.hooks.length ? `${effective.hooks.length} hook(s)` : "",
     effective.mcpServers.length ? `${effective.mcpServers.length} MCP server(s)` : "",
     effective.permissions.length ? `${effective.permissions.length} permission rule(s)` : "",

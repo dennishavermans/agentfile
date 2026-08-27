@@ -15,6 +15,7 @@ export type {
   AgentConfiguration,
   Applicability,
   ArtifactEntry,
+  CommandEntry,
   ConfigOrigin,
   ConfigScope,
   Directive,

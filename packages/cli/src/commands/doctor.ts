@@ -73,8 +73,8 @@ function reportInventory(result: DiscoveryResult, verbose: boolean): void {
     logger.warn("No agent configuration found.");
     console.log();
     logger.info("Nothing to analyse yet. agentfile looks for files such as:");
-    logger.info("  AGENTS.md, CLAUDE.md, .claude/rules/, .claude/skills/,");
-    logger.info("  .cursor/rules/, .github/copilot-instructions.md, .mcp.json");
+    logger.info("  AGENTS.md, CLAUDE.md, .claude/rules/, .claude/skills/, .claude/commands/,");
+    logger.info("  .cursor/rules/, .cursor/commands/, .github/copilot-instructions.md, .mcp.json");
     console.log();
     logger.info("Run `agentfile init` to start from a contract instead.");
     return;

@@ -283,10 +283,13 @@ always-loaded instructions.
 
 ### `AGF501` security-issue · error · active
 Static analysis matched a documented risk pattern in a file bundled with a
-skill. Severity follows the pattern: piping a downloaded script into a shell is
-an error, requesting elevated privileges is a warning, and making network calls
-at all is recorded as info so that what a skill reaches out to is visible
-without reading every script.
+skill, or in shell a slash command embeds with `` !`…` `` — which runs at
+invocation, before the model sees the output, and is reachable by the model
+itself through the SlashCommand tool unless `disable-model-invocation` bars it.
+Severity follows the pattern: piping a downloaded script into a shell is an
+error, requesting elevated privileges is a warning, and making network calls at
+all is recorded as info so that what a skill or command reaches out to is
+visible without reading every script.
 
 Two rules govern every finding in this band:
 

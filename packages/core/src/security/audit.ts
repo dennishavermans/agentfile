@@ -19,6 +19,7 @@ import type { Diagnostic } from "../diagnostics/index.js";
 import type { FileSystem } from "../fs/index.js";
 import type { AgentConfiguration } from "../ir/index.js";
 import { inspectSkillResources } from "../skills/index.js";
+import { auditCommands } from "./commands.js";
 import { auditHooks } from "./hooks.js";
 import { auditInstructionText } from "./injection.js";
 import { auditMcpServers } from "./mcp.js";
@@ -27,7 +28,7 @@ import { auditPermissions } from "./permissions.js";
 /** A surface the audit covers, and how much of it was present. */
 export interface AuditSurface {
   /** Stable name, used in output and JSON. */
-  name: "skills" | "hooks" | "mcp-servers" | "permissions" | "instructions";
+  name: "skills" | "commands" | "hooks" | "mcp-servers" | "permissions" | "instructions";
   /** How many nodes of this kind were analysed. */
   analysed: number;
   /** What the surface covers, for a reader who needs to know what was not checked. */
@@ -62,6 +63,7 @@ export function auditConfiguration(configuration: AgentConfiguration, options: A
 
   const diagnostics = [
     ...skills.diagnostics,
+    ...auditCommands(configuration),
     ...auditHooks(configuration, { files: options.files }),
     ...auditMcpServers(configuration),
     ...auditPermissions(configuration),
@@ -73,6 +75,11 @@ export function auditConfiguration(configuration: AgentConfiguration, options: A
       name: "skills",
       analysed: configuration.skills.length,
       description: "bundled scripts matched against documented risk patterns, never executed",
+    },
+    {
+      name: "commands",
+      analysed: configuration.commands.length,
+      description: "inline shell that runs at invocation, matched against documented risk patterns",
     },
     {
       name: "hooks",

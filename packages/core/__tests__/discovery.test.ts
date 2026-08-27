@@ -9,6 +9,7 @@ import {
   discoverCursorRules,
   discoverMcpServers,
   discoverSkills,
+  discoverCommands,
   discoverSubagents,
   filesNamed,
   filesUnder,
@@ -259,6 +260,7 @@ function emptyConfigurationFor(root: string) {
     directives: [],
     skills: [],
     subagents: [],
+    commands: [],
     hooks: [],
     mcpServers: [],
     permissions: [],
@@ -506,6 +508,103 @@ describe("discoverSkills", () => {
 });
 
 // ─── Subagents ─────────────────────────────────────────────────────────────
+
+describe("discoverCommands", () => {
+  it("reads a Claude Code command with its frontmatter", () => {
+    const { fs, scan } = scanOf({
+      "/repo/.claude/commands/deploy.md": [
+        "---",
+        "description: Deploy to an environment",
+        "argument-hint: [environment]",
+        "allowed-tools: Bash(kubectl:*), Read",
+        "model: sonnet",
+        "disable-model-invocation: true",
+        "---",
+        "",
+        "Deploy $1. Cluster: !`kubectl cluster-info`",
+      ].join("\n"),
+    });
+
+    const [command] = discoverCommands(ROOT, scan, fs).commands;
+    expect(command.name).toBe("deploy");
+    expect(command.description).toBe("Deploy to an environment");
+    expect(command.argumentHint).toBe("[environment]");
+    expect(command.allowedTools).toEqual(["Bash(kubectl:*)", "Read"]);
+    expect(command.model).toBe("sonnet");
+    expect(command.disableModelInvocation).toBe(true);
+    expect(command.inlineCommands).toEqual(["kubectl cluster-info"]);
+    expect(command.provenance.platform).toBe("claude");
+  });
+
+  it("names a command after its file, and a subdirectory does not rename it", () => {
+    const { fs, scan } = scanOf({
+      "/repo/.claude/commands/frontend/component.md": "Create a component named $1.",
+    });
+
+    expect(discoverCommands(ROOT, scan, fs).commands[0].name).toBe("component");
+  });
+
+  it("extracts every piece of inline shell in body order", () => {
+    const { fs, scan } = scanOf({
+      "/repo/.claude/commands/status.md": "Diff: !`git diff --stat`\nBranch: !`git branch --show-current`",
+    });
+
+    expect(discoverCommands(ROOT, scan, fs).commands[0].inlineCommands).toEqual([
+      "git diff --stat",
+      "git branch --show-current",
+    ]);
+  });
+
+  it("reads a Cursor command as plain prompt text", () => {
+    const { fs, scan } = scanOf({
+      "/repo/.cursor/commands/fix-lint.md": "# Fix Lint\n\nRun the linter and fix everything it reports.",
+    });
+
+    const [command] = discoverCommands(ROOT, scan, fs).commands;
+    expect(command.name).toBe("fix-lint");
+    expect(command.provenance.platform).toBe("cursor");
+    expect(command.inlineCommands).toEqual([]);
+    expect(command.body).toContain("# Fix Lint");
+  });
+
+  it("reports an @-reference whose target does not exist", () => {
+    const { fs, scan } = scanOf({
+      "/repo/.claude/commands/review.md": "Review the changes against @docs/style-guide.md before approving.",
+    });
+
+    const { diagnostics } = discoverCommands(ROOT, scan, fs);
+    expect(diagnostics.map((item) => item.code)).toContain("AGF004");
+    expect(diagnostics[0].message).toContain("docs/style-guide.md");
+  });
+
+  it("accepts an @-reference whose target exists", () => {
+    const { fs, scan } = scanOf({
+      "/repo/.claude/commands/review.md": "Review against @docs/style-guide.md.",
+      "/repo/docs/style-guide.md": "Rules.",
+    });
+
+    expect(discoverCommands(ROOT, scan, fs).diagnostics).toEqual([]);
+  });
+
+  it("does not check an @-reference built from arguments", () => {
+    const { fs, scan } = scanOf({
+      "/repo/.claude/commands/open.md": "Open @src/$1.ts and summarise it.",
+    });
+
+    expect(discoverCommands(ROOT, scan, fs).diagnostics).toEqual([]);
+  });
+
+  it("records each command as a source file", () => {
+    const { fs, scan } = scanOf({
+      "/repo/.claude/commands/a.md": "A.",
+      "/repo/.cursor/commands/b.md": "B.",
+    });
+
+    const { sources } = discoverCommands(ROOT, scan, fs);
+    expect(sources.map((source) => source.kind)).toEqual(["command", "command"]);
+    expect(sources.map((source) => source.platform).sort()).toEqual(["claude", "cursor"]);
+  });
+});
 
 describe("discoverSubagents", () => {
   it("reads name, description, tools, and model", () => {

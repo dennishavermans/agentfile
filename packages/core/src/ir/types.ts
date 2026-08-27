@@ -174,6 +174,38 @@ export interface SubagentEntry {
 }
 
 /**
+ * A slash command: a reusable prompt invoked by name.
+ *
+ * Claude Code reads them from `.claude/commands/`, Cursor from
+ * `.cursor/commands/`. A Claude command body can embed shell with
+ * `` !`command` `` — executed when the command is invoked, before the model
+ * sees anything — which makes commands an executable surface like hooks, not
+ * just prose. `inlineCommands` records that shell as DATA; static analysis
+ * never runs it.
+ */
+export interface CommandEntry {
+  /** Stable identifier, derived from provenance. Used by `explain`. */
+  id: string;
+  /** Invocation name: `/deploy` comes from `deploy.md`. Subdirectories namespace the listing, not the name. */
+  name: string;
+  description: string;
+  /** Documented argument shape, e.g. "[pr-number]". */
+  argumentHint?: string;
+  /** Tool allowlist the command runs under, as authored. */
+  allowedTools?: string[];
+  model?: string;
+  /** True when only a human may invoke it — the model's SlashCommand tool is barred. */
+  disableModelInvocation?: boolean;
+  /** Markdown body after the frontmatter. */
+  body: string;
+  /** Shell embedded with !`…`, in body order. Recorded, never executed. */
+  inlineCommands: string[];
+  /** Non-standard frontmatter keys, preserved verbatim. */
+  extensions?: Record<string, unknown>;
+  provenance: Provenance;
+}
+
+/**
  * Handler kinds a hook can use.
  *
  * Claude Code documents `command`, `http`, `mcp_tool`, `prompt`, and `agent`.
@@ -310,6 +342,7 @@ export interface AgentConfiguration {
   directives: Directive[];
   skills: SkillEntry[];
   subagents: SubagentEntry[];
+  commands: CommandEntry[];
   hooks: HookEntry[];
   mcpServers: McpServerEntry[];
   permissions: PermissionRule[];
