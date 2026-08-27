@@ -61,7 +61,14 @@ const unreachableConfiguration: Rule = {
     if (!context.files.length) {
       return { diagnostics: [], skipped: "no file list was available to match patterns against" };
     }
-    return { diagnostics: unreachableDiagnostics(context.configuration, { files: context.files }) };
+    return {
+      diagnostics: unreachableDiagnostics(context.configuration, {
+        files: context.files,
+        root: context.root,
+        fs: context.fs,
+        truncated: context.scanTruncated,
+      }),
+    };
   },
 };
 

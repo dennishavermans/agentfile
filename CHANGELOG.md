@@ -9,6 +9,20 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.0.0-beta.3] — 2026-08-28
+
+### Fixed
+
+- **The same truncation bug, in the other direction.** `AGF303` asks whether any
+  file matches a glob, which a bounded scan cannot answer either: PostHog's
+  `proto/**` and `tach.toml` were both reported as matching nothing while both
+  sat on disk. A pattern is now only called dead when the scan is complete, or
+  when the literal part of the pattern before its first wildcard is also absent
+  from the disk. A pattern with no literal prefix cannot be settled that way and
+  is left alone rather than guessed at.
+
+  All three of PostHog's reported dead globs were this. It has none.
+
 ## [2.0.0-beta.2] — 2026-08-27
 
 ### Fixed

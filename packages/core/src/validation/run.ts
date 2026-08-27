@@ -142,6 +142,7 @@ export function runValidation(options: ValidationOptions): ValidationResult {
     fs,
     discoveryDiagnostics: discovery.diagnostics,
     files: discovery.scan.files,
+    scanTruncated: discovery.scan.truncated,
     targets: options.targets ?? [],
     budgetTokens: options.budgetTokens ?? config.budget,
     similarityThreshold: options.similarityThreshold ?? config.similarity,

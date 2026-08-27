@@ -12,7 +12,9 @@
  * same matcher decides both.
  */
 
+import { join } from "node:path";
 import { type Diagnostic, diagnostic, type Location } from "../diagnostics/index.js";
+import type { FileSystem } from "../fs/index.js";
 import type { AgentConfiguration, Applicability, Provenance } from "../ir/index.js";
 import { matchesPattern } from "../paths/index.js";
 
@@ -59,9 +61,56 @@ function candidates(configuration: AgentConfiguration): Candidate[] {
   return found;
 }
 
-/** Patterns in a glob-scoped node that no scanned file matches. */
-export function deadPatterns(patterns: readonly string[], files: readonly string[]): string[] {
-  return patterns.filter((pattern) => !files.some((file) => matchesPattern(file, pattern)));
+/**
+ * The part of a glob before its first wildcard.
+ *
+ * `proto/**` gives `proto`, `src/api/*.ts` gives `src/api`, and `**\/*.ts`
+ * gives nothing. That prefix is a real path, so its existence can be settled
+ * with a stat even when the file list cannot settle the glob.
+ */
+export function literalPrefix(pattern: string): string | undefined {
+  const segments: string[] = [];
+  for (const segment of pattern.split("/")) {
+    if (/[*?[\]{}]/.test(segment)) break;
+    segments.push(segment);
+  }
+  const prefix = segments.join("/");
+  return prefix.length ? prefix : undefined;
+}
+
+export interface DeadPatternOptions {
+  /** Absolute project root and filesystem, used when the file list is incomplete. */
+  root?: string;
+  fs?: FileSystem;
+  /** True when the scan stopped early, so the file list proves nothing absent. */
+  truncated?: boolean;
+}
+
+/**
+ * Patterns in a glob-scoped node that no scanned file matches.
+ *
+ * A pattern matching nothing in the list is only dead if the list is complete.
+ * The scan stops after 20,000 files, and on a repository past that a live
+ * pattern looks dead: PostHog's `proto/**` and `tach.toml` were both reported
+ * as matching nothing while both were sitting on disk.
+ *
+ * So when the scan truncated, a pattern is only called dead if its literal
+ * prefix is also absent from the disk. A pattern with no literal prefix cannot
+ * be settled that way and is left alone rather than guessed at.
+ */
+export function deadPatterns(
+  patterns: readonly string[],
+  files: readonly string[],
+  options: DeadPatternOptions = {},
+): string[] {
+  return patterns.filter((pattern) => {
+    if (files.some((file) => matchesPattern(file, pattern))) return false;
+    if (!options.truncated || !options.fs || options.root === undefined) return true;
+
+    const prefix = literalPrefix(pattern);
+    if (prefix === undefined) return false; // nothing checkable; do not accuse
+    return !options.fs.exists(join(options.root, prefix));
+  });
 }
 
 /**
@@ -77,6 +126,11 @@ const SCAN_CAVEAT =
 export interface ReachabilityOptions {
   /** Project-relative paths of every file the scan found. */
   files: readonly string[];
+  /** Absolute project root, so an incomplete scan can be checked against disk. */
+  root?: string;
+  fs?: FileSystem;
+  /** True when the scan stopped early. */
+  truncated?: boolean;
 }
 
 /** AGF303 findings for glob-scoped configuration that matches nothing. */
@@ -88,7 +142,11 @@ export function unreachableDiagnostics(configuration: AgentConfiguration, option
     const { patterns } = candidate.applies;
     if (!patterns.length) continue;
 
-    const dead = deadPatterns(patterns, options.files);
+    const dead = deadPatterns(patterns, options.files, {
+      root: options.root,
+      fs: options.fs,
+      truncated: options.truncated,
+    });
     if (!dead.length) continue;
 
     const location: Location = { file: candidate.provenance.file, line: candidate.provenance.line };

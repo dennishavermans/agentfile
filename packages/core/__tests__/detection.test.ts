@@ -284,4 +284,35 @@ describe("a bounded scan never proves a file is missing", () => {
 
     expect(codes).toContain("AGF004");
   });
+
+  it("does not call a glob dead when the scan could not see the directory", () => {
+    const files = {
+      [`${ROOT}/.cursor/rules/api.mdc`]: '---\nglobs: "services/api/**"\n---\n\nValidate every input.\n',
+      [`${ROOT}/services/api/index.ts`]: "export const handler = () => {};\n",
+    };
+
+    const result = runValidation({
+      root: ROOT,
+      fs: memoryFileSystem(files),
+      layers: IMPLEMENTED_LAYERS,
+      discovery: discover({ root: ROOT, fs: memoryFileSystem(files), maxFiles: 1 }),
+    });
+
+    expect(result.diagnostics.map((item) => item.code)).not.toContain("AGF303");
+  });
+
+  it("still calls a glob dead when its directory is genuinely absent", () => {
+    const files = {
+      [`${ROOT}/.cursor/rules/api.mdc`]: '---\nglobs: "services/api/**"\n---\n\nValidate every input.\n',
+    };
+
+    const result = runValidation({
+      root: ROOT,
+      fs: memoryFileSystem(files),
+      layers: IMPLEMENTED_LAYERS,
+      discovery: discover({ root: ROOT, fs: memoryFileSystem(files), maxFiles: 1 }),
+    });
+
+    expect(result.diagnostics.map((item) => item.code)).toContain("AGF303");
+  });
 });

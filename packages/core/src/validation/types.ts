@@ -68,6 +68,13 @@ export interface RuleContext {
   discoveryDiagnostics: readonly Diagnostic[];
   /** Project-relative paths of every scanned file. */
   files: readonly string[];
+  /**
+   * True when the scan stopped early, so `files` is incomplete.
+   *
+   * A rule concluding that something is absent must consult this: the list
+   * proves presence and, when truncated, proves nothing about absence.
+   */
+  scanTruncated: boolean;
   /** Targets to check compatibility against. Empty means the caller named none. */
   targets: readonly TargetId[];
   /** Always-loaded context budget in estimated tokens, when overridden. */
