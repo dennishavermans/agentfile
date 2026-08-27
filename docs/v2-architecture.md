@@ -1,6 +1,12 @@
 # Agentfile v2 — Architecture Audit and Direction
 
 > **Status:** Phase 0 deliverable (architecture audit).
+> **Status:** a baseline snapshot. It describes the repository as it stood at
+> `0.4.0`, before the v2 rework, and is kept as the record of what was there and
+> why each decision was made. For what the tool does now see the
+> [README](../README.md); for what consumers may depend on see
+> [stability.md](stability.md).
+>
 > **Scope:** describes the repository as it actually exists at `0.4.0`, the architectural
 > problems found, the proposed v2 direction, and the incremental migration strategy.
 > **Source of truth for intent:** `REWORK.md`. This document is the source of truth for

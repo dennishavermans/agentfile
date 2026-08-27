@@ -13,7 +13,7 @@
 import { allDiagnosticCodes, type DiagnosticCode, diagnosticMeta, docsUrlFor } from "@agentfile/core";
 import chalk from "chalk";
 import { logger } from "../logger.js";
-import { parseFindingFormat, printJson, rejectFormat } from "../report.js";
+import { EXIT_USAGE, parseFindingFormat, printJson, rejectFormat } from "../report.js";
 
 export interface RuleOptions {
   /** `human` (default) or `json`. */
@@ -88,7 +88,7 @@ export async function ruleCommand(code: string | undefined, options: RuleOptions
       logger.info("Run `agentfile rule` to list every code.");
     }
     console.log();
-    process.exit(1);
+    process.exit(EXIT_USAGE);
     return;
   }
 

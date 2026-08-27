@@ -1,7 +1,7 @@
 {
   "name": "@agentfile/agentfile",
-  "version": "0.4.0",
-  "description": "One contract. Every AI agent. Zero clutter.",
+  "version": "2.0.0-beta.1",
+  "description": "Find what is wrong with the AI agent configuration your repository already has",
   "type": "module",
   "bin": {
     "agentfile": "dist/bin.js"
@@ -41,7 +41,7 @@
     "access": "public"
   },
   "dependencies": {
-    "@agentfile/cli": "^0.4.0"
+    "@agentfile/cli": "^2.0.0-beta.1"
   },
   "devDependencies": {
     "@types/node": "^22.19.0",

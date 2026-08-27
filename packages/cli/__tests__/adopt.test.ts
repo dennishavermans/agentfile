@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node
 import { dirname, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { adoptCommand } from "../src/commands/adopt.js";
+import { EXIT_USAGE } from "../src/report.js";
 
 const TEST_DIR = join(process.cwd(), "__test_adopt__");
 
@@ -109,7 +110,7 @@ describe("agentfile adopt", () => {
       expect(text).toContain("skills");
     });
 
-    it("says so, and exits 1, when the source platform has no root file", async () => {
+    it("says so, and exits 2, when the source platform has no root file", async () => {
       mixedRepository();
 
       const output = captureOutput();
@@ -118,7 +119,7 @@ describe("agentfile adopt", () => {
       output.restore();
 
       expect(text).toContain("AGF001");
-      expect(exitCodes).toEqual([1]);
+      expect(exitCodes).toEqual([EXIT_USAGE]);
     });
 
     it("emits a machine-readable plan", async () => {

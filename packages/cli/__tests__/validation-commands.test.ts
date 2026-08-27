@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { checkCommand } from "../src/commands/check.js";
 import { lintCommand } from "../src/commands/lint.js";
 import { validateCommand } from "../src/commands/validate.js";
+import { EXIT_USAGE } from "../src/report.js";
 
 const TEST_DIR = join(process.cwd(), "__test_validation__");
 
@@ -157,7 +158,7 @@ describe("validation commands", () => {
       output.restore();
 
       expect(text).toContain("Unknown format");
-      expect(exitCodes).toEqual([1]);
+      expect(exitCodes).toEqual([EXIT_USAGE]);
     });
 
     it("changes nothing on disk", async () => {
@@ -218,7 +219,7 @@ describe("validation commands", () => {
       output.restore();
 
       expect(text).toContain("Invalid --budget");
-      expect(exitCodes).toEqual([1]);
+      expect(exitCodes).toEqual([EXIT_USAGE]);
     });
 
     it("rejects a similarity threshold outside 0 to 1", async () => {
@@ -228,7 +229,7 @@ describe("validation commands", () => {
       output.restore();
 
       expect(text).toContain("Invalid --similarity");
-      expect(exitCodes).toEqual([1]);
+      expect(exitCodes).toEqual([EXIT_USAGE]);
     });
 
     it("records the thresholds it used in JSON output", async () => {
@@ -349,7 +350,7 @@ describe("validation commands", () => {
       output.restore();
 
       expect(text).toContain("Unknown target");
-      expect(exitCodes).toEqual([1]);
+      expect(exitCodes).toEqual([EXIT_USAGE]);
     });
 
     it("lists the rule set with its layers and codes", async () => {
@@ -432,6 +433,61 @@ describe("validation commands", () => {
 
       const codes = parsed.report.diagnostics.map((item: { code: string }) => item.code);
       expect(codes).toContain("AGF005");
+    });
+  });
+
+  /**
+   * The exit-code contract, pinned.
+   *
+   * Documented in docs/stability.md and depended on by CI: 0 is clean, 1 is a
+   * fact about the repository, 2 is a fact about the invocation. These drifted
+   * apart once already — every command used 1 for a mistyped flag while compile
+   * used 2 — which made "the build failed" ambiguous between a bad argument and a
+   * real finding.
+   */
+  describe("exit codes", () => {
+    const TESTS: Array<[string, () => Promise<unknown>]> = [
+      ["check --format", () => checkCommand({ root: TEST_DIR, format: "xml" })],
+      ["validate --format", () => validateCommand({ root: TEST_DIR, format: "xml" })],
+      ["lint --format", () => lintCommand({ root: TEST_DIR, format: "xml" })],
+      ["lint --budget", () => lintCommand({ root: TEST_DIR, budget: "not-a-number" })],
+      ["lint --similarity", () => lintCommand({ root: TEST_DIR, similarity: "9" })],
+      ["validate --target", () => validateCommand({ root: TEST_DIR, target: ["nonsense"] })],
+      ["check --max-warnings", () => checkCommand({ root: TEST_DIR, maxWarnings: "lots" })],
+    ];
+
+    for (const [label, run] of TESTS) {
+      it(`exits ${EXIT_USAGE} for a bad invocation: ${label}`, async () => {
+        write("AGENTS.md", "- Use pnpm as the package manager\n");
+
+        const output = captureOutput();
+        await run();
+        output.restore();
+
+        expect(exitCodes).toEqual([EXIT_USAGE]);
+      });
+    }
+
+    it("exits 0 when the configuration is clean", async () => {
+      write("AGENTS.md", "- Use pnpm as the package manager\n");
+
+      const output = captureOutput();
+      await checkCommand({ root: TEST_DIR });
+      output.restore();
+
+      expect(exitCodes).toEqual([]);
+    });
+
+    it("exits 1 for a finding about the repository, not 2", async () => {
+      const duplicated = "- Use pnpm as the package manager, never npm\n";
+      write("AGENTS.md", duplicated);
+      write(".github/copilot-instructions.md", duplicated);
+
+      const output = captureOutput();
+      await checkCommand({ root: TEST_DIR, strict: true });
+      output.restore();
+
+      expect(exitCodes).toEqual([1]);
     });
   });
 });

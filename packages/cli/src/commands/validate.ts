@@ -28,6 +28,7 @@ import {
 import chalk from "chalk";
 import { logger } from "../logger.js";
 import {
+  EXIT_USAGE,
   exitOnFindings,
   parseFormat,
   printCoverageGaps,
@@ -38,6 +39,7 @@ import {
   printSuppressed,
   rejectFormat,
   resolveMaxWarnings,
+  usageError,
   validationEnvelope,
 } from "../report.js";
 
@@ -144,7 +146,7 @@ export async function validateCommand(options: ValidateOptions = {}): Promise<vo
 
   const targets = resolveTargets(options.target);
   if (targets === null) {
-    process.exit(1);
+    process.exit(EXIT_USAGE);
     return;
   }
 
@@ -176,8 +178,7 @@ export async function validateCommand(options: ValidateOptions = {}): Promise<vo
 
   const maxWarnings = resolveMaxWarnings(options.maxWarnings, result);
   if (maxWarnings === null) {
-    logger.error(`Invalid --max-warnings "${options.maxWarnings}". Expected a whole number of warnings, or 0.`);
-    process.exit(1);
+    usageError(`Invalid --max-warnings "${options.maxWarnings}". Expected a whole number of warnings, or 0.`);
     return;
   }
 

@@ -25,6 +25,7 @@ import {
   printSuppressed,
   rejectFormat,
   resolveMaxWarnings,
+  usageError,
   validationEnvelope,
 } from "../report.js";
 
@@ -58,8 +59,7 @@ export async function checkCommand(options: CheckOptions = {}): Promise<void> {
 
   const maxWarnings = resolveMaxWarnings(options.maxWarnings, result);
   if (maxWarnings === null) {
-    logger.error(`Invalid --max-warnings "${options.maxWarnings}". Expected a whole number of warnings, or 0.`);
-    process.exit(1);
+    usageError(`Invalid --max-warnings "${options.maxWarnings}". Expected a whole number of warnings, or 0.`);
     return;
   }
 

@@ -17,6 +17,7 @@ import { DEFAULT_CONTEXT_BUDGET_TOKENS, LINT_LAYERS, NEAR_DUPLICATE_THRESHOLD, r
 import chalk from "chalk";
 import { logger } from "../logger.js";
 import {
+  EXIT_USAGE,
   exitOnFindings,
   parseFormat,
   printCoverageGaps,
@@ -27,6 +28,7 @@ import {
   printSuppressed,
   rejectFormat,
   resolveMaxWarnings,
+  usageError,
   validationEnvelope,
 } from "../report.js";
 
@@ -71,7 +73,7 @@ export async function lintCommand(options: LintOptions = {}): Promise<void> {
 
   const budgetTokens = numericOption(options.budget, "--budget", (value) => value > 0, "a positive number of tokens");
   if (budgetTokens === null) {
-    process.exit(1);
+    process.exit(EXIT_USAGE);
     return;
   }
 
@@ -82,7 +84,7 @@ export async function lintCommand(options: LintOptions = {}): Promise<void> {
     "a number between 0 and 1",
   );
   if (similarityThreshold === null) {
-    process.exit(1);
+    process.exit(EXIT_USAGE);
     return;
   }
 
@@ -98,8 +100,7 @@ export async function lintCommand(options: LintOptions = {}): Promise<void> {
 
   const maxWarnings = resolveMaxWarnings(options.maxWarnings, result);
   if (maxWarnings === null) {
-    logger.error(`Invalid --max-warnings "${options.maxWarnings}". Expected a whole number of warnings, or 0.`);
-    process.exit(1);
+    usageError(`Invalid --max-warnings "${options.maxWarnings}". Expected a whole number of warnings, or 0.`);
     return;
   }
 

@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { doctorCommand } from "../src/commands/doctor.js";
+import { EXIT_USAGE } from "../src/report.js";
 
 const TEST_DIR = join(process.cwd(), "__test_doctor__");
 
@@ -196,7 +197,7 @@ describe("doctor command", () => {
     output.restore();
 
     expect(text).toContain("Unknown format");
-    expect(exitCodes).toEqual([1]);
+    expect(exitCodes).toEqual([EXIT_USAGE]);
   });
 
   it("does not read generated or vendored directories", async () => {

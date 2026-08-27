@@ -29,6 +29,7 @@ import {
 } from "@agentfile/core";
 import chalk from "chalk";
 import { logger } from "../logger.js";
+import { EXIT_USAGE } from "../report.js";
 
 export interface DoctorOptions {
   /** Directory to analyse. Defaults to the current working directory. */
@@ -190,7 +191,7 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<void> 
 
   if (format !== "human" && format !== "json") {
     logger.error(`Unknown format "${format}". Supported formats: human, json.`);
-    process.exit(1);
+    process.exit(EXIT_USAGE);
     return;
   }
 

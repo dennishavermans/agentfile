@@ -4,6 +4,7 @@ import { dirname, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { contextCommand } from "../src/commands/context.js";
 import { explainCommand } from "../src/commands/explain.js";
+import { EXIT_USAGE } from "../src/report.js";
 
 const TEST_DIR = join(process.cwd(), "__test_observability__");
 
@@ -189,7 +190,7 @@ describe("observability commands", () => {
       output.restore();
 
       expect(text).toContain("Unknown format");
-      expect(exitCodes).toEqual([1]);
+      expect(exitCodes).toEqual([EXIT_USAGE]);
     });
 
     it("changes nothing on disk", async () => {
@@ -317,7 +318,7 @@ describe("observability commands", () => {
       output.restore();
 
       expect(text).toContain("Unknown kind");
-      expect(exitCodes).toEqual([1]);
+      expect(exitCodes).toEqual([EXIT_USAGE]);
     });
 
     it("emits machine-readable JSON", async () => {

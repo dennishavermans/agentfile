@@ -1,8 +1,12 @@
 # @agentfile/cli
 
-> One contract. Every AI agent. Zero clutter.
+> Find what is wrong with the AI agent configuration your repository already has.
 
-CLI for [agentfile](https://github.com/dennishavermans/agentfile) — analyse existing AI agent configuration, and scaffold, migrate, generate, validate, diff, clean, and rollback instruction files from a single `contract.yaml`.
+The CLI for [agentfile](https://github.com/dennishavermans/agentfile). It reads `AGENTS.md`, `CLAUDE.md`, `.claude/`, `.cursor/` and `.github/` as they are — no setup, no adoption step, nothing written to disk — and reports the rules that contradict each other, the context they cost every session, and what a hook, skill, command or MCP server could do.
+
+Nothing found in a repository is ever executed.
+
+The v1 contract workflow (`init`, `migrate`, `sync`, `watch`) is unchanged and still supported; see [migration-v2.md](https://github.com/dennishavermans/agentfile/blob/main/docs/migration-v2.md).
 
 ## Usage
 

@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { auditCommand } from "../src/commands/audit.js";
+import { EXIT_USAGE } from "../src/report.js";
 
 const TEST_DIR = join(process.cwd(), "__test_audit__");
 
@@ -193,6 +194,6 @@ describe("audit command", () => {
     output.restore();
 
     expect(text).toContain("xml");
-    expect(exitCodes).toContain(1);
+    expect(exitCodes).toContain(EXIT_USAGE);
   });
 });

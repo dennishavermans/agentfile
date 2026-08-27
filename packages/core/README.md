@@ -1,8 +1,12 @@
 # @agentfile/core
 
-Core engine for [agentfile](https://github.com/dennishavermans/agentfile) — schema validation, YAML loading, template rendering, file generation, manifest ownership tracking, drift detection, and backup utilities.
+The engine behind [agentfile](https://github.com/dennishavermans/agentfile): discovery of the agent configuration a repository already has, a platform-neutral IR with full provenance, a deterministic resolver, a stable diagnostic registry, static security analysis, and target compilers.
 
-Use this package if you want to integrate agentfile into your own tooling or build scripts.
+Use this package to build your own tooling on top. The CLI is a thin layer over it, and every command shares one implementation of what applies where — there is no second answer to a question core already answers.
+
+Nothing discovered is ever executed: hooks, skills, commands and MCP configuration are read as text.
+
+What is stable and what is not: [stability.md](https://github.com/dennishavermans/agentfile/blob/main/docs/stability.md).
 
 ## Usage
 

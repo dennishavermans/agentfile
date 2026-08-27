@@ -37,7 +37,7 @@ import {
 } from "@agentfile/core";
 import chalk from "chalk";
 import { logger } from "../logger.js";
-import { parseFindingFormat, printJson, rejectFormat } from "../report.js";
+import { EXIT_USAGE, parseFindingFormat, printJson, rejectFormat } from "../report.js";
 
 export interface AdoptOptions {
   /** Directory to adopt instead of the current working directory. */
@@ -176,13 +176,13 @@ export async function adoptCommand(options: AdoptOptions = {}): Promise<void> {
       untouched: plan.untouched,
       blockers: plan.blockers,
     });
-    if (plan.blockers.length) process.exit(1);
+    if (plan.blockers.length) process.exit(EXIT_USAGE);
     return;
   }
 
   reportPlan(plan, root);
 
-  if (plan.blockers.length) process.exit(1);
+  if (plan.blockers.length) process.exit(EXIT_USAGE);
   if (!plan.source) return;
 
   const alreadyAdopted =

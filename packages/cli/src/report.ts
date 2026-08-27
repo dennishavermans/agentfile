@@ -43,10 +43,27 @@ export function parseFindingFormat(value: string | undefined): Exclude<OutputFor
   return format === "sarif" ? undefined : format;
 }
 
+/**
+ * Exit code for "agentfile could not run", as opposed to "agentfile ran and
+ * found something".
+ *
+ * The distinction is load-bearing for CI: exit 1 is a fact about the
+ * repository, exit 2 is a fact about the invocation or the tool. A pipeline
+ * that treats them alike reports a mistyped flag as a failing codebase. Same
+ * convention as `prettier --check`.
+ */
+export const EXIT_USAGE = 2;
+
+/** Reports a bad invocation and exits 2. */
+export function usageError(message: string, ...detail: string[]): void {
+  logger.error(message);
+  for (const line of detail) logger.info(line);
+  process.exit(EXIT_USAGE);
+}
+
 /** Reports an unknown `--format` and exits, so no command has to guess. */
 export function rejectFormat(value: string, supported: readonly string[] = FORMATS): void {
-  logger.error(`Unknown format "${value}". Supported formats: ${supported.join(", ")}.`);
-  process.exit(1);
+  usageError(`Unknown format "${value}". Supported formats: ${supported.join(", ")}.`);
 }
 
 /** Writes the SARIF log for a run. */

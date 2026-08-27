@@ -9,6 +9,90 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.0.0-beta.1] — 2026-08-27
+
+The v2 rework, in one release. See [docs/migration-v2.md](docs/migration-v2.md)
+for what changes for an existing repository — the short answer is that nothing
+you have breaks, and `agentfile doctor` now works in a repository that has never
+heard of agentfile.
+
+### Breaking
+
+- **Usage errors exit `2`, not `1`.** A mistyped flag, an unknown `--target`, an
+  unparsable `--budget`. Exit `1` now means one thing only: agentfile ran and
+  found something. This was already true of `compile` and `eval` and false of
+  everything else, which left "the build failed" ambiguous between a bad
+  argument and a real finding. The contract is pinned by test and documented in
+  [docs/stability.md](docs/stability.md).
+- **`@agentfile/ui` is an optional peer dependency.** `agentfile ui` needs it
+  installed alongside the CLI; every other command works without it, and the CLI
+  says so if it is missing. It ships an HTTP server and a built front end, which
+  is a lot to install on a machine that only runs `check` in a pre-commit hook.
+  Same arrangement as `vitest --ui`.
+- **Node `>=22`**, down from `>=24`. `@types/node` is pinned to the same line so
+  the compiler enforces the floor rather than the `engines` field claiming it.
+
+### Added
+
+- **`agentfile adopt`** — plans a single source of truth for the configuration a
+  repository already has, and shows the plan before touching anything. Two
+  phases, in an order that is not cosmetic: consolidate every platform's text
+  into one hand-written source, then generate the rest from it. A compiler never
+  carries a target's own file into that target, so generating `CLAUDE.md` while
+  it still holds unique text would lose that text.
+- **`AGF205`** — two compile targets that would each be built from the other.
+  Without `--force` this surfaces as per-file refusals; with `--force` the two
+  files swap contents, which looks like a successful compile and is not.
+- **Slash commands are configuration.** `.claude/commands/` and
+  `.cursor/commands/` are discovered, and the shell a Claude command embeds with
+  `` !`…` `` — which runs at invocation, before the model sees the output, and
+  is reachable by the model itself unless `disable-model-invocation` bars it —
+  is audited as `AGF501`. Nothing is executed.
+- **Suppression directives.** `agentfile-disable`, `-line` and `-next-line`, in
+  `<!-- -->`, `#` or `//` comments. Suppressed findings are counted and kept,
+  never silently dropped, and a directive that silences nothing is reported as
+  `AGF005` — including in files that are now clean, which is where stale
+  suppressions accumulate.
+- **`agentfile.yaml`** — ignored directories, per-code severity including `off`,
+  budget, similarity, targets, warning ceiling. Optional, and strict: an
+  unrecognised key is an error, and a file that fails to validate is reported
+  and then ignored entirely rather than half-applied. Flags always win.
+- **`--format sarif`** on `check`, `validate`, `lint` and `audit`. Every code is
+  declared with a documentation link, including ones that did not fire, and
+  findings are fingerprinted without their line number so an edit above a
+  finding does not close the alert and open an identical one.
+- **`--max-warnings <n>`** — a ratchet for working a count down, without
+  `--strict`'s claim that every warning is a failure.
+- **`agentfile rule [code]`** — what a diagnostic code means, from the registry
+  that produces it.
+- **`AGF206`** — an instruction file past a limit a platform documents; today
+  Codex truncating `AGENTS.md` at 32 KiB. Distinct from `AGF201`–`AGF203`: the
+  target supports everything in the file and stops partway through, so those
+  rules are not unsupported, they are unread.
+- **CI**, across ubuntu, macOS and Windows on Node 22 and 24, plus a smoke job
+  that installs the packed tarballs into a bare project, and a scheduled corpus
+  job that analyses PostHog, Next.js and Expo.
+- **[docs/stability.md](docs/stability.md)** — what consumers may depend on, and
+  what is deliberately free to change.
+
+### Fixed
+
+- Symlinked instruction files are one text, not two. A `CLAUDE.md` symlinked to
+  `AGENTS.md` was reported as duplication and counted twice against the context
+  budget.
+- Scoped npm package names in prose (`@next/rspack-core`) are no longer read as
+  broken imports.
+- A malformed YAML frontmatter value no longer aborts discovery, and one bad
+  file produces one finding rather than dozens.
+- The generated-file marker is written after YAML frontmatter, not above it,
+  which previously unscoped every generated rule file.
+- Glob matching is pinned to POSIX semantics, so a repository does not resolve
+  differently depending on who cloned it.
+- The dashboard is imported lazily, taking roughly 15% off the startup of every
+  other command.
+- `.gitattributes` normalises line endings, so `compile --check` cannot report
+  permanent drift on a CRLF checkout.
+
 ### Added — v2 foundation (`@agentfile/core`)
 
 The first phase of the v2 rework. Everything here is **additive**: the v1 API,
@@ -27,7 +111,7 @@ existing 144 tests pass untouched. See `docs/v2-architecture.md`.
   for what reason. Ordering is scope, then directory depth, then specificity
   tier, then pattern specificity, then declaration order.
 - **Path matching** — normalisation, ancestor chains, and glob matching with a
-  documented specificity order, built on Node's `path.matchesGlob` so no
+  documented specificity order, built on Node's `path.posix.matchesGlob` so no
   third-party matcher is required.
 - **Capability registry** — 41 rows across Claude Code, Copilot, Cursor, plain
   AGENTS.md, and Codex, each attributed to a documentation URL. Unverified

@@ -1,7 +1,7 @@
 {
   "name": "@agentfile/core",
-  "version": "0.4.0",
-  "description": "Core engine for agentfile — schema validation, loading, rendering, and generation",
+  "version": "2.0.0-beta.1",
+  "description": "Read, analyse and compile AI agent configuration \u2014 discovery, a normalized IR, a resolver, diagnostics, and static security analysis",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

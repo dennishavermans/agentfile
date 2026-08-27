@@ -15,7 +15,7 @@
 import { discover, type ExplainKind, type ExplainTarget, explainTarget, findExplainTargets } from "@agentfile/core";
 import chalk from "chalk";
 import { logger } from "../logger.js";
-import { parseFindingFormat, printJson, rejectFormat } from "../report.js";
+import { EXIT_USAGE, parseFindingFormat, printJson, rejectFormat } from "../report.js";
 
 export interface ExplainCommandOptions {
   root?: string;
@@ -52,7 +52,7 @@ export async function explainCommand(query: string, options: ExplainCommandOptio
 
   if (options.kind && !KINDS.includes(options.kind as ExplainKind)) {
     logger.error(`Unknown kind "${options.kind}". Known kinds: ${KINDS.join(", ")}.`);
-    process.exit(1);
+    process.exit(EXIT_USAGE);
     return;
   }
 
