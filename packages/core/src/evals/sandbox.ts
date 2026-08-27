@@ -163,7 +163,15 @@ export function temporaryDirectorySandbox(options: {
             env: { ...process.env, ...execOptions.env },
           });
 
-          const timedOut = result.error !== undefined && (result.error as NodeJS.ErrnoException).code === "ETIMEDOUT";
+          // How a timeout surfaces is platform-dependent: POSIX sets
+          // `error.code` to ETIMEDOUT, Windows has no real signals and reports
+          // the kill through `signal` instead. Checking only the first means a
+          // hung agent on Windows is reported as an ordinary failure, which
+          // hides the one fact that matters about it. Both are only consulted
+          // when a timeout was actually requested.
+          const timedOut =
+            execOptions.timeoutMs !== undefined &&
+            ((result.error as NodeJS.ErrnoException | undefined)?.code === "ETIMEDOUT" || result.signal !== null);
 
           return {
             exitCode: result.status,
