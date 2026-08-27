@@ -201,6 +201,22 @@ The fix is the two-phase order `agentfile adopt` plans: consolidate every
 platform's text into one source that stays hand-written, then generate the other
 targets from it.
 
+### `AGF206` instruction-file-too-large · warning · active
+An instruction file larger than a named target will read. Different from
+`AGF201`–`AGF203`: the target supports everything in the file and stops partway
+through it, so the rules past the cut are not unsupported, they are unread — and
+nothing in the session says so.
+
+Only limits a platform documents are checked, and only when that target is
+named. Today that is Codex, which truncates `AGENTS.md` at 32 KiB. Size is
+measured in bytes, because the limit is in bytes: a repository whose rules
+contain non-ASCII would otherwise be told it is under a limit it is over.
+
+The fix is not a smaller root file for its own sake. It is moving detail into
+skills and path-scoped files, which load when they are relevant, and keeping the
+root file to what must apply everywhere. `AGF401` measures the same text from
+the other direction: what it costs in every session.
+
 ---
 
 ## AGF3xx — instructions and resolution

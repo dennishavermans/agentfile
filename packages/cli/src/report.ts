@@ -8,23 +8,55 @@
  * three cannot disagree about what a warning looks like or when a build fails.
  */
 
-import { buildReport, formatHuman, hasErrors, type ValidationResult } from "@agentfile/core";
+import {
+  buildReport,
+  type Diagnostic,
+  formatHuman,
+  formatSarif,
+  hasErrors,
+  type ValidationResult,
+} from "@agentfile/core";
 import chalk from "chalk";
 import { logger } from "./logger.js";
+import { VERSION } from "./version.js";
 
-export type OutputFormat = "human" | "json";
+export type OutputFormat = "human" | "json" | "sarif";
+
+/** Formats every reporting command accepts. */
+const FORMATS: readonly OutputFormat[] = ["human", "json", "sarif"];
 
 /** Parses `--format`. Returns undefined for anything unrecognised. */
 export function parseFormat(value: string | undefined): OutputFormat | undefined {
   if (value === undefined) return "human";
-  if (value === "human" || value === "json") return value;
-  return undefined;
+  return (FORMATS as readonly string[]).includes(value) ? (value as OutputFormat) : undefined;
+}
+
+/**
+ * Parses `--format` where SARIF makes no sense.
+ *
+ * SARIF describes findings against source locations. A command whose output is
+ * a plan or an inventory rather than a list of findings has nothing to put in
+ * one, and emitting an empty-but-valid log would be worse than refusing.
+ */
+export function parseFindingFormat(value: string | undefined): Exclude<OutputFormat, "sarif"> | undefined {
+  const format = parseFormat(value);
+  return format === "sarif" ? undefined : format;
 }
 
 /** Reports an unknown `--format` and exits, so no command has to guess. */
-export function rejectFormat(value: string): void {
-  logger.error(`Unknown format "${value}". Supported formats: human, json.`);
+export function rejectFormat(value: string, supported: readonly string[] = FORMATS): void {
+  logger.error(`Unknown format "${value}". Supported formats: ${supported.join(", ")}.`);
   process.exit(1);
+}
+
+/** Writes the SARIF log for a run. */
+export function printSarif(result: ValidationResult): void {
+  printSarifDiagnostics(result.diagnostics);
+}
+
+/** Writes a SARIF log for findings that did not come from the validation pipeline. */
+export function printSarifDiagnostics(diagnostics: readonly Diagnostic[]): void {
+  process.stdout.write(formatSarif(diagnostics, { version: VERSION }));
 }
 
 export interface HeaderOptions {
@@ -174,4 +206,37 @@ export function printJson(envelope: JsonEnvelope): void {
 /** Exits 1 when anything reached error severity. Called last, after output. */
 export function exitOnErrors(result: ValidationResult): void {
   if (hasErrors(result.diagnostics)) process.exit(1);
+}
+
+/**
+ * The exit decision, including the warning ceiling.
+ *
+ * `--max-warnings` is the ratchet a team uses to stop a warning count growing
+ * while they work it down. It is separate from `--strict`, which promotes every
+ * warning to an error at once: the ceiling lets a repository hold a line
+ * without pretending the remaining warnings are failures.
+ */
+export function exitOnFindings(result: ValidationResult, maxWarnings?: number): void {
+  if (hasErrors(result.diagnostics)) process.exit(1);
+
+  if (maxWarnings !== undefined && result.summary.warnings > maxWarnings) {
+    const count = result.summary.warnings;
+    logger.error(`${count} warning${count === 1 ? "" : "s"} exceeds the maximum of ${maxWarnings}.`);
+    console.log();
+    process.exit(1);
+  }
+}
+
+/**
+ * Reads `--max-warnings`, falling back to the setting in `agentfile.yaml`.
+ *
+ * Returns `null` when the flag was given but is not a count, so the caller can
+ * report the bad value rather than silently running without a ceiling.
+ */
+export function resolveMaxWarnings(value: string | undefined, result: ValidationResult): number | undefined | null {
+  if (value === undefined) return result.config.maxWarnings;
+
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 0) return null;
+  return parsed;
 }

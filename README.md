@@ -168,6 +168,14 @@ Nothing is written without `--apply`, and `--apply` confirms first. A hand-writt
 
 Asking `compile` to do both phases at once is reported as `AGF205`: with two hand-written targets each becomes the other's source, and under `--force` their contents swap.
 
+### `npx @agentfile/cli rule [code]`
+What a diagnostic code means, from the same registry that produces it.
+
+```bash
+npx @agentfile/cli rule            # every code, grouped by band
+npx @agentfile/cli rule AGF302     # one code in full
+```
+
 ### `npx @agentfile/cli context <path>`
 What configuration actually applies to a file — in load order, with the reason for each.
 
@@ -356,6 +364,52 @@ npx @agentfile/cli ui                        # open dashboard on default port 43
 npx @agentfile/cli ui --port 3000            # custom port
 npx @agentfile/cli ui --root ./packages/app  # inspect a specific directory
 ```
+
+---
+
+## Configuring agentfile
+
+Everything below is also a flag, and a repository that never writes this file loses nothing. What the file buys is agreement: a pre-commit hook, a CI job and an editor cannot each spell out the same `--budget 2000 --similarity 0.75`, and a tool arguing for one source of truth should not need its own settings in three places.
+
+`agentfile.yaml`, at the repository root, every key optional:
+
+```yaml
+# Directory names to skip, added to the built-in list
+ignore:
+  - fixtures
+
+# Per-code severity. `off` silences a code repository-wide
+severity:
+  AGF302: info
+  AGF501: error
+  AGF203: off
+
+budget: 2000        # always-loaded context budget, in estimated tokens
+similarity: 0.75    # near-duplicate threshold
+targets: [claude, copilot]
+maxWarnings: 0      # fail when warnings exceed this
+suppressions: true  # honour agentfile-disable directives
+```
+
+A key nobody recognises is an error, not a shrug — a silently ignored `sevrity:` block is a setting the team believes is applied and is not, which is the failure agentfile exists to report. And a file that does not validate is reported and then **ignored entirely**: a half-applied configuration is worse than none, because the half that applied looks like the whole. A flag always beats the file.
+
+Turning a code `off` in this file is a repository-wide decision, recorded in a committed file. It is a different thing from an `agentfile-disable` comment, which silences one finding at one line and is reported when it goes stale.
+
+## CI output
+
+`check`, `validate`, `lint` and `audit` emit **SARIF 2.1.0** with `--format sarif`, which GitHub code scanning reads:
+
+```yaml
+- run: npx @agentfile/cli check --format sarif > agentfile.sarif
+  continue-on-error: true
+- uses: github/codeql-action/upload-sarif@v3
+  with:
+    sarif_file: agentfile.sarif
+```
+
+Findings then appear as annotations on the pull request that introduced them instead of in a job log. Every code is declared with a documentation link, and findings are fingerprinted without their line number, so editing a file above a finding does not close the alert and open an identical new one.
+
+`--max-warnings <n>` is the ratchet for working a warning count down: it fails the run when warnings exceed the ceiling, without `--strict`'s claim that every warning is an error.
 
 ---
 

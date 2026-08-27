@@ -2,6 +2,8 @@ export type { CapabilityCheckContext } from "./diagnose.js";
 export { diagnoseCapability } from "./diagnose.js";
 export type { FeatureUsage } from "./features.js";
 export { compatibilityDiagnostics, featuresUsed, groupFeatureUsage } from "./features.js";
+export type { InstructionSizeLimit } from "./limits.js";
+export { INSTRUCTION_SIZE_LIMITS, instructionSizeDiagnostics } from "./limits.js";
 export type { CapabilityLevel, CapabilityRow, FeatureId, FeatureMeta, TargetId } from "./registry.js";
 export {
   CAPABILITIES,

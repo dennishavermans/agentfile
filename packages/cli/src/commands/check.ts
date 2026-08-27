@@ -15,14 +15,16 @@
 import { CHECK_LAYERS, runValidation } from "@agentfile/core";
 import { logger } from "../logger.js";
 import {
-  exitOnErrors,
+  exitOnFindings,
   parseFormat,
   printCoverageGaps,
   printFindings,
   printHeader,
   printJson,
+  printSarif,
   printSuppressed,
   rejectFormat,
+  resolveMaxWarnings,
   validationEnvelope,
 } from "../report.js";
 
@@ -33,6 +35,8 @@ export interface CheckOptions {
   format?: string;
   /** Treat warnings as errors. */
   strict?: boolean;
+  /** Fail when warnings exceed this count. Falls back to agentfile.yaml. */
+  maxWarnings?: string;
   /**
    * Honour `agentfile-disable` directives. Commander sets this false for
    * `--no-suppressions`, which is the "show me what we chose to ignore" view.
@@ -52,6 +56,13 @@ export async function checkCommand(options: CheckOptions = {}): Promise<void> {
     suppressions: options.suppressions,
   });
 
+  const maxWarnings = resolveMaxWarnings(options.maxWarnings, result);
+  if (maxWarnings === null) {
+    logger.error(`Invalid --max-warnings "${options.maxWarnings}". Expected a whole number of warnings, or 0.`);
+    process.exit(1);
+    return;
+  }
+
   if (format === "json") {
     printJson(
       validationEnvelope("check", root, result, {
@@ -59,7 +70,13 @@ export async function checkCommand(options: CheckOptions = {}): Promise<void> {
         strict: options.strict === true,
       }),
     );
-    exitOnErrors(result);
+    exitOnFindings(result, maxWarnings);
+    return;
+  }
+
+  if (format === "sarif") {
+    printSarif(result);
+    exitOnFindings(result, maxWarnings);
     return;
   }
 
@@ -81,5 +98,5 @@ export async function checkCommand(options: CheckOptions = {}): Promise<void> {
   printCoverageGaps(result);
   printFindings(result, { strict: options.strict });
   printSuppressed(result);
-  exitOnErrors(result);
+  exitOnFindings(result, maxWarnings);
 }

@@ -188,6 +188,8 @@ export {
   featureMeta,
   featuresUsed,
   groupFeatureUsage,
+  INSTRUCTION_SIZE_LIMITS,
+  instructionSizeDiagnostics,
   KNOWN_TARGETS,
   supports,
   targetCapabilities,
@@ -212,6 +214,16 @@ export {
   planCompilation,
   selectSources,
 } from "./compilers/index.js";
+// ─── Configuration file ────────────────────────────────────────────────────
+export type { AgentfileConfig, ConfiguredSeverity, LoadedConfig } from "./config/index.js";
+export {
+  AgentfileConfigSchema,
+  applyConfiguredSeverity,
+  CONFIG_FILE,
+  CONFIG_VERSION,
+  EMPTY_CONFIG,
+  loadConfig,
+} from "./config/index.js";
 // ─── Diagnostics ───────────────────────────────────────────────────────────
 export type {
   CodeStatus,
@@ -225,6 +237,7 @@ export type {
   HumanFormatOptions,
   Location,
   RelatedLocation,
+  SarifOptions,
   Severity,
   SuppressedCodes,
   SuppressedDiagnostic,
@@ -238,12 +251,16 @@ export {
   allDiagnosticCodes,
   applySuppressions,
   buildReport,
+  buildSarif,
   DIAGNOSTIC_CODES,
   DIAGNOSTIC_REPORT_VERSION,
   diagnostic,
   diagnosticMeta,
+  docsUrlFor,
   formatHuman,
   formatJson,
+  formatSarif,
+  githubAnchor,
   hasErrors,
   parseSuppressions,
   sortDiagnostics,

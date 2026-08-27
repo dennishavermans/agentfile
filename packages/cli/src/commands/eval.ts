@@ -34,7 +34,7 @@ import {
 } from "@agentfile/core";
 import chalk from "chalk";
 import { logger } from "../logger.js";
-import { parseFormat, printJson, rejectFormat } from "../report.js";
+import { parseFindingFormat, printJson, rejectFormat } from "../report.js";
 
 export interface EvalOptions {
   /** Explicit eval definition files. Defaults to every *.eval.yaml discovered. */
@@ -89,8 +89,8 @@ function statusLabel(result: { status: keyof typeof STATUS_LABEL; cached?: boole
 }
 
 export async function evalCommand(options: EvalOptions = {}): Promise<void> {
-  const format = parseFormat(options.format);
-  if (!format) return rejectFormat(options.format as string);
+  const format = parseFindingFormat(options.format);
+  if (!format) return rejectFormat(options.format as string, ["human", "json"]);
 
   const root = options.root ?? process.cwd();
   const discovery = discover({ root });

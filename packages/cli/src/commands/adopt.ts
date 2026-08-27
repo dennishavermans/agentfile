@@ -37,7 +37,7 @@ import {
 } from "@agentfile/core";
 import chalk from "chalk";
 import { logger } from "../logger.js";
-import { parseFormat, printJson, rejectFormat } from "../report.js";
+import { parseFindingFormat, printJson, rejectFormat } from "../report.js";
 
 export interface AdoptOptions {
   /** Directory to adopt instead of the current working directory. */
@@ -148,8 +148,8 @@ function reportUntouched(plan: AdoptionPlan): void {
 }
 
 export async function adoptCommand(options: AdoptOptions = {}): Promise<void> {
-  const format = parseFormat(options.format);
-  if (!format) return rejectFormat(options.format as string);
+  const format = parseFindingFormat(options.format);
+  if (!format) return rejectFormat(options.format as string, ["human", "json"]);
 
   const root = options.root ?? process.cwd();
   const discovery = discover({ root });

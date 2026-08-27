@@ -13,7 +13,7 @@
 import { alwaysLoadedContext, discover, estimateContext, resolveForPath, withoutAliases } from "@agentfile/core";
 import chalk from "chalk";
 import { logger } from "../logger.js";
-import { parseFormat, printJson, rejectFormat } from "../report.js";
+import { parseFindingFormat, printJson, rejectFormat } from "../report.js";
 
 export interface ContextOptions {
   /** Directory to resolve against instead of the current working directory. */
@@ -37,8 +37,8 @@ function pad(value: string, width: number): string {
 const LIST_LIMIT = 20;
 
 export async function contextCommand(targetPath: string, options: ContextOptions = {}): Promise<void> {
-  const format = parseFormat(options.format);
-  if (!format) return rejectFormat(options.format as string);
+  const format = parseFindingFormat(options.format);
+  if (!format) return rejectFormat(options.format as string, ["human", "json"]);
 
   const root = options.root ?? process.cwd();
   const discovery = discover({ root });

@@ -27,7 +27,7 @@ import {
 } from "@agentfile/core";
 import chalk from "chalk";
 import { logger } from "../logger.js";
-import { parseFormat, printJson, rejectFormat } from "../report.js";
+import { parseFormat, printJson, printSarifDiagnostics, rejectFormat } from "../report.js";
 
 export interface AuditOptions {
   /** Directory to audit instead of the current working directory. */
@@ -130,6 +130,14 @@ export async function auditCommand(options: AuditOptions = {}): Promise<void> {
       },
     });
 
+    if (hasErrors(diagnostics)) process.exit(1);
+    return;
+  }
+
+  // SARIF is where a security audit belongs in CI: GitHub code scanning turns
+  // these into annotations on the pull request that introduced them.
+  if (format === "sarif") {
+    printSarifDiagnostics(diagnostics);
     if (hasErrors(diagnostics)) process.exit(1);
     return;
   }

@@ -7,6 +7,7 @@
  */
 
 import type { TargetId } from "../capabilities/index.js";
+import { type AgentfileConfig, applyConfiguredSeverity, loadConfig } from "../config/index.js";
 import {
   applySuppressions,
   type Diagnostic,
@@ -15,7 +16,7 @@ import {
   sortDiagnostics,
   summarize,
 } from "../diagnostics/index.js";
-import { type DiscoveryResult, discover } from "../discovery/index.js";
+import { DEFAULT_IGNORED_DIRECTORIES, type DiscoveryResult, discover } from "../discovery/index.js";
 import { type FileSystem, nodeFileSystem } from "../fs/index.js";
 import { findRule, RULES } from "./rules.js";
 import { IMPLEMENTED_LAYERS, type Rule, type RuleSkip, type ValidationLayer } from "./types.js";
@@ -50,6 +51,14 @@ export interface ValidationOptions {
    * ignore" audit view.
    */
   suppressions?: boolean;
+  /**
+   * Settings from `agentfile.yaml`. Loaded from `root` when not supplied.
+   *
+   * Every field here is a default that an explicit option overrides: a flag
+   * typed at the prompt is a deliberate decision about this run, and a
+   * committed file is a decision about the repository.
+   */
+  config?: AgentfileConfig;
 }
 
 export interface ValidationResult {
@@ -71,6 +80,8 @@ export interface ValidationResult {
    * silently discarding them would make "no problems found" unverifiable.
    */
   suppressed: SuppressedDiagnostic[];
+  /** The settings actually in force, after flags overrode the file. */
+  config: AgentfileConfig;
 }
 
 /** Rules matching a selection, in registry order. */
@@ -107,11 +118,20 @@ function applyStrict(diagnostics: readonly Diagnostic[]): Diagnostic[] {
 }
 
 export function runValidation(options: ValidationOptions): ValidationResult {
+  const fs = options.fs ?? nodeFileSystem;
+
+  // A settings file that does not parse is reported and then ignored entirely.
+  // Applying the half that validated would leave the team with settings they
+  // believe are in force and are not.
+  const loaded = options.config ? { config: options.config, diagnostics: [] } : loadConfig(options.root, fs);
+  const config = loaded.config;
+
   const discovery =
     options.discovery ??
     discover({
       root: options.root,
       fs: options.fs,
+      ignore: config.ignore?.length ? [...DEFAULT_IGNORED_DIRECTORIES, ...config.ignore] : undefined,
     });
 
   const { rules, unknownRules, emptyLayers } = selectRules(options);
@@ -119,15 +139,15 @@ export function runValidation(options: ValidationOptions): ValidationResult {
   const context = {
     configuration: discovery.configuration,
     root: options.root,
-    fs: options.fs ?? nodeFileSystem,
+    fs,
     discoveryDiagnostics: discovery.diagnostics,
     files: discovery.scan.files,
     targets: options.targets ?? [],
-    budgetTokens: options.budgetTokens,
-    similarityThreshold: options.similarityThreshold,
+    budgetTokens: options.budgetTokens ?? config.budget,
+    similarityThreshold: options.similarityThreshold ?? config.similarity,
   };
 
-  const diagnostics: Diagnostic[] = [];
+  const diagnostics: Diagnostic[] = [...loaded.diagnostics];
   const rulesRun: string[] = [];
   const skipped: RuleSkip[] = [];
 
@@ -141,16 +161,19 @@ export function runValidation(options: ValidationOptions): ValidationResult {
   // Suppression runs before `--strict`, so a silenced warning is never promoted
   // into a build failure, and the AGF005 findings it produces are themselves
   // subject to promotion like any other warning.
-  const suppression =
-    options.suppressions === false
-      ? { diagnostics: [...diagnostics], suppressed: [], unused: [] }
-      : applySuppressions(diagnostics, {
-          root: options.root,
-          fs: context.fs,
-          files: discovery.configuration.sources.map((source) => source.path),
-        });
+  const honourSuppressions = options.suppressions ?? config.suppressions ?? true;
+  const suppression = honourSuppressions
+    ? applySuppressions(diagnostics, {
+        root: options.root,
+        fs: context.fs,
+        files: discovery.configuration.sources.map((source) => source.path),
+      })
+    : { diagnostics: [...diagnostics], suppressed: [], unused: [] };
 
-  const reported = [...suppression.diagnostics, ...suppression.unused];
+  // Configured severity is applied before `--strict`, so a code set to
+  // `warning` is still promoted by strict mode and a code set to `off` is gone
+  // before promotion can reach it.
+  const reported = applyConfiguredSeverity([...suppression.diagnostics, ...suppression.unused], config.severity);
   const finalDiagnostics = sortDiagnostics(options.strict ? applyStrict(reported) : reported);
 
   return {
@@ -162,5 +185,6 @@ export function runValidation(options: ValidationOptions): ValidationResult {
     emptyLayers,
     unknownRules,
     suppressed: suppression.suppressed,
+    config,
   };
 }

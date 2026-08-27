@@ -17,7 +17,7 @@ import {
   overlapDiagnostics,
   scopeMismatchDiagnostics,
 } from "../analysis/index.js";
-import { compatibilityDiagnostics } from "../capabilities/index.js";
+import { compatibilityDiagnostics, instructionSizeDiagnostics } from "../capabilities/index.js";
 import { repositoryResolutionDiagnostics, unreachableDiagnostics } from "../resolver/index.js";
 import { auditHooks, auditInstructionText, auditMcpServers, auditPermissions } from "../security/index.js";
 import { analyzeSkillQuality, checkSkillReferences, inspectSkillResources, validateSkills } from "../skills/index.js";
@@ -113,12 +113,17 @@ const targetCompatibility: Rule = {
   id: "target-compatibility",
   layer: "compatibility",
   description: "Features the configuration uses that a target does not support natively",
-  emits: ["AGF201", "AGF202", "AGF203"],
+  emits: ["AGF201", "AGF202", "AGF203", "AGF206"],
   run: (context) => {
     if (!context.targets.length) {
       return { diagnostics: [], skipped: "no target was named, so there is nothing to check compatibility against" };
     }
-    return { diagnostics: compatibilityDiagnostics(context.configuration, context.targets) };
+    return {
+      diagnostics: [
+        ...compatibilityDiagnostics(context.configuration, context.targets),
+        ...instructionSizeDiagnostics(context.configuration, context.targets),
+      ],
+    };
   },
 };
 

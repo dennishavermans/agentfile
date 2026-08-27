@@ -15,16 +15,18 @@ import { initCommand } from "./commands/init.js";
 import { lintCommand } from "./commands/lint.js";
 import { migrateCommand } from "./commands/migrate.js";
 import { rollbackCommand } from "./commands/rollback.js";
+import { ruleCommand } from "./commands/rule.js";
 import { syncCommand } from "./commands/sync.js";
 import { validateCommand } from "./commands/validate.js";
 import { watchCommand } from "./commands/watch.js";
+import { VERSION } from "./version.js";
 
 const program = new Command();
 
 program
   .name("agentfile")
   .description("Read, check, and compile the AI agent configuration in a repository")
-  .version("0.4.0");
+  .version(VERSION);
 
 /**
  * Help groups.
@@ -70,9 +72,11 @@ program
   .option("--root <path>", "Directory to check instead of the current working directory")
   .option("--format <format>", "Output format: human or json", "human")
   .option("--strict", "Treat warnings as errors")
+  .option("--max-warnings <count>", "Fail when warnings exceed this count")
   .option("--no-suppressions", "Report findings an agentfile-disable directive would silence")
-  .action((options: { root?: string; format?: string; strict?: boolean; suppressions?: boolean }) =>
-    checkCommand(options),
+  .action(
+    (options: { root?: string; format?: string; strict?: boolean; suppressions?: boolean; maxWarnings?: string }) =>
+      checkCommand(options),
   );
 
 program
@@ -84,6 +88,7 @@ program
   .option("--target <ide>", "Check compatibility against a target, repeatable, or 'all'", collect, [] as string[])
   .option("--strict", "Treat warnings as errors")
   .option("--list-rules", "Print the rule set and exit")
+  .option("--max-warnings <count>", "Fail when warnings exceed this count")
   .option("--no-suppressions", "Report findings an agentfile-disable directive would silence")
   .action(
     (options: {
@@ -93,6 +98,7 @@ program
       strict?: boolean;
       listRules?: boolean;
       suppressions?: boolean;
+      maxWarnings?: string;
     }) => validateCommand(options),
   );
 
@@ -105,6 +111,7 @@ program
   .option("--budget <tokens>", "Always-loaded context budget, in estimated tokens")
   .option("--similarity <ratio>", "Near-duplicate similarity threshold between 0 and 1")
   .option("--strict", "Treat warnings as errors")
+  .option("--max-warnings <count>", "Fail when warnings exceed this count")
   .option("--no-suppressions", "Report findings an agentfile-disable directive would silence")
   .action(
     (options: {
@@ -114,6 +121,7 @@ program
       similarity?: string;
       strict?: boolean;
       suppressions?: boolean;
+      maxWarnings?: string;
     }) => lintCommand(options),
   );
 
@@ -154,6 +162,14 @@ program
   .action((target: string, options: { root?: string; format?: string; at?: string; kind?: string }) =>
     explainCommand(target, options),
   );
+
+program
+  .command("rule")
+  .helpGroup(ANALYSE)
+  .argument("[code]", "Diagnostic code, e.g. AGF302. Omit to list every code")
+  .description("Explain a diagnostic code: what it means, its severity, and how to configure it")
+  .option("--format <format>", "Output format: human or json", "human")
+  .action((code: string | undefined, options: { format?: string }) => ruleCommand(code, options));
 
 program
   .command("compile")

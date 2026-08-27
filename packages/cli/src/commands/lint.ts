@@ -17,14 +17,16 @@ import { DEFAULT_CONTEXT_BUDGET_TOKENS, LINT_LAYERS, NEAR_DUPLICATE_THRESHOLD, r
 import chalk from "chalk";
 import { logger } from "../logger.js";
 import {
-  exitOnErrors,
+  exitOnFindings,
   parseFormat,
   printCoverageGaps,
   printFindings,
   printHeader,
   printJson,
+  printSarif,
   printSuppressed,
   rejectFormat,
+  resolveMaxWarnings,
   validationEnvelope,
 } from "../report.js";
 
@@ -32,6 +34,8 @@ export interface LintOptions {
   root?: string;
   format?: string;
   strict?: boolean;
+  /** Fail when warnings exceed this count. Falls back to agentfile.yaml. */
+  maxWarnings?: string;
   /**
    * Honour `agentfile-disable` directives. Commander sets this false for
    * `--no-suppressions`, which is the "show me what we chose to ignore" view.
@@ -92,6 +96,13 @@ export async function lintCommand(options: LintOptions = {}): Promise<void> {
     suppressions: options.suppressions,
   });
 
+  const maxWarnings = resolveMaxWarnings(options.maxWarnings, result);
+  if (maxWarnings === null) {
+    logger.error(`Invalid --max-warnings "${options.maxWarnings}". Expected a whole number of warnings, or 0.`);
+    process.exit(1);
+    return;
+  }
+
   if (format === "json") {
     printJson(
       validationEnvelope("lint", root, result, {
@@ -101,7 +112,13 @@ export async function lintCommand(options: LintOptions = {}): Promise<void> {
         similarityThreshold: similarityThreshold ?? NEAR_DUPLICATE_THRESHOLD,
       }),
     );
-    exitOnErrors(result);
+    exitOnFindings(result, maxWarnings);
+    return;
+  }
+
+  if (format === "sarif") {
+    printSarif(result);
+    exitOnFindings(result, maxWarnings);
     return;
   }
 
@@ -133,5 +150,5 @@ export async function lintCommand(options: LintOptions = {}): Promise<void> {
   );
   console.log();
 
-  exitOnErrors(result);
+  exitOnFindings(result, maxWarnings);
 }

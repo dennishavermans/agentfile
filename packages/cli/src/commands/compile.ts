@@ -32,7 +32,7 @@ import {
 } from "@agentfile/core";
 import chalk from "chalk";
 import { logger } from "../logger.js";
-import { parseFormat, printJson, rejectFormat } from "../report.js";
+import { parseFindingFormat, printJson, rejectFormat } from "../report.js";
 
 export interface CompileOptions {
   /** Directory to compile instead of the current working directory. */
@@ -66,8 +66,8 @@ function reportTargets(plan: CompilationPlan): void {
 }
 
 export async function compileCommand(options: CompileOptions = {}): Promise<void> {
-  const format = parseFormat(options.format);
-  if (!format) return rejectFormat(options.format as string);
+  const format = parseFindingFormat(options.format);
+  if (!format) return rejectFormat(options.format as string, ["human", "json"]);
 
   const targets = options.target ?? [];
   if (!targets.length) {

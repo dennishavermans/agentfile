@@ -4,6 +4,8 @@ export type { HumanFormatOptions } from "./format-human.js";
 export { formatHuman } from "./format-human.js";
 export type { DiagnosticReport } from "./format-json.js";
 export { buildReport, DIAGNOSTIC_REPORT_VERSION, formatJson } from "./format-json.js";
+export type { SarifOptions } from "./format-sarif.js";
+export { buildSarif, docsUrlFor, formatSarif, githubAnchor } from "./format-sarif.js";
 export type {
   SuppressedCodes,
   SuppressedDiagnostic,

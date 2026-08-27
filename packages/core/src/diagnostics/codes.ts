@@ -166,6 +166,13 @@ export const DIAGNOSTIC_CODES = {
     defaultSeverity: "warning",
     status: "active",
   },
+  AGF206: {
+    name: "instruction-file-too-large",
+    title: "Instruction file exceeds a target's documented size limit",
+    band: "targets",
+    defaultSeverity: "warning",
+    status: "active",
+  },
 
   // ─── AGF3xx — instructions & resolution ─────────────────────────────────
   AGF301: {

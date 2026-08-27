@@ -15,7 +15,7 @@
 import { discover, type ExplainKind, type ExplainTarget, explainTarget, findExplainTargets } from "@agentfile/core";
 import chalk from "chalk";
 import { logger } from "../logger.js";
-import { parseFormat, printJson, rejectFormat } from "../report.js";
+import { parseFindingFormat, printJson, rejectFormat } from "../report.js";
 
 export interface ExplainCommandOptions {
   root?: string;
@@ -47,8 +47,8 @@ function truncate(text: string, limit = 90): string {
 }
 
 export async function explainCommand(query: string, options: ExplainCommandOptions = {}): Promise<void> {
-  const format = parseFormat(options.format);
-  if (!format) return rejectFormat(options.format as string);
+  const format = parseFindingFormat(options.format);
+  if (!format) return rejectFormat(options.format as string, ["human", "json"]);
 
   if (options.kind && !KINDS.includes(options.kind as ExplainKind)) {
     logger.error(`Unknown kind "${options.kind}". Known kinds: ${KINDS.join(", ")}.`);
