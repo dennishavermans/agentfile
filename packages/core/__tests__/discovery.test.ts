@@ -876,12 +876,20 @@ describe("discover", () => {
 // ─── Symlinked instruction files ────────────────────────────────────────────
 
 describe("symlinked instruction files", () => {
-  /** A memory filesystem where CLAUDE.md is a symlink to AGENTS.md. */
+  /**
+   * A memory filesystem where CLAUDE.md is a symlink to AGENTS.md.
+   *
+   * The override normalises before comparing, because callers reach it through
+   * `join(root, file)`, which produces backslashes on Windows. `memoryFileSystem`
+   * already normalises internally; an override that compares the raw string
+   * would silently stop matching on one platform and pass on the other.
+   */
   function linkedFs(body: string) {
     const inner = memoryFileSystem({ "/repo/AGENTS.md": body, "/repo/CLAUDE.md": body });
+    const asPosix = (path: string) => path.replaceAll("\\", "/");
     return {
       ...inner,
-      realPath: (path: string) => (path === "/repo/CLAUDE.md" ? "/repo/AGENTS.md" : inner.realPath(path)),
+      realPath: (path: string) => (asPosix(path) === "/repo/CLAUDE.md" ? "/repo/AGENTS.md" : inner.realPath(path)),
     };
   }
 

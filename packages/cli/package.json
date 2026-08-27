@@ -50,6 +50,7 @@
     "enquirer": "^2.4.1"
   },
   "devDependencies": {
+    "@agentfile/ui": "^0.1.0-beta.0",
     "@types/node": "^22.19.0",
     "tsx": "^4.21.0",
     "typescript": "^6.0.2",

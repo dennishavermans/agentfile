@@ -10,6 +10,7 @@
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
+import { normalizePath } from "./paths/index.js";
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -259,7 +260,9 @@ export function readBackup(root: string, tag: string): BackupEntry[] {
       if (dirent.isDirectory()) {
         walk(full);
       } else {
-        const relPath = relative(backupRoot, full);
+        // Normalised, like every other path agentfile reports: a backup written
+        // on Windows and read anywhere else must describe the same file.
+        const relPath = normalizePath(relative(backupRoot, full));
         entries.push({ path: relPath, content: readFileSync(full, "utf-8") });
       }
     }

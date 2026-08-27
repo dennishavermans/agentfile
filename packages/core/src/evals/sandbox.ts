@@ -70,6 +70,44 @@ export function hashContent(content: string | Buffer): string {
  * `node_modules` and other ignored trees stay out, and `setup` commands
  * reconstruct what a build needs.
  */
+export const NO_POSIX_SHELL = [
+  "No POSIX shell was found, so this command was not run.",
+  "",
+  "Eval commands and agent templates are quoted for a POSIX shell, which is what",
+  "`sh` provides everywhere except Windows. Git for Windows ships `bash`; with it",
+  "on PATH, evals run the same way they do everywhere else.",
+].join("\n");
+
+/**
+ * The shell eval commands run in.
+ *
+ * `true` means Node's default, which is `/bin/sh` on POSIX and `cmd.exe` on
+ * Windows. cmd.exe is not an option here: every command and every agent
+ * template is quoted by `shellQuote`, which emits POSIX single-quoting, and
+ * cmd.exe does not understand it. Passing a POSIX-quoted command to cmd.exe
+ * does not fail cleanly either — it mangles the arguments and runs something
+ * else, which is the worst possible outcome for a tool that executes a command
+ * a user supplied.
+ *
+ * So on Windows the shell is `bash`, which Git for Windows installs, and when
+ * there is none the command is refused with a reason rather than mis-quoted.
+ */
+let cachedShell: string | boolean | undefined | null = null;
+
+export function posixShell(): string | boolean | undefined {
+  if (process.platform !== "win32") return true;
+  if (cachedShell !== null) return cachedShell as string | undefined;
+
+  try {
+    const probe = spawnSync("bash", ["-c", "exit 0"], { encoding: "utf-8", timeout: 10_000 });
+    cachedShell = probe.error === undefined && probe.status === 0 ? "bash" : undefined;
+  } catch {
+    cachedShell = undefined;
+  }
+
+  return cachedShell as string | undefined;
+}
+
 export function temporaryDirectorySandbox(options: {
   root: string;
   files: readonly string[];
@@ -104,8 +142,20 @@ export function temporaryDirectorySandbox(options: {
         seeded,
         exec(command: string, execOptions: ExecOptions = {}): ExecResult {
           const started = Date.now();
+
+          const shell = posixShell();
+          if (shell === undefined) {
+            return {
+              exitCode: 127,
+              stdout: "",
+              stderr: NO_POSIX_SHELL,
+              timedOut: false,
+              durationMs: Date.now() - started,
+            };
+          }
+
           const result = spawnSync(command, {
-            shell: true,
+            shell,
             cwd: workspaceRoot,
             encoding: "utf-8",
             timeout: execOptions.timeoutMs,

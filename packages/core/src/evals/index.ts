@@ -11,4 +11,4 @@ export {
 export type { AgentInvocation, EvalResult, EvalStatus, RunEvalOptions } from "./runner.js";
 export { changedFiles, evalCacheKey, runEval, shellQuote } from "./runner.js";
 export type { ExecOptions, ExecResult, Sandbox, Workspace } from "./sandbox.js";
-export { gitSeedFiles, gitStateFingerprint, temporaryDirectorySandbox } from "./sandbox.js";
+export { gitSeedFiles, gitStateFingerprint, NO_POSIX_SHELL, posixShell, temporaryDirectorySandbox } from "./sandbox.js";

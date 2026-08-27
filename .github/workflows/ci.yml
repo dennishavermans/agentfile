@@ -35,6 +35,10 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run lint
+      # The CLI typechecks against core's built .d.ts, so a fresh checkout has
+      # to build before it can typecheck. This passed locally only because dist
+      # was already there.
+      - run: npm run build
       - run: npm run typecheck
 
   test:
