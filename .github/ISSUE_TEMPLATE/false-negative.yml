@@ -1,0 +1,36 @@
+name: A defect was not found
+description: agentfile stayed quiet about something it should have reported
+labels: ["false negative"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Silence is the failure mode that is hardest to notice, so this is worth
+        reporting even when you are not sure the check exists yet.
+  - type: textarea
+    id: defect
+    attributes:
+      label: What is wrong with the configuration
+      description: Describe it the way you would to a colleague.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: The configuration
+      render: text
+    validations:
+      required: true
+  - type: input
+    id: command
+    attributes:
+      label: What you ran
+      placeholder: agentfile check
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+    validations:
+      required: true

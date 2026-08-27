@@ -1,0 +1,47 @@
+name: A finding is wrong
+description: agentfile reported something that is not actually a problem
+labels: ["false positive"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This is the most useful kind of report. A false positive has already
+        changed the tool once — `AGF105` was reporting linked files as orphans
+        because it searched a skill's body and not its description.
+  - type: input
+    id: code
+    attributes:
+      label: Which code
+      placeholder: AGF302
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: The smallest configuration that reproduces it
+      description: File paths and contents. The smaller the better — one file is ideal.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: json
+    attributes:
+      label: Output of the command with --format json
+      description: The JSON carries the location and the structured data the finding was built from, which usually shows what went wrong without guessing.
+      render: json
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why it is wrong
+      description: What is actually true about this configuration?
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: "`agentfile --version`"
+    validations:
+      required: true

@@ -115,6 +115,8 @@ The local dashboard is a separate install, because it ships an HTTP server most 
 - [Diagnostic codes](docs/diagnostics.md) — every `AGFxxx`, what it means, and how to configure it
 - [What is stable](docs/stability.md) — what CI and editors may depend on
 - [Moving to v2](docs/migration-v2.md) — nothing you have breaks; here is what is new
+- [Security](SECURITY.md) — what agentfile promises about execution, and what it does not promise about safety
+- [Contributing](CONTRIBUTING.md) — the rules the code follows, and why
 
 ---
 
@@ -649,60 +651,60 @@ for (const r of result.results) {
 
 ## Contributing
 
-agentfile is in early development. Issues and PRs welcome.
+agentfile is in early development. Issues and pull requests are welcome,
+including the ones that say a finding is wrong — that is the most useful kind of
+report, and it has already changed the tool once.
 
-1. Clone the repo
-2. `npm install` from the root
-3. `npm run build` to build all packages
-4. `npm test` to run all tests
+```bash
+npm install    # from the root
+npm run build  # the CLI typechecks against core's built types, so build first
+npm test
+npm run lint
+```
+
+[CONTRIBUTING.md](CONTRIBUTING.md) has the rest: the rules the code follows and
+why, how to add a diagnostic, and what makes a false-positive report
+actionable.
 
 ---
 
 ## Release process
 
-### npm packages
+Publishing happens in GitHub Actions, not on a laptop, so every package carries
+[npm provenance](https://docs.npmjs.com/generating-provenance-statements) — a
+signed statement of which commit and which workflow built it. For a tool that
+tells people what is unsafe in their configuration, publishing without that
+would be the wrong way round.
 
-1. Update versions in all package manifests (`packages/core`, `packages/cli`, `packages/agentfile`), keeping the internal `@agentfile/*` dependency ranges in step — a published package whose dependency range predates it resolves against the previous release.
-2. Update `CHANGELOG.md`
-3. Build and test from repo root:
-
-```bash
-npm run build
-npm run test
-```
-
-4. Publish. A pre-release goes out under a tag so nobody installs it by accident:
-
-```bash
-npm publish --workspace packages/core      --tag next --provenance
-npm publish --workspace packages/cli       --tag next --provenance
-npm publish --workspace packages/agentfile --tag next --provenance
-```
-
-A stable release drops `--tag next`, or promotes what was already published:
+1. Update the version in `packages/core`, `packages/cli` and
+   `packages/agentfile`, keeping the internal `@agentfile/*` dependency ranges
+   in step. The release workflow refuses to publish if the tag and the manifests
+   disagree.
+2. Add the section to `CHANGELOG.md`. It becomes the release notes; the workflow
+   fails if there is no section for the version being tagged.
+3. Tag and push:
 
 ```bash
-npm dist-tag add @agentfile/cli@2.0.0 latest
+git tag v2.0.0-beta.1
+git push origin v2.0.0-beta.1
 ```
 
-Order is `core` → `cli` → `agentfile`, so each package's dependency exists when it is installed. `@agentfile/ui` is versioned separately: it is an optional peer of the CLI, not part of the release train.
+That runs lint, build and the full test suite, publishes `core` → `cli` →
+`agentfile` in that order, and creates the GitHub release. A version with a
+hyphen in it is treated as a pre-release: it goes out under the `next` dist-tag
+and is marked as a pre-release on GitHub, so `npm install @agentfile/cli` keeps
+resolving to the last stable version.
 
-### VS Code extension
+`workflow_dispatch` runs the same thing as a dry run, which is worth doing once
+before the first real tag.
 
-The extension is published separately to the VS Code Marketplace and Open VSX Registry:
+### One-time setup
 
-```bash
-# Build and package the .vsix
-npm run package:extension
-
-# Publish to VS Code Marketplace (requires VSCE_PAT env var)
-npm run publish:extension
-
-# Publish to Open VSX Registry (requires OVSX_PAT env var)
-cd packages/extension && npx ovsx publish *.vsix
-```
-
-The extension version is managed independently in `packages/extension/package.json`.
+- An `NPM_TOKEN` secret with publish rights, in a repository environment named
+  `release`.
+- Better, if you can: [npm trusted
+  publishing](https://docs.npmjs.com/trusted-publishers), which drops the token
+  entirely and authenticates the workflow itself.
 
 ---
 

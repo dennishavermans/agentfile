@@ -31,7 +31,8 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/dennishavermans/agentfile.git"
+    "url": "git+https://github.com/dennishavermans/agentfile.git",
+    "directory": "packages/cli"
   },
   "homepage": "https://github.com/dennishavermans/agentfile#readme",
   "bugs": {
@@ -63,5 +64,6 @@
     "@agentfile/ui": {
       "optional": true
     }
-  }
+  },
+  "author": "Dennis Havermans"
 }

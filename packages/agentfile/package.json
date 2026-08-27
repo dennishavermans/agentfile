@@ -18,7 +18,8 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/dennishavermans/agentfile.git"
+    "url": "git+https://github.com/dennishavermans/agentfile.git",
+    "directory": "packages/agentfile"
   },
   "homepage": "https://github.com/dennishavermans/agentfile#readme",
   "bugs": {
@@ -46,5 +47,6 @@
   "devDependencies": {
     "@types/node": "^22.19.0",
     "typescript": "^6.0.2"
-  }
+  },
+  "author": "Dennis Havermans"
 }
