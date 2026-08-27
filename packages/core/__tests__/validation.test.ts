@@ -56,6 +56,7 @@ describe("the rule set", () => {
       "AGF204", // compile host: overwrite refusal is a fact about the disk, not the configuration
       "AGF602", // eval runner: an assertion failure is a fact about a sandboxed run, not the configuration
       "AGF005", // suppression pass: a stale directive is a fact about the report, not a rule's finding
+      "AGF205", // compile host: whether two targets would source each other is a fact about the requested target set
     ]);
     const active = allDiagnosticCodes().filter((code) => diagnosticMeta(code).status === "active");
 

@@ -182,6 +182,16 @@ export {
   supports,
   targetCapabilities,
 } from "./capabilities/index.js";
+// ─── Adoption ──────────────────────────────────────────────────────────────
+export type {
+  AdoptedBody,
+  AdoptionOptions,
+  AdoptionPlan,
+  AdoptionSource,
+  AdoptionTarget,
+  UntouchedSurface,
+} from "./adopt/index.js";
+export { DEFAULT_SOURCE_PLATFORM, planAdoption, sourceOnlyConfiguration } from "./adopt/index.js";
 // ─── Diagnostics ───────────────────────────────────────────────────────────
 export type {
   CodeStatus,

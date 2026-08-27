@@ -150,6 +150,24 @@ It reads `AGENTS.md`, `CLAUDE.md`, `.claude/rules/`, `.claude/skills/`, `.claude
 
 `doctor` runs no model, makes no network calls, and never executes a hook, script, or MCP command it finds. It exits non-zero on errors, so it can gate CI.
 
+### `npx @agentfile/cli adopt`
+Proposes a single source of truth for the configuration you already have, and shows the plan before touching anything.
+
+```bash
+npx @agentfile/cli adopt                  # plan only — writes nothing
+npx @agentfile/cli adopt --apply          # carry it out, after confirming
+npx @agentfile/cli adopt --source claude  # consolidate into CLAUDE.md instead
+```
+
+Adoption happens in two phases, and the order is not cosmetic. A compiler never carries a target's own file into that target, so generating `CLAUDE.md` while `CLAUDE.md` still holds text nothing else has would lose that text. So:
+
+1. **Consolidate.** Everything every platform says is gathered into one file — `AGENTS.md` by default, because it is the cross-tool standard — which stays hand-written. Bodies are appended whole under a heading naming where they came from: nothing is rewritten, reordered, or summarised, and a file the source already says everything from is skipped rather than copied again.
+2. **Generate.** The other platforms' files become compiler output of that source.
+
+Nothing is written without `--apply`, and `--apply` confirms first. A hand-written file is overwritten only once its own text is already in the source — anything else is still refused, exactly as `compile` refuses it. Skills, subagents, commands, hooks, MCP servers and permission rules are left alone, and the plan says so rather than leaving you to notice.
+
+Asking `compile` to do both phases at once is reported as `AGF205`: with two hand-written targets each becomes the other's source, and under `--force` their contents swap.
+
 ### `npx @agentfile/cli context <path>`
 What configuration actually applies to a file — in load order, with the reason for each.
 

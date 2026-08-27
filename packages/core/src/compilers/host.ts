@@ -22,8 +22,9 @@ import { dirname, join } from "node:path";
 import type { TargetId } from "../capabilities/index.js";
 import { type Diagnostic, diagnostic } from "../diagnostics/index.js";
 import type { FileSystem } from "../fs/index.js";
-import type { AgentConfiguration } from "../ir/index.js";
+import { type AgentConfiguration, withoutAliases } from "../ir/index.js";
 import { addMarker, hasGeneratedMarker } from "../manifest.js";
+import { isCompileSource } from "./sources.js";
 import { COMPILE_TARGETS, compilerFor } from "./targets.js";
 import type { CompilePlan } from "./types.js";
 
@@ -136,16 +137,72 @@ export function planCompilation(configuration: AgentConfiguration, options: Plan
     );
   }
 
+  diagnostics.push(...mutualSourceDiagnostics(configuration, options.targets));
+
   files.sort((a, b) => a.path.localeCompare(b.path));
   return { targets, files, diagnostics };
 }
 
-function decideAction(
-  path: string,
-  content: string,
-  options: PlanOptions,
-  owned: ReadonlySet<string>,
-): FileAction {
+/**
+ * Platforms whose instructions would be carried into `target`.
+ *
+ * The same filter the compilers use, so this cannot disagree with what they
+ * actually select.
+ */
+function sourcePlatformsFor(configuration: AgentConfiguration, target: TargetId): Set<string> {
+  const platforms = new Set<string>();
+  for (const instruction of withoutAliases(configuration.instructions)) {
+    if (isCompileSource(instruction, target)) platforms.add(String(instruction.provenance.platform));
+  }
+  return platforms;
+}
+
+/**
+ * AGF205: two requested targets that would each compile from the other.
+ *
+ * A compiler never carries a target's own files into that target, so asking for
+ * two targets that both still hold hand-written text means each output is built
+ * from the other's text and neither ends up holding the union. Without `--force`
+ * this surfaces as an overwrite refusal and no harm is done; with `--force` the
+ * two files swap contents, which looks like a successful compile and is not.
+ *
+ * The fix is to consolidate into one source first, which is what
+ * `agentfile adopt` plans.
+ */
+function mutualSourceDiagnostics(configuration: AgentConfiguration, targets: readonly string[]): Diagnostic[] {
+  const findings: Diagnostic[] = [];
+  const sources = new Map(targets.map((target) => [target, sourcePlatformsFor(configuration, target)]));
+
+  for (let i = 0; i < targets.length; i++) {
+    for (let j = i + 1; j < targets.length; j++) {
+      const a = targets[i];
+      const b = targets[j];
+      if (!sources.get(a)?.has(b) || !sources.get(b)?.has(a)) continue;
+
+      findings.push(
+        diagnostic({
+          code: "AGF205",
+          message: `Compiling ${a} and ${b} together makes each the source for the other`,
+          explanation: [
+            `Both ${a} and ${b} still hold hand-written instructions, and a compiler never`,
+            "carries a target's own files into that target. So each output would be built",
+            "from the other's text, and neither would hold everything.",
+            "",
+            "Without --force this is refused per file and nothing is lost. With --force the",
+            "two files swap contents, which looks like a successful compile and is not.",
+          ].join("\n"),
+          suggestion:
+            "Consolidate into one source first — `agentfile adopt` plans that — then compile the other targets from it.",
+          data: { targets: `${a},${b}` },
+        }),
+      );
+    }
+  }
+
+  return findings;
+}
+
+function decideAction(path: string, content: string, options: PlanOptions, owned: ReadonlySet<string>): FileAction {
   const absolute = join(options.root, path);
   if (!options.fs.exists(absolute)) return "create";
 

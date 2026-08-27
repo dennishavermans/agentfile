@@ -159,6 +159,13 @@ export const DIAGNOSTIC_CODES = {
     defaultSeverity: "error",
     status: "active",
   },
+  AGF205: {
+    name: "mutual-compile-sources",
+    title: "Two targets would compile from each other",
+    band: "targets",
+    defaultSeverity: "warning",
+    status: "active",
+  },
 
   // ─── AGF3xx — instructions & resolution ─────────────────────────────────
   AGF301: {

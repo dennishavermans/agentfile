@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /// <reference types="node" />
 import { Command } from "commander";
+import { adoptCommand } from "./commands/adopt.js";
 import { auditCommand } from "./commands/audit.js";
 import { checkCommand } from "./commands/check.js";
 import { cleanCommand } from "./commands/clean.js";
@@ -49,6 +50,19 @@ program
   .action((options: { root?: string; format?: string; verbose?: boolean }) => doctorCommand(options));
 
 const collect = (val: string, prev: string[]) => prev.concat(val.split(",").map((s) => s.trim()));
+
+program
+  .command("adopt")
+  .helpGroup(ANALYSE)
+  .description("Plan a single source of truth for the configuration already here")
+  .option("--root <path>", "Directory to adopt instead of the current working directory")
+  .option("--source <platform>", "Platform to consolidate into: agents-md (default), claude, copilot")
+  .option("--apply", "Carry the plan out. Without this, nothing is written")
+  .option("--yes", "Skip the confirmation prompt")
+  .option("--format <format>", "Output format: human or json", "human")
+  .action((options: { root?: string; source?: string; apply?: boolean; yes?: boolean; format?: string }) =>
+    adoptCommand(options),
+  );
 
 program
   .command("check")

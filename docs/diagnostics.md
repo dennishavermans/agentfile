@@ -187,6 +187,20 @@ silently. The file is left untouched; `--force` overwrites it deliberately.
 Emitted by the compile host rather than by a validation rule — it is a fact
 about the disk at compile time, not about the configuration.
 
+### `AGF205` mutual-compile-sources · warning · active
+Two requested compile targets that would each be built from the other. A
+compiler never carries a target's own files into that target, so asking for two
+targets that both still hold hand-written text means each output is assembled
+from the other's text and neither ends up holding everything.
+
+Without `--force` this surfaces as an `AGF204` refusal per file and nothing is
+lost. With `--force` the two files swap contents — which looks like a successful
+compile and is not.
+
+The fix is the two-phase order `agentfile adopt` plans: consolidate every
+platform's text into one source that stays hand-written, then generate the other
+targets from it.
+
 ---
 
 ## AGF3xx — instructions and resolution
