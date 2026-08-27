@@ -42,26 +42,43 @@ jobs:
         id: version
         run: |
           set -euo pipefail
-          tag="${GITHUB_REF_NAME#v}"
-          echo "tag says: $tag"
+
+          # On a tag push the tag is the authority and the manifests must match
+          # it. On a manual dispatch there is no tag — the ref is a branch — so
+          # the manifests are the authority and what is being rehearsed is
+          # everything after this check.
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            version="${GITHUB_REF_NAME#v}"
+            echo "tag says: $version"
+          else
+            version=$(node -p "require('./packages/core/package.json').version")
+            echo "no tag (dispatch); manifests say: $version"
+          fi
 
           for package in core cli agentfile; do
             manifest=$(node -p "require('./packages/$package/package.json').version")
-            if [ "$manifest" != "$tag" ]; then
-              echo "::error::packages/$package is $manifest but the tag says $tag"
+            if [ "$manifest" != "$version" ]; then
+              echo "::error::packages/$package is $manifest but the release is $version"
               exit 1
             fi
           done
 
+          # The changelog is the release notes, so its absence is a failure now
+          # rather than an empty release body later.
+          if ! grep -q "^## \\[$version\\]" CHANGELOG.md; then
+            echo "::error::CHANGELOG.md has no section for $version"
+            exit 1
+          fi
+
           # Anything with a hyphen is a pre-release: 2.0.0-beta.1 goes out under
           # the `next` dist-tag so `npm install @agentfile/cli` keeps resolving
           # to the last stable version.
-          case "$tag" in
+          case "$version" in
             *-*) prerelease=true ;;
             *)   prerelease=false ;;
           esac
 
-          echo "version=$tag" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
 
       - run: npm ci
