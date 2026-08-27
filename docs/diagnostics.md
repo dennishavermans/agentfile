@@ -47,6 +47,36 @@ a doc `file`, or a skill resource. This is an error rather than a warning
 because generation does not skip a missing reference: it silently produces empty
 content.
 
+### `AGF005` unused-suppression · warning · active
+An `agentfile-disable` directive that silenced nothing. Either the problem was
+fixed and the directive outlived it, or the code it names does not match the
+finding it was meant to silence. A warning rather than an error: a stale
+directive is untidy, not broken, and failing a build over one would push people
+towards blanket `agentfile-disable` comments that silence everything.
+
+Directives are written as a comment in the configuration file itself, in
+whichever comment syntax that file already uses:
+
+```markdown
+<!-- agentfile-disable-next-line AGF302 mirrored deliberately for the audit trail -->
+```
+
+```yaml
+# agentfile-disable-next-line AGF501 vendored script, reviewed 2026-08
+```
+
+Three scopes are recognised. `agentfile-disable-next-line` covers the following
+line, `agentfile-disable-line` covers its own line, and `agentfile-disable` or
+`agentfile-disable-file` covers the whole file. A directive naming no codes
+silences every code, matching ESLint's bare `eslint-disable-next-line`; anything
+after the code list is a free-text reason, recorded in `--format json` and never
+interpreted.
+
+Suppressed findings are counted, not discarded. Every command that reports them
+prints how many a directive silenced, and the JSON output carries each one with
+the directive responsible — "no problems found" beside fifteen silent
+suppressions would be true and misleading at the same time.
+
 ---
 
 ## AGF1xx — skills

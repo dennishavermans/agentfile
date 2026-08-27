@@ -80,6 +80,26 @@ export interface SummaryOptions {
   strict?: boolean;
 }
 
+/**
+ * Reports what a directive silenced.
+ *
+ * Printed even on a clean run. "No problems found" next to a silent count of
+ * fifteen suppressed findings would be technically true and actively
+ * misleading, which is the failure mode every suppression mechanism invites.
+ */
+export function printSuppressed(result: ValidationResult): void {
+  if (!result.suppressed.length) return;
+
+  const count = result.suppressed.length;
+  logger.info(
+    chalk.gray(
+      `${count} finding${count === 1 ? "" : "s"} suppressed by agentfile-disable ` +
+        `directive${count === 1 ? "" : "s"} in the configuration.`,
+    ),
+  );
+  console.log();
+}
+
 export function printFindings(result: ValidationResult, options: SummaryOptions = {}): void {
   if (result.diagnostics.length) {
     logger.title("Problems");
@@ -131,6 +151,18 @@ export function validationEnvelope(
     skipped: result.skipped,
     emptyLayers: result.emptyLayers,
     ...extra,
+    suppressed: result.suppressed.map((entry) => ({
+      code: entry.diagnostic.code,
+      message: entry.diagnostic.message,
+      file: entry.file,
+      line: entry.diagnostic.location?.line,
+      directive: {
+        scope: entry.directive.scope,
+        codes: entry.directive.codes,
+        line: entry.directive.line,
+        reason: entry.directive.reason,
+      },
+    })),
     report: buildReport(result.diagnostics),
   };
 }

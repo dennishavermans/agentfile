@@ -76,6 +76,15 @@ export const DIAGNOSTIC_CODES = {
     defaultSeverity: "error",
     status: "active",
   },
+  AGF005: {
+    name: "unused-suppression",
+    title: "Suppression directive silences nothing",
+    band: "configuration",
+    // A warning, not an error: a stale suppression is untidy, not broken, and
+    // failing a build over one would push people towards blanket directives.
+    defaultSeverity: "warning",
+    status: "active",
+  },
 
   // ─── AGF1xx — skills ────────────────────────────────────────────────────
   AGF101: {

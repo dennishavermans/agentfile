@@ -7,7 +7,14 @@
  */
 
 import type { TargetId } from "../capabilities/index.js";
-import { type Diagnostic, type DiagnosticSummary, sortDiagnostics, summarize } from "../diagnostics/index.js";
+import {
+  applySuppressions,
+  type Diagnostic,
+  type DiagnosticSummary,
+  type SuppressedDiagnostic,
+  sortDiagnostics,
+  summarize,
+} from "../diagnostics/index.js";
 import { type DiscoveryResult, discover } from "../discovery/index.js";
 import { type FileSystem, nodeFileSystem } from "../fs/index.js";
 import { findRule, RULES } from "./rules.js";
@@ -37,6 +44,12 @@ export interface ValidationOptions {
    * failure would punish the developer for a gap in agentfile's own registry.
    */
   strict?: boolean;
+  /**
+   * Honour `agentfile-disable` directives in the files being checked. Defaults
+   * to true; `false` is the "show me everything, including what we chose to
+   * ignore" audit view.
+   */
+  suppressions?: boolean;
 }
 
 export interface ValidationResult {
@@ -51,6 +64,13 @@ export interface ValidationResult {
   emptyLayers: ValidationLayer[];
   /** Rule ids that were requested but do not exist. */
   unknownRules: string[];
+  /**
+   * Findings a directive silenced, kept rather than dropped.
+   *
+   * A count of what a repository has chosen not to see belongs in the report;
+   * silently discarding them would make "no problems found" unverifiable.
+   */
+  suppressed: SuppressedDiagnostic[];
 }
 
 /** Rules matching a selection, in registry order. */
@@ -118,7 +138,20 @@ export function runValidation(options: ValidationOptions): ValidationResult {
     if (result.skipped) skipped.push({ rule: rule.id, reason: result.skipped });
   }
 
-  const finalDiagnostics = sortDiagnostics(options.strict ? applyStrict(diagnostics) : diagnostics);
+  // Suppression runs before `--strict`, so a silenced warning is never promoted
+  // into a build failure, and the AGF005 findings it produces are themselves
+  // subject to promotion like any other warning.
+  const suppression =
+    options.suppressions === false
+      ? { diagnostics: [...diagnostics], suppressed: [], unused: [] }
+      : applySuppressions(diagnostics, {
+          root: options.root,
+          fs: context.fs,
+          files: discovery.configuration.sources.map((source) => source.path),
+        });
+
+  const reported = [...suppression.diagnostics, ...suppression.unused];
+  const finalDiagnostics = sortDiagnostics(options.strict ? applyStrict(reported) : reported);
 
   return {
     diagnostics: finalDiagnostics,
@@ -128,5 +161,6 @@ export function runValidation(options: ValidationOptions): ValidationResult {
     skipped,
     emptyLayers,
     unknownRules,
+    suppressed: suppression.suppressed,
   };
 }

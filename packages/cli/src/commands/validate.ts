@@ -34,6 +34,7 @@ import {
   printFindings,
   printHeader,
   printJson,
+  printSuppressed,
   rejectFormat,
   validationEnvelope,
 } from "../report.js";
@@ -45,6 +46,11 @@ export interface ValidateOptions {
   target?: string[];
   /** Treat warnings as errors. */
   strict?: boolean;
+  /**
+   * Honour `agentfile-disable` directives. Commander sets this false for
+   * `--no-suppressions`, which is the "show me what we chose to ignore" view.
+   */
+  suppressions?: boolean;
   /** Print the rule set and exit. */
   listRules?: boolean;
 }
@@ -161,6 +167,7 @@ export async function validateCommand(options: ValidateOptions = {}): Promise<vo
     layers: IMPLEMENTED_LAYERS,
     targets,
     strict: options.strict,
+    suppressions: options.suppressions,
   });
 
   if (json) {
@@ -206,5 +213,6 @@ export async function validateCommand(options: ValidateOptions = {}): Promise<vo
 
   printCoverageGaps(result);
   printFindings(result, { strict: options.strict });
+  printSuppressed(result);
   exitOnErrors(result);
 }

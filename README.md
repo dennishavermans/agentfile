@@ -182,6 +182,18 @@ npx @agentfile/cli check --format json
 
 Runs the structural and resolution checks: files that will not parse, references that point at nothing, the same rule maintained in several places, glob-scoped rules that match no file, and rules whose scope differs between platforms. No network, no model, nothing executed.
 
+#### Silencing a finding you have already decided about
+
+A finding you have reviewed and accepted is silenced with a comment in the file itself, in whatever comment syntax that file already uses:
+
+```markdown
+<!-- agentfile-disable-next-line AGF302 mirrored deliberately for the audit trail -->
+```
+
+`agentfile-disable-next-line` covers the following line, `agentfile-disable-line` its own line, and `agentfile-disable` the whole file. Name no codes and it silences everything on that line.
+
+Two things keep this from becoming a way to hide problems. Suppressed findings are **counted, not discarded** — every command says how many it silenced, and `--format json` carries each one with the directive responsible, so `--no-suppressions` is never needed to find out what a repository has chosen not to see. And a directive that silences nothing is reported as `AGF005`, so a suppression cannot quietly outlive the problem it was written for.
+
 ### `npx @agentfile/cli lint`
 Quality analysis — the things that are not wrong but are costing you.
 

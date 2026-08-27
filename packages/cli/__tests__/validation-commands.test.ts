@@ -375,4 +375,63 @@ describe("validation commands", () => {
       expect(text.match(/agentfile validate/g)).toHaveLength(1);
     });
   });
+
+  describe("suppression directives", () => {
+    const duplicated = "- Use pnpm as the package manager, never npm\n";
+
+    function writeDuplicatedRule(directive = "") {
+      write("AGENTS.md", directive + duplicated);
+      write(".github/copilot-instructions.md", duplicated);
+    }
+
+    it("silences a finding the directive names", async () => {
+      writeDuplicatedRule("<!-- agentfile-disable AGF302 mirrored for the audit trail -->\n");
+
+      const output = captureOutput();
+      await checkCommand({ root: TEST_DIR });
+      const text = output.text();
+      output.restore();
+
+      expect(text).not.toContain("AGF302");
+      expect(text).toContain("1 finding suppressed");
+    });
+
+    it("says how many findings were silenced rather than hiding them", async () => {
+      writeDuplicatedRule("<!-- agentfile-disable AGF302 -->\n");
+
+      const output = captureOutput();
+      await checkCommand({ root: TEST_DIR, format: "json" });
+      const parsed = JSON.parse(output.text());
+      output.restore();
+
+      expect(parsed.suppressed).toHaveLength(1);
+      expect(parsed.suppressed[0].code).toBe("AGF302");
+      expect(parsed.suppressed[0].directive.scope).toBe("file");
+      expect(parsed.report.diagnostics.map((item: { code: string }) => item.code)).not.toContain("AGF302");
+    });
+
+    it("shows the finding again under --no-suppressions", async () => {
+      writeDuplicatedRule("<!-- agentfile-disable AGF302 -->\n");
+
+      const output = captureOutput();
+      await checkCommand({ root: TEST_DIR, format: "json", suppressions: false });
+      const parsed = JSON.parse(output.text());
+      output.restore();
+
+      expect(parsed.suppressed).toHaveLength(0);
+      expect(parsed.report.diagnostics.map((item: { code: string }) => item.code)).toContain("AGF302");
+    });
+
+    it("reports a directive that outlived the problem it silenced", async () => {
+      write("AGENTS.md", "<!-- agentfile-disable AGF302 -->\n- Run the tests before pushing\n");
+
+      const output = captureOutput();
+      await checkCommand({ root: TEST_DIR, format: "json" });
+      const parsed = JSON.parse(output.text());
+      output.restore();
+
+      const codes = parsed.report.diagnostics.map((item: { code: string }) => item.code);
+      expect(codes).toContain("AGF005");
+    });
+  });
 });

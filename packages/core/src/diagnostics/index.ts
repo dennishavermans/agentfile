@@ -4,5 +4,14 @@ export type { HumanFormatOptions } from "./format-human.js";
 export { formatHuman } from "./format-human.js";
 export type { DiagnosticReport } from "./format-json.js";
 export { buildReport, DIAGNOSTIC_REPORT_VERSION, formatJson } from "./format-json.js";
+export type {
+  SuppressedCodes,
+  SuppressedDiagnostic,
+  SuppressionDirective,
+  SuppressionOptions,
+  SuppressionResult,
+  SuppressionScope,
+} from "./suppressions.js";
+export { ALL_CODES, applySuppressions, parseSuppressions, suppressibleCodes } from "./suppressions.js";
 export type { Diagnostic, DiagnosticInput, DiagnosticSummary, Location, RelatedLocation } from "./types.js";
 export { diagnostic, hasErrors, sortDiagnostics, summarize } from "./types.js";

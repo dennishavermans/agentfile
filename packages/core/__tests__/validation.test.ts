@@ -55,14 +55,14 @@ describe("the rule set", () => {
     const commandEmitted = new Set([
       "AGF204", // compile host: overwrite refusal is a fact about the disk, not the configuration
       "AGF602", // eval runner: an assertion failure is a fact about a sandboxed run, not the configuration
+      "AGF005", // suppression pass: a stale directive is a fact about the report, not a rule's finding
     ]);
     const active = allDiagnosticCodes().filter((code) => diagnosticMeta(code).status === "active");
 
     for (const code of active) {
-      expect(
-        claimed.has(code) || commandEmitted.has(code),
-        `${code} is active but no rule or command emits it`,
-      ).toBe(true);
+      expect(claimed.has(code) || commandEmitted.has(code), `${code} is active but no rule or command emits it`).toBe(
+        true,
+      );
     }
   });
 
@@ -115,6 +115,55 @@ describe("selectRules", () => {
 });
 
 // ─── Running ───────────────────────────────────────────────────────────────
+
+describe("suppression through the pipeline", () => {
+  const duplicated = "- Use pnpm as the package manager, never npm\n";
+
+  it("silences a finding a directive names", () => {
+    const result = run({
+      [`${ROOT}/AGENTS.md`]: `<!-- agentfile-disable AGF302 mirrored on purpose -->\n${duplicated}`,
+      [`${ROOT}/.github/copilot-instructions.md`]: duplicated,
+    });
+
+    expect(result.diagnostics.map((item) => item.code)).not.toContain("AGF302");
+    expect(result.suppressed.map((entry) => entry.diagnostic.code)).toContain("AGF302");
+  });
+
+  it("keeps the finding when --no-suppressions asks to see everything", () => {
+    const result = run(
+      {
+        [`${ROOT}/AGENTS.md`]: `<!-- agentfile-disable AGF302 -->\n${duplicated}`,
+        [`${ROOT}/.github/copilot-instructions.md`]: duplicated,
+      },
+      { suppressions: false },
+    );
+
+    expect(result.diagnostics.map((item) => item.code)).toContain("AGF302");
+    expect(result.suppressed).toHaveLength(0);
+  });
+
+  it("does not let --strict promote a suppressed warning into an error", () => {
+    const result = run(
+      {
+        [`${ROOT}/AGENTS.md`]: `<!-- agentfile-disable AGF302 -->\n${duplicated}`,
+        [`${ROOT}/.github/copilot-instructions.md`]: duplicated,
+      },
+      { strict: true },
+    );
+
+    expect(result.diagnostics.filter((item) => item.code === "AGF302")).toHaveLength(0);
+  });
+
+  it("reports a directive left behind in a clean file", () => {
+    const result = run({
+      [`${ROOT}/AGENTS.md`]: "<!-- agentfile-disable AGF302 -->\n- Run the tests before pushing\n",
+    });
+
+    const stale = result.diagnostics.filter((item) => item.code === "AGF005");
+    expect(stale).toHaveLength(1);
+    expect(stale[0].location?.file).toBe("AGENTS.md");
+  });
+});
 
 describe("runValidation", () => {
   it("finds a duplicate rule maintained for two platforms", () => {

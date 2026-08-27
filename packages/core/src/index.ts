@@ -196,9 +196,17 @@ export type {
   Location,
   RelatedLocation,
   Severity,
+  SuppressedCodes,
+  SuppressedDiagnostic,
+  SuppressionDirective,
+  SuppressionOptions,
+  SuppressionResult,
+  SuppressionScope,
 } from "./diagnostics/index.js";
 export {
+  ALL_CODES,
   allDiagnosticCodes,
+  applySuppressions,
   buildReport,
   DIAGNOSTIC_CODES,
   DIAGNOSTIC_REPORT_VERSION,
@@ -207,8 +215,10 @@ export {
   formatHuman,
   formatJson,
   hasErrors,
+  parseSuppressions,
   sortDiagnostics,
   summarize,
+  suppressibleCodes,
 } from "./diagnostics/index.js";
 // ─── Discovery ─────────────────────────────────────────────────────────────
 export type {

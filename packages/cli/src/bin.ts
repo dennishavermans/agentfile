@@ -80,7 +80,10 @@ program
   .option("--root <path>", "Directory to check instead of the current working directory")
   .option("--format <format>", "Output format: human or json", "human")
   .option("--strict", "Treat warnings as errors")
-  .action((options: { root?: string; format?: string; strict?: boolean }) => checkCommand(options));
+  .option("--no-suppressions", "Report findings an agentfile-disable directive would silence")
+  .action((options: { root?: string; format?: string; strict?: boolean; suppressions?: boolean }) =>
+    checkCommand(options),
+  );
 
 program
   .command("validate")
@@ -90,8 +93,16 @@ program
   .option("--target <ide>", "Check compatibility against a target, repeatable, or 'all'", collect, [] as string[])
   .option("--strict", "Treat warnings as errors")
   .option("--list-rules", "Print the rule set and exit")
-  .action((options: { root?: string; format?: string; target?: string[]; strict?: boolean; listRules?: boolean }) =>
-    validateCommand(options),
+  .option("--no-suppressions", "Report findings an agentfile-disable directive would silence")
+  .action(
+    (options: {
+      root?: string;
+      format?: string;
+      target?: string[];
+      strict?: boolean;
+      listRules?: boolean;
+      suppressions?: boolean;
+    }) => validateCommand(options),
   );
 
 program
@@ -129,7 +140,10 @@ program
   .option("--format <format>", "Output format: human or json", "human")
   .option("--strict", "Treat warnings as errors")
   .option("--all", "Include informational findings, which record rather than flag")
-  .action((options: { root?: string; format?: string; strict?: boolean; all?: boolean }) => auditCommand(options));
+  .option("--no-suppressions", "Report findings an agentfile-disable directive would silence")
+  .action((options: { root?: string; format?: string; strict?: boolean; all?: boolean; suppressions?: boolean }) =>
+    auditCommand(options),
+  );
 
 program
   .command("lint")
@@ -139,8 +153,16 @@ program
   .option("--budget <tokens>", "Always-loaded context budget, in estimated tokens")
   .option("--similarity <ratio>", "Near-duplicate similarity threshold between 0 and 1")
   .option("--strict", "Treat warnings as errors")
-  .action((options: { root?: string; format?: string; budget?: string; similarity?: string; strict?: boolean }) =>
-    lintCommand(options),
+  .option("--no-suppressions", "Report findings an agentfile-disable directive would silence")
+  .action(
+    (options: {
+      root?: string;
+      format?: string;
+      budget?: string;
+      similarity?: string;
+      strict?: boolean;
+      suppressions?: boolean;
+    }) => lintCommand(options),
   );
 
 program

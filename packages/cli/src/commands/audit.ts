@@ -15,6 +15,7 @@
  */
 
 import {
+  applySuppressions,
   auditConfiguration,
   discover,
   formatHuman,
@@ -35,6 +36,11 @@ export interface AuditOptions {
   format?: string;
   /** Treat warnings as errors. */
   strict?: boolean;
+  /**
+   * Honour `agentfile-disable` directives. Commander sets this false for
+   * `--no-suppressions`, which is the "show me what we chose to ignore" view.
+   */
+  suppressions?: boolean;
   /** Include the informational findings, which are recorded rather than raised. */
   all?: boolean;
 }
@@ -70,10 +76,23 @@ export async function auditCommand(options: AuditOptions = {}): Promise<void> {
     files: discovery.scan.files,
   });
 
+  // Directives silence what a team has reviewed and accepted. Applied before
+  // the informational filter and before --strict, so an accepted finding is
+  // never promoted into a build failure.
+  const suppression =
+    options.suppressions === false
+      ? { diagnostics: result.diagnostics, suppressed: [], unused: [] }
+      : applySuppressions(result.diagnostics, {
+          root,
+          fs: nodeFileSystem,
+          files: discovery.configuration.sources.map((source) => source.path),
+        });
+  const audited = [...suppression.diagnostics, ...suppression.unused];
+
   // Informational findings record what a skill or hook reaches out to. They are
   // useful context and terrible noise, so they are opt-in.
-  const shown = options.all ? result.diagnostics : result.diagnostics.filter((item) => item.severity !== "info");
-  const withdrawn = result.diagnostics.length - shown.length;
+  const shown = options.all ? audited : audited.filter((item) => item.severity !== "info");
+  const withdrawn = audited.length - shown.length;
 
   const promoted = options.strict
     ? shown.map((item) => (item.severity === "warning" ? { ...item, severity: "error" as const } : item))
@@ -91,6 +110,18 @@ export async function auditCommand(options: AuditOptions = {}): Promise<void> {
       inspectedFiles: result.inspectedFiles,
       skippedFiles: result.skippedFiles,
       informationalWithheld: options.all ? 0 : withdrawn,
+      suppressed: suppression.suppressed.map((entry) => ({
+        code: entry.diagnostic.code,
+        message: entry.diagnostic.message,
+        file: entry.file,
+        line: entry.diagnostic.location?.line,
+        directive: {
+          scope: entry.directive.scope,
+          codes: entry.directive.codes,
+          line: entry.directive.line,
+          reason: entry.directive.reason,
+        },
+      })),
       caveat: NO_FINDINGS_CAVEAT,
       report: {
         version: 1,
@@ -161,7 +192,20 @@ export async function auditCommand(options: AuditOptions = {}): Promise<void> {
       counts.warnings ? `${counts.warnings} warning${counts.warnings === 1 ? "" : "s"}` : "",
       counts.infos ? `${counts.infos} info` : "",
     ].filter(Boolean);
-    logger.warn(parts.join(", ") + (options.strict && counts.errors ? chalk.gray(" (warnings promoted by --strict)") : ""));
+    logger.warn(
+      parts.join(", ") + (options.strict && counts.errors ? chalk.gray(" (warnings promoted by --strict)") : ""),
+    );
+  }
+
+  if (suppression.suppressed.length) {
+    const count = suppression.suppressed.length;
+    console.log();
+    logger.info(
+      chalk.gray(
+        `${count} finding${count === 1 ? "" : "s"} suppressed by agentfile-disable ` +
+          `directive${count === 1 ? "" : "s"} in the configuration.`,
+      ),
+    );
   }
 
   if (withdrawn > 0) {

@@ -23,6 +23,7 @@ import {
   printFindings,
   printHeader,
   printJson,
+  printSuppressed,
   rejectFormat,
   validationEnvelope,
 } from "../report.js";
@@ -31,6 +32,11 @@ export interface LintOptions {
   root?: string;
   format?: string;
   strict?: boolean;
+  /**
+   * Honour `agentfile-disable` directives. Commander sets this false for
+   * `--no-suppressions`, which is the "show me what we chose to ignore" view.
+   */
+  suppressions?: boolean;
   /** Always-loaded context budget, in estimated tokens. */
   budget?: string;
   /** Near-duplicate similarity threshold, 0–1. */
@@ -83,6 +89,7 @@ export async function lintCommand(options: LintOptions = {}): Promise<void> {
     strict: options.strict,
     budgetTokens,
     similarityThreshold,
+    suppressions: options.suppressions,
   });
 
   if (format === "json") {
@@ -115,6 +122,7 @@ export async function lintCommand(options: LintOptions = {}): Promise<void> {
 
   printCoverageGaps(result);
   printFindings(result, { cleanMessage: "Nothing to improve.", strict: options.strict });
+  printSuppressed(result);
 
   logger.info(
     chalk.gray(

@@ -21,6 +21,7 @@ import {
   printFindings,
   printHeader,
   printJson,
+  printSuppressed,
   rejectFormat,
   validationEnvelope,
 } from "../report.js";
@@ -32,6 +33,11 @@ export interface CheckOptions {
   format?: string;
   /** Treat warnings as errors. */
   strict?: boolean;
+  /**
+   * Honour `agentfile-disable` directives. Commander sets this false for
+   * `--no-suppressions`, which is the "show me what we chose to ignore" view.
+   */
+  suppressions?: boolean;
 }
 
 export async function checkCommand(options: CheckOptions = {}): Promise<void> {
@@ -39,7 +45,12 @@ export async function checkCommand(options: CheckOptions = {}): Promise<void> {
   if (!format) return rejectFormat(options.format as string);
 
   const root = options.root ?? process.cwd();
-  const result = runValidation({ root, layers: CHECK_LAYERS, strict: options.strict });
+  const result = runValidation({
+    root,
+    layers: CHECK_LAYERS,
+    strict: options.strict,
+    suppressions: options.suppressions,
+  });
 
   if (format === "json") {
     printJson(
@@ -69,5 +80,6 @@ export async function checkCommand(options: CheckOptions = {}): Promise<void> {
 
   printCoverageGaps(result);
   printFindings(result, { strict: options.strict });
+  printSuppressed(result);
   exitOnErrors(result);
 }
