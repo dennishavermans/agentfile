@@ -310,16 +310,23 @@ export function resourceDiagnostics(configuration: AgentConfiguration): Diagnost
       );
     }
 
-    const references = referencedPaths(skill.body);
-    const unreferenced = skill.resources.filter((resource) => !isReferenced(resource.path, references, skill.body));
+    // The description counts as pointing at a file, not just the body. It is
+    // the part of a skill that is always loaded, and a skill whose description
+    // says "see references/setup.md" has pointed at that file as plainly as the
+    // body could. Searching only the body reported real, linked resources as
+    // orphans — found by verifying agentfile's own findings against PostHog.
+    const mentions = `${skill.description}\n${skill.body}`;
+    const references = referencedPaths(mentions);
+    const unreferenced = skill.resources.filter((resource) => !isReferenced(resource.path, references, mentions));
 
     if (unreferenced.length) {
       diagnostics.push(
         diagnostic({
           code: "AGF105",
-          message: `Skill "${label(skill)}" bundles ${unreferenced.length} file${unreferenced.length === 1 ? "" : "s"} its body never mentions`,
+          message: `Skill "${label(skill)}" bundles ${unreferenced.length} file${unreferenced.length === 1 ? "" : "s"} nothing mentions`,
           explanation: [
-            "These files ship with the skill but nothing in the body points at them:",
+            "These files ship with the skill and neither its description nor its body",
+            "points at them:",
             "",
             ...unreferenced.slice(0, 5).map((resource) => `  ${resource.path} (${resource.kind})`),
             ...(unreferenced.length > 5 ? [`  …and ${unreferenced.length - 5} more`] : []),

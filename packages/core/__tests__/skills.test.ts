@@ -309,6 +309,43 @@ describe("resourceDiagnostics", () => {
     expect(found?.explanation).toContain("not necessarily broken");
   });
 
+  it("counts a file named in the description as referenced, not only in the body", () => {
+    // Found by verifying agentfile's own findings against PostHog: two skills
+    // point at their references from a multi-line `description:` and were
+    // reported as shipping orphaned files. The description is always loaded, so
+    // a mention there points at the file as plainly as the body could.
+    const found = resourceDiagnostics(
+      configurationOf(
+        skill({
+          description:
+            "Operating procedure for the sweep. Operators setting up the Loop: see references/loop-setup.md.",
+          body: "Run the sweep.",
+          resources: [{ path: "references/loop-setup.md", kind: "reference" }],
+        }),
+      ),
+    ).find((item) => item.data?.unreferenced);
+
+    expect(found).toBeUndefined();
+  });
+
+  it("still reports a file neither the description nor the body mentions", () => {
+    const found = resourceDiagnostics(
+      configurationOf(
+        skill({
+          description: "Operating procedure for the sweep. See references/loop-setup.md.",
+          body: "Run the sweep.",
+          resources: [
+            { path: "references/loop-setup.md", kind: "reference" },
+            { path: "references/orphan.md", kind: "reference" },
+          ],
+        }),
+      ),
+    ).find((item) => item.data?.unreferenced);
+
+    expect(found?.data?.unreferenced).toBe(1);
+    expect(found?.explanation).toContain("orphan.md");
+  });
+
   it("counts a file named in prose as referenced, not only a markdown link", () => {
     expect(
       resourceDiagnostics(
