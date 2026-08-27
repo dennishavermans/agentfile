@@ -16,7 +16,6 @@ import { lintCommand } from "./commands/lint.js";
 import { migrateCommand } from "./commands/migrate.js";
 import { rollbackCommand } from "./commands/rollback.js";
 import { syncCommand } from "./commands/sync.js";
-import { uiCommand } from "./commands/ui.js";
 import { validateCommand } from "./commands/validate.js";
 import { watchCommand } from "./commands/watch.js";
 
@@ -271,13 +270,18 @@ program
   .option("--dev", "Run UI in development mode")
   .option("--port <port>", "Port for the local dashboard", "4311")
   .option("--root <path>", "Project folder to inspect instead of the current working directory")
-  .action((options: { dev?: boolean; port: string; root?: string }) =>
-    uiCommand({
+  .action(async (options: { dev?: boolean; port: string; root?: string }) => {
+    // Imported here rather than at the top of the file: the dashboard pulls in
+    // an HTTP server and its dependencies, which is roughly half the startup
+    // cost of the whole CLI. `check` runs in a pre-commit hook and must not pay
+    // for a command it never calls.
+    const { uiCommand } = await import("./commands/ui.js");
+    await uiCommand({
       dev: options.dev,
       port: Number(options.port),
       root: options.root,
-    }),
-  );
+    });
+  });
 
 program.addHelpText(
   "after",

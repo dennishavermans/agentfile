@@ -20,7 +20,17 @@
  * an option such as dot-matching, is a single-file change.
  */
 
-import { matchesGlob } from "node:path";
+import { posix } from "node:path";
+
+/**
+ * Glob matching, pinned to POSIX semantics.
+ *
+ * `path.matchesGlob` resolves to the win32 implementation on Windows, which
+ * also treats `\` as a separator. Every path in the IR is normalised to POSIX
+ * form regardless of platform, so matching them with win32 rules would make the
+ * same repository resolve differently depending on who cloned it.
+ */
+const matchesGlob = posix.matchesGlob;
 
 /** The project root, expressed as a normalised path. */
 export const ROOT_PATH = "";

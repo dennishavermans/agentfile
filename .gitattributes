@@ -1,0 +1,12 @@
+# Line endings are normalised to LF in the repository and on checkout.
+#
+# Not a style preference. agentfile compares generated file content byte for
+# byte to decide whether output has drifted, so a CRLF checkout on Windows would
+# make `compile --check` report drift on files nothing had touched, forever.
+* text=auto eol=lf
+
+# Binary assets must never be normalised.
+*.png binary
+*.gif binary
+*.mp4 binary
+*.ico binary
