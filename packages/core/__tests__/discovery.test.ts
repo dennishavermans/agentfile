@@ -355,6 +355,44 @@ describe("discoverCursorRules", () => {
     const { fs, scan } = scanOf({ "/repo/.cursor/rules/a.mdc": "---\ndescription: Nice title\n---\n\nBody" });
     expect(discoverCursorRules(ROOT, scan, fs).instructions[0].title).toBe("Nice title");
   });
+
+  // A subproject's rule directory scopes its globs to that subproject. Matched
+  // at the repository root instead, `python/.cursor/rules` writing `globs: *.py`
+  // was called dead while python/conftest.py sat beside it, and called live
+  // whenever an unrelated *.py existed at the root.
+  it("scopes a nested rule's globs to the directory it governs", () => {
+    const { fs, scan } = scanOf({
+      "/repo/python/.cursor/rules/py.mdc": '---\nglobs: "*.py"\nalwaysApply: false\n---\n\nBody',
+    });
+
+    expect(discoverCursorRules(ROOT, scan, fs).instructions[0].applies).toEqual({
+      kind: "paths",
+      patterns: ["python/*.py"],
+    });
+  });
+
+  it("leaves a root rule's globs alone", () => {
+    const { fs, scan } = scanOf({
+      "/repo/.cursor/rules/py.mdc": '---\nglobs: "*.py"\nalwaysApply: false\n---\n\nBody',
+    });
+
+    expect(discoverCursorRules(ROOT, scan, fs).instructions[0].applies).toEqual({
+      kind: "paths",
+      patterns: ["*.py"],
+    });
+  });
+
+  // A leading slash is the author anchoring to the repository root themselves.
+  it("does not nest a pattern the author anchored to the root", () => {
+    const { fs, scan } = scanOf({
+      "/repo/python/.cursor/rules/py.mdc": '---\nglobs: "/scripts/*.py"\nalwaysApply: false\n---\n\nBody',
+    });
+
+    expect(discoverCursorRules(ROOT, scan, fs).instructions[0].applies).toEqual({
+      kind: "paths",
+      patterns: ["scripts/*.py"],
+    });
+  });
 });
 
 // ─── Copilot ───────────────────────────────────────────────────────────────

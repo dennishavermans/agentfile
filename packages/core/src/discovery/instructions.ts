@@ -28,6 +28,7 @@ import {
   findImports,
   governedDirectory,
   hierarchicalApplicability,
+  scopedPatterns,
   originFor,
   provenanceOf,
 } from "./shared.js";
@@ -152,7 +153,7 @@ export function discoverClaudeRules(root: string, scan: RepositoryScan, fs: File
       bodyLine: parsed.bodyLine,
       // A path-scoped rule is glob-scoped. An unscoped rule follows the file's
       // own position in the tree, matching how nested rule directories behave.
-      applies: paths?.length ? appliesToPaths(paths) : hierarchicalApplicability(file),
+      applies: paths?.length ? appliesToPaths(scopedPatterns(file, paths)) : hierarchicalApplicability(file),
       provenance,
     });
     result.sources.push(sourceOf(file, "claude", "rule", text));
@@ -188,7 +189,7 @@ export function discoverCursorRules(root: string, scan: RepositoryScan, fs: File
     const applies = alwaysApply
       ? ALWAYS
       : globs?.length
-        ? appliesToPaths(globs)
+        ? appliesToPaths(scopedPatterns(file, globs))
         : description
           ? MODEL_SELECTED
           : MANUAL;
