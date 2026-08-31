@@ -68,8 +68,15 @@ jobs:
           # this comment is the reason the list looks incomplete.
           git sparse-checkout set .claude .cursor .github .agents ai
 
-          echo "Files fetched:"
-          find . -path ./.git -prune -o -type f -print | head -50
+          # Not `find | head`: head closes the pipe once it has its 50 lines,
+          # find dies of SIGPIPE, and pipefail reports that as the pipeline's
+          # status, which set -e turns into a failed step before a single
+          # command has been run. Writing the list out first also makes the
+          # diagnostic more useful, because the total is what says whether the
+          # sparse checkout brought anything.
+          find . -path ./.git -prune -o -type f -print > "$RUNNER_TEMP/fetched.txt"
+          echo "Files fetched: $(wc -l < "$RUNNER_TEMP/fetched.txt")"
+          head -50 "$RUNNER_TEMP/fetched.txt"
 
       - name: Analyse
         run: |
