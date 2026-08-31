@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 /// <reference types="node" />
-import { Command } from "commander";
+import { existsSync, statSync } from "node:fs";
+import { resolve } from "node:path";
+import { Command, InvalidArgumentError } from "commander";
 import { adoptCommand } from "./commands/adopt.js";
 import { auditCommand } from "./commands/audit.js";
 import { checkCommand } from "./commands/check.js";
@@ -22,6 +24,31 @@ import { watchCommand } from "./commands/watch.js";
 import { VERSION } from "./version.js";
 
 const program = new Command();
+
+/**
+ * The exit-code contract (docs/stability.md): 1 is a fact about the
+ * repository, 2 is a fact about the invocation. Commander exits 1 for its own
+ * errors — an unknown option, a malformed argument — which a CI job reads as
+ * "findings at error severity". Route those to 2, and leave --help and -V at
+ * their exit 0.
+ */
+program.exitOverride((error) => {
+  process.exit(error.exitCode === 0 ? 0 : 2);
+});
+
+/**
+ * `--root` must name a directory that exists. Scanning a path that does not
+ * exist used to report "0 files, nothing to check" and exit 0 — a typo in a CI
+ * job read as a permanently clean repository. An unreadable repository is the
+ * contract's own example of exit 2.
+ */
+function rootDirectory(value: string): string {
+  const path = resolve(value);
+  if (!existsSync(path) || !statSync(path).isDirectory()) {
+    throw new InvalidArgumentError("no such directory.");
+  }
+  return path;
+}
 
 program
   .name("agentfile")
@@ -45,7 +72,7 @@ program
   .command("doctor")
   .helpGroup(ANALYSE)
   .description("Analyse the AI agent configuration already present in this repository")
-  .option("--root <path>", "Directory to analyse instead of the current working directory")
+  .option("--root <path>", "Directory to analyse instead of the current working directory", rootDirectory)
   .option("--format <format>", "Output format: human or json", "human")
   .option("--verbose", "List every configuration file found")
   .action((options: { root?: string; format?: string; verbose?: boolean }) => doctorCommand(options));
@@ -56,7 +83,7 @@ program
   .command("adopt")
   .helpGroup(ANALYSE)
   .description("Plan a single source of truth for the configuration already here")
-  .option("--root <path>", "Directory to adopt instead of the current working directory")
+  .option("--root <path>", "Directory to adopt instead of the current working directory", rootDirectory)
   .option("--source <platform>", "Platform to consolidate into: agents-md (default), claude, copilot")
   .option("--apply", "Carry the plan out. Without this, nothing is written")
   .option("--yes", "Skip the confirmation prompt")
@@ -69,7 +96,7 @@ program
   .command("check")
   .helpGroup(ANALYSE)
   .description("Fast deterministic validation, suitable for pre-commit hooks and editors")
-  .option("--root <path>", "Directory to check instead of the current working directory")
+  .option("--root <path>", "Directory to check instead of the current working directory", rootDirectory)
   .option("--format <format>", "Output format: human, json, or sarif", "human")
   .option("--strict", "Treat warnings as errors")
   .option("--max-warnings <count>", "Fail when warnings exceed this count")
@@ -83,7 +110,7 @@ program
   .command("validate")
   .helpGroup(ANALYSE)
   .description("Strict deterministic validation across every layer (used in CI)")
-  .option("--root <path>", "Directory to validate instead of the current working directory")
+  .option("--root <path>", "Directory to validate instead of the current working directory", rootDirectory)
   .option("--format <format>", "Output format: human, json, or sarif", "human")
   .option("--target <ide>", "Check compatibility against a target, repeatable, or 'all'", collect, [] as string[])
   .option("--strict", "Treat warnings as errors")
@@ -106,7 +133,7 @@ program
   .command("lint")
   .helpGroup(ANALYSE)
   .description("Analyse configuration quality: drifted copies, duplication, context cost")
-  .option("--root <path>", "Directory to analyse instead of the current working directory")
+  .option("--root <path>", "Directory to analyse instead of the current working directory", rootDirectory)
   .option("--format <format>", "Output format: human, json, or sarif", "human")
   .option("--budget <tokens>", "Always-loaded context budget, in estimated tokens")
   .option("--similarity <ratio>", "Near-duplicate similarity threshold between 0 and 1")
@@ -129,7 +156,7 @@ program
   .command("audit")
   .helpGroup(ANALYSE)
   .description("Security and trust analysis of hooks, skills, MCP servers, and permissions")
-  .option("--root <path>", "Directory to audit instead of the current working directory")
+  .option("--root <path>", "Directory to audit instead of the current working directory", rootDirectory)
   .option("--format <format>", "Output format: human, json, or sarif", "human")
   .option("--strict", "Treat warnings as errors")
   .option("--all", "Include informational findings, which record rather than flag")
@@ -143,7 +170,7 @@ program
   .helpGroup(ANALYSE)
   .argument("<path>", "File or directory to resolve the effective configuration for")
   .description("Show which configuration applies to a path, in load order, and why")
-  .option("--root <path>", "Directory to resolve against instead of the current working directory")
+  .option("--root <path>", "Directory to resolve against instead of the current working directory", rootDirectory)
   .option("--format <format>", "Output format: human or json", "human")
   .option("--excluded", "List everything that did not apply, with the reason")
   .action((path: string, options: { root?: string; format?: string; excluded?: boolean }) =>
@@ -155,7 +182,7 @@ program
   .helpGroup(ANALYSE)
   .argument("<target>", "A file path, a skill or subagent name, or part of a rule's text")
   .description("Explain where a piece of configuration comes from and when it applies")
-  .option("--root <path>", "Directory to resolve against instead of the current working directory")
+  .option("--root <path>", "Directory to resolve against instead of the current working directory", rootDirectory)
   .option("--format <format>", "Output format: human or json", "human")
   .option("--at <path>", "Ask whether it applies to a specific file")
   .option("--kind <kind>", "Restrict to one kind when the target is ambiguous")
@@ -176,7 +203,7 @@ program
   .helpGroup(GENERATE)
   .description("Compile the normalized configuration into native target files")
   .option("--target <targets...>", "Targets to compile: agents-md, claude, copilot, cursor (repeatable)")
-  .option("--root <path>", "Directory to compile instead of the current working directory")
+  .option("--root <path>", "Directory to compile instead of the current working directory", rootDirectory)
   .option("--check", "Verify outputs are up to date instead of writing (exit 1 on drift)")
   .option("--force", "Overwrite files agentfile does not own")
   .option("--format <format>", "Output format: human or json", "human")
@@ -190,7 +217,7 @@ program
   .description("Run behavioral evals: an agent task in a sandbox, judged by deterministic assertions")
   .argument("[files...]", "Eval definition files (default: every *.eval.yaml in the repository)")
   .option("--agent <template>", 'Agent command template, e.g. "claude -p {prompt}"')
-  .option("--root <path>", "Directory to run in instead of the current working directory")
+  .option("--root <path>", "Directory to run in instead of the current working directory", rootDirectory)
   .option("--no-cache", "Re-run evals even when definition, agent, and repository state are unchanged")
   .option("--keep-workspace", "Leave each eval's temporary workspace on disk for inspection")
   .option("--format <format>", "Output format: human or json", "human")
@@ -285,7 +312,7 @@ program
   .description("Legacy: start the local dashboard for ai/contract.yaml")
   .option("--dev", "Run UI in development mode")
   .option("--port <port>", "Port for the local dashboard", "4311")
-  .option("--root <path>", "Project folder to inspect instead of the current working directory")
+  .option("--root <path>", "Project folder to inspect instead of the current working directory", rootDirectory)
   .action(async (options: { dev?: boolean; port: string; root?: string }) => {
     // Imported here rather than at the top of the file: the dashboard pulls in
     // an HTTP server and its dependencies, which is roughly half the startup
