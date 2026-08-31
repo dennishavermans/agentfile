@@ -1,7 +1,12 @@
 /// <reference types="node" />
 import { existsSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
+// At file scope rather than inside each test: a dynamic import in the first
+// test body charges that test's 5s timeout for the whole cold transform of
+// the module graph. vi.mock is hoisted, so the mocks still apply.
+import { validateContract } from "@agentfile/core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { initCommand } from "../src/commands/init.js";
 
 // ─── Test Directory ────────────────────────────────────────────────────────
 
@@ -51,7 +56,6 @@ describe("init command", () => {
   });
 
   it("creates ai/contract.yaml with correct project name and stack", async () => {
-    const { initCommand } = await import("../src/commands/init.js");
     await initCommand();
 
     expect(fileExists("ai/contract.yaml")).toBe(true);
@@ -62,7 +66,6 @@ describe("init command", () => {
   });
 
   it("creates agent config and template for each default agent", async () => {
-    const { initCommand } = await import("../src/commands/init.js");
     await initCommand();
 
     for (const agent of ["claude", "copilot", "cursor"]) {
@@ -72,7 +75,6 @@ describe("init command", () => {
   });
 
   it("creates .ai-agents with the selected agents", async () => {
-    const { initCommand } = await import("../src/commands/init.js");
     await initCommand();
 
     expect(fileExists(".ai-agents")).toBe(true);
@@ -82,14 +84,12 @@ describe("init command", () => {
   });
 
   it("creates .ai-agents.example", async () => {
-    const { initCommand } = await import("../src/commands/init.js");
     await initCommand();
 
     expect(fileExists(".ai-agents.example")).toBe(true);
   });
 
   it("creates CI workflow file", async () => {
-    const { initCommand } = await import("../src/commands/init.js");
     await initCommand();
 
     expect(fileExists(".github/workflows/ai-contract.yml")).toBe(true);
@@ -99,7 +99,6 @@ describe("init command", () => {
   });
 
   it("does not overwrite existing files on re-run", async () => {
-    const { initCommand } = await import("../src/commands/init.js");
     await initCommand();
 
     // Mutate the contract file
@@ -114,10 +113,8 @@ describe("init command", () => {
   });
 
   it("generated contract.yaml passes core schema validation", async () => {
-    const { initCommand } = await import("../src/commands/init.js");
     await initCommand();
 
-    const { validateContract } = await import("@agentfile/core");
     const contractPath = join(TEST_DIR, "ai", "contract.yaml");
 
     expect(() => validateContract({ contractPath })).not.toThrow();

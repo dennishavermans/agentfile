@@ -1,7 +1,14 @@
 /// <reference types="node" />
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+// Imported at file scope, not inside each test. A dynamic import in the first
+// test body pays the whole cold transform of this module graph against that
+// test's 5s timeout, which is what made the first test in this file fail on
+// Windows while the other 30 hit a warm module cache. vi.mock below is
+// hoisted by vitest, so a static import still receives the mocked enquirer.
+import { validateContract } from "@agentfile/core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { mergeFiles, migrateCommand, parseAgentFile } from "../src/commands/migrate.js";
 
 // ─── Test Directory ────────────────────────────────────────────────────────
 
@@ -137,7 +144,6 @@ describe("parseAgentFile", () => {
 
   it("extracts project name and stack from metadata lines", async () => {
     const path = writeFixture("CLAUDE.md", CLAUDE_MD);
-    const { parseAgentFile } = await import("../src/commands/migrate.js");
 
     const result = parseAgentFile(path);
     expect(result.projectName).toBe("Billit App");
@@ -146,7 +152,6 @@ describe("parseAgentFile", () => {
 
   it("extracts coding rules from matching heading", async () => {
     const path = writeFixture("CLAUDE.md", CLAUDE_MD);
-    const { parseAgentFile } = await import("../src/commands/migrate.js");
 
     const result = parseAgentFile(path);
     expect(result.rules.coding).toContain("Use strict TypeScript types");
@@ -156,7 +161,6 @@ describe("parseAgentFile", () => {
 
   it("extracts architecture rules", async () => {
     const path = writeFixture("CLAUDE.md", CLAUDE_MD);
-    const { parseAgentFile } = await import("../src/commands/migrate.js");
 
     const result = parseAgentFile(path);
     expect(result.rules.architecture).toContain("Follow feature-based folder structure");
@@ -165,7 +169,6 @@ describe("parseAgentFile", () => {
 
   it("extracts testing rules", async () => {
     const path = writeFixture("CLAUDE.md", CLAUDE_MD);
-    const { parseAgentFile } = await import("../src/commands/migrate.js");
 
     const result = parseAgentFile(path);
     expect(result.rules.testing).toContain("Write tests with React Native Testing Library");
@@ -174,7 +177,6 @@ describe("parseAgentFile", () => {
 
   it("extracts naming rules", async () => {
     const path = writeFixture("CLAUDE.md", CLAUDE_MD);
-    const { parseAgentFile } = await import("../src/commands/migrate.js");
 
     const result = parseAgentFile(path);
     expect(result.rules.naming).toContain("Use kebab-case for feature folders");
@@ -183,7 +185,6 @@ describe("parseAgentFile", () => {
 
   it("extracts skills from a Skills container section", async () => {
     const path = writeFixture("CLAUDE.md", CLAUDE_MD);
-    const { parseAgentFile } = await import("../src/commands/migrate.js");
 
     const result = parseAgentFile(path);
     expect(result.skills).toHaveLength(1);
@@ -192,7 +193,6 @@ describe("parseAgentFile", () => {
 
   it("extracts skill description", async () => {
     const path = writeFixture("CLAUDE.md", CLAUDE_MD);
-    const { parseAgentFile } = await import("../src/commands/migrate.js");
 
     const result = parseAgentFile(path);
     expect(result.skills[0].description).toContain("feature component");
@@ -200,7 +200,6 @@ describe("parseAgentFile", () => {
 
   it("extracts skill steps from numbered list under **Steps:**", async () => {
     const path = writeFixture("CLAUDE.md", CLAUDE_MD);
-    const { parseAgentFile } = await import("../src/commands/migrate.js");
 
     const result = parseAgentFile(path);
     const steps = result.skills[0].steps;
@@ -210,7 +209,6 @@ describe("parseAgentFile", () => {
 
   it("extracts expected output", async () => {
     const path = writeFixture("CLAUDE.md", CLAUDE_MD);
-    const { parseAgentFile } = await import("../src/commands/migrate.js");
 
     const result = parseAgentFile(path);
     expect(result.skills[0].expected_output).toContain("React Native component");
@@ -219,7 +217,6 @@ describe("parseAgentFile", () => {
   it("handles a file with no recognizable project metadata without crashing", async () => {
     const minimal = `# My Rules\n\n## Coding Rules\n\n- Use semicolons\n`;
     const path = writeFixture("minimal.md", minimal);
-    const { parseAgentFile } = await import("../src/commands/migrate.js");
 
     const result = parseAgentFile(path);
     expect(result.projectName).toBeUndefined();
@@ -239,7 +236,6 @@ describe("mergeFiles", () => {
   it("deduplicates identical rules across files", async () => {
     const p1 = writeFixture("A.md", CLAUDE_MD);
     const p2 = writeFixture("B.md", COPILOT_MD);
-    const { parseAgentFile, mergeFiles } = await import("../src/commands/migrate.js");
 
     const merged = mergeFiles([parseAgentFile(p1), parseAgentFile(p2)]);
 
@@ -251,7 +247,6 @@ describe("mergeFiles", () => {
   it("includes unique rules from both files", async () => {
     const p1 = writeFixture("A.md", CLAUDE_MD);
     const p2 = writeFixture("B.md", COPILOT_MD);
-    const { parseAgentFile, mergeFiles } = await import("../src/commands/migrate.js");
 
     const merged = mergeFiles([parseAgentFile(p1), parseAgentFile(p2)]);
 
@@ -262,7 +257,6 @@ describe("mergeFiles", () => {
   it("merges skills from multiple files by name", async () => {
     const p1 = writeFixture("A.md", CLAUDE_MD);
     const p2 = writeFixture("B.md", COPILOT_MD);
-    const { parseAgentFile, mergeFiles } = await import("../src/commands/migrate.js");
 
     const merged = mergeFiles([parseAgentFile(p1), parseAgentFile(p2)]);
 
@@ -276,7 +270,6 @@ describe("mergeFiles", () => {
     const dup = CLAUDE_MD;
     const p1 = writeFixture("A.md", dup);
     const p2 = writeFixture("B.md", dup);
-    const { parseAgentFile, mergeFiles } = await import("../src/commands/migrate.js");
 
     const merged = mergeFiles([parseAgentFile(p1), parseAgentFile(p2)]);
 
@@ -291,7 +284,6 @@ describe("mergeFiles", () => {
     );
     const p1 = writeFixture("A.md", CLAUDE_MD);
     const p2 = writeFixture("B.md", alt);
-    const { parseAgentFile, mergeFiles } = await import("../src/commands/migrate.js");
 
     const merged = mergeFiles([parseAgentFile(p1), parseAgentFile(p2)]);
 
@@ -314,7 +306,6 @@ describe("migrateCommand", () => {
 
   it("writes ai/contract.yaml from a single source file", async () => {
     const src = writeFixture("CLAUDE.md", CLAUDE_MD);
-    const { migrateCommand } = await import("../src/commands/migrate.js");
 
     await migrateCommand({ from: [src] });
 
@@ -323,7 +314,6 @@ describe("migrateCommand", () => {
 
   it("generated contract.yaml contains extracted rules", async () => {
     const src = writeFixture("CLAUDE.md", CLAUDE_MD);
-    const { migrateCommand } = await import("../src/commands/migrate.js");
 
     await migrateCommand({ from: [src] });
 
@@ -336,7 +326,6 @@ describe("migrateCommand", () => {
 
   it("generated contract.yaml contains extracted skills", async () => {
     const src = writeFixture("CLAUDE.md", CLAUDE_MD);
-    const { migrateCommand } = await import("../src/commands/migrate.js");
 
     await migrateCommand({ from: [src] });
 
@@ -346,18 +335,15 @@ describe("migrateCommand", () => {
 
   it("generated contract.yaml passes core schema validation", async () => {
     const src = writeFixture("CLAUDE.md", CLAUDE_MD);
-    const { migrateCommand } = await import("../src/commands/migrate.js");
 
     await migrateCommand({ from: [src] });
 
-    const { validateContract } = await import("@agentfile/core");
     const contractPath = join(TEST_DIR, "ai", "contract.yaml");
     expect(() => validateContract({ contractPath })).not.toThrow();
   });
 
   it("dry-run does not write any files", async () => {
     const src = writeFixture("CLAUDE.md", CLAUDE_MD);
-    const { migrateCommand } = await import("../src/commands/migrate.js");
 
     await migrateCommand({ from: [src], dryRun: true });
 
@@ -367,7 +353,6 @@ describe("migrateCommand", () => {
   it("writes to a custom --output path", async () => {
     const src = writeFixture("CLAUDE.md", CLAUDE_MD);
     const outputPath = join(TEST_DIR, "custom", "output.yaml");
-    const { migrateCommand } = await import("../src/commands/migrate.js");
 
     await migrateCommand({ from: [src], output: outputPath });
 
@@ -377,7 +362,6 @@ describe("migrateCommand", () => {
   it("merges rules from multiple --from files", async () => {
     const p1 = writeFixture("A.md", CLAUDE_MD);
     const p2 = writeFixture("B.md", COPILOT_MD);
-    const { migrateCommand } = await import("../src/commands/migrate.js");
 
     await migrateCommand({ from: [p1, p2] });
 
@@ -387,8 +371,6 @@ describe("migrateCommand", () => {
   });
 
   it("exits with an error when a --from file does not exist", async () => {
-    const { migrateCommand } = await import("../src/commands/migrate.js");
-
     const exitSpy = vi.spyOn(process, "exit").mockImplementation((() => {}) as never);
 
     await migrateCommand({ from: ["/nonexistent/file.md"] });
@@ -397,8 +379,6 @@ describe("migrateCommand", () => {
   });
 
   it("exits with an error when no --from files are provided", async () => {
-    const { migrateCommand } = await import("../src/commands/migrate.js");
-
     const exitSpy = vi.spyOn(process, "exit").mockImplementation((() => {}) as never);
 
     await migrateCommand({ from: [] });
@@ -429,8 +409,6 @@ describe("migrate --targets / --exclude", () => {
     mkdirSync(join(TEST_DIR, ".claude"), { recursive: true });
     const claudeFile = writeFixture(".claude/CLAUDE.md", CLAUDE_MD);
 
-    const { migrateCommand } = await import("../src/commands/migrate.js");
-
     await migrateCommand({
       from: [copilotFile, claudeFile],
       targets: ["copilot"],
@@ -449,8 +427,6 @@ describe("migrate --targets / --exclude", () => {
     mkdirSync(join(TEST_DIR, ".claude"), { recursive: true });
     const claudeFile = writeFixture(".claude/CLAUDE.md", CLAUDE_MD);
 
-    const { migrateCommand } = await import("../src/commands/migrate.js");
-
     await migrateCommand({
       from: [copilotFile, claudeFile],
       exclude: ["copilot"],
@@ -467,7 +443,6 @@ describe("migrate --targets / --exclude", () => {
     mkdirSync(join(TEST_DIR, ".github"), { recursive: true });
     const copilotFile = writeFixture(".github/copilot-instructions.md", COPILOT_MD);
 
-    const { migrateCommand } = await import("../src/commands/migrate.js");
     const exitSpy = vi.spyOn(process, "exit").mockImplementation((() => {}) as never);
 
     await migrateCommand({
@@ -495,7 +470,6 @@ describe("migrate --replace-policy", () => {
 
   it("keeps source files with replace-policy keep (default)", async () => {
     const file = writeFixture("instructions.md", CLAUDE_MD);
-    const { migrateCommand } = await import("../src/commands/migrate.js");
 
     await migrateCommand({ from: [file], replacePolicy: "keep" });
 
@@ -504,7 +478,6 @@ describe("migrate --replace-policy", () => {
 
   it("deletes source files with replace-policy delete", async () => {
     const file = writeFixture("instructions.md", CLAUDE_MD);
-    const { migrateCommand } = await import("../src/commands/migrate.js");
 
     await migrateCommand({ from: [file], replacePolicy: "delete" });
 
@@ -513,7 +486,6 @@ describe("migrate --replace-policy", () => {
 
   it("archives source files with replace-policy archive", async () => {
     const file = writeFixture("instructions.md", CLAUDE_MD);
-    const { migrateCommand } = await import("../src/commands/migrate.js");
 
     await migrateCommand({ from: [file], replacePolicy: "archive" });
 
@@ -526,7 +498,6 @@ describe("migrate --replace-policy", () => {
 
   it("creates a backup before writing with replace-policy delete", async () => {
     const file = writeFixture("instructions.md", CLAUDE_MD);
-    const { migrateCommand } = await import("../src/commands/migrate.js");
 
     await migrateCommand({ from: [file], replacePolicy: "delete" });
 
