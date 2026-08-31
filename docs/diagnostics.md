@@ -54,6 +54,18 @@ finding it was meant to silence. A warning rather than an error: a stale
 directive is untidy, not broken, and failing a build over one would push people
 towards blanket `agentfile-disable` comments that silence everything.
 
+### `AGF006` scan-truncated · warning · active
+The repository scan hit a limit and stopped early, so agentfile did not read
+every file. Nothing in the configuration is necessarily wrong; the report is
+simply incomplete, and every finding below it that rests on absence — a
+reference that "does not exist", a glob that matches "nothing" — is weaker than
+it looks. Raise the scan limits, or exclude large generated directories, and run
+it again.
+
+Reported under its own code since 2.0.0. Before that it shared `AGF002` with
+"configuration file not found", which meant `agentfile rule AGF002` explained
+the wrong problem and turning one off silenced the other.
+
 Directives are written as a comment in the configuration file itself, in
 whichever comment syntax that file already uses:
 

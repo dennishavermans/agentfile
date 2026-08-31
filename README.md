@@ -378,7 +378,7 @@ skipped exactly when there is something to upload.
 | --- | --- | --- |
 | `command` | `check` | `check`, `validate`, `lint` or `audit` — the four that produce findings against a file |
 | `root` | `.` | directory to analyse |
-| `version` | `next` | version or dist-tag of `@agentfile/cli`; pin it for a reproducible job |
+| `version` | `latest` | version or dist-tag of `@agentfile/cli`; pin an exact version for a job that cannot change under you |
 | `sarif-file` | `agentfile.sarif` | where to write SARIF; empty string skips it |
 | `fail-on-findings` | `true` | whether findings fail the step |
 | `args` | none | extra arguments, e.g. `--strict` or `--max-warnings 5` |
@@ -394,9 +394,6 @@ skipped exactly when there is something to upload.
 Running more than one command means more than one upload, and each needs its
 own `category` (`agentfile-check`, `agentfile-audit`) or the second will close
 the first one's alerts.
-
-`version` defaults to `next` because 2.0 is in beta and `latest` still points at
-the v1 CLI. That default becomes `latest` at 2.0 stable.
 
 ---
 

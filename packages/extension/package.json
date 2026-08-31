@@ -114,7 +114,7 @@
     "publish:openvsx": "ovsx publish *.vsix"
   },
   "dependencies": {
-    "@agentfile/core": "^2.0.0-beta.3",
+    "@agentfile/core": "^2.0.0",
     "yaml": "^2.9.0"
   },
   "devDependencies": {

@@ -27,9 +27,9 @@ inputs:
     required: false
     default: .
   version:
-    description: 'Version or dist-tag of @agentfile/cli to run. Pin this for a reproducible job; `next` is the 2.0 line while it is in beta, and becomes `latest` at 2.0 stable.'
+    description: 'Version or dist-tag of @agentfile/cli to run. Pin it to an exact version for a job that cannot change under you.'
     required: false
-    default: next
+    default: latest
   sarif-file:
     description: Path to write the SARIF log to. Set to an empty string to skip SARIF entirely.
     required: false
