@@ -378,7 +378,7 @@ skipped exactly when there is something to upload.
 | --- | --- | --- |
 | `command` | `check` | `check`, `validate`, `lint` or `audit` — the four that produce findings against a file |
 | `root` | `.` | directory to analyse |
-| `version` | `next` | version or dist-tag of `@agentfile/cli`; pin an exact version for a job that cannot change under you |
+| `version` | `latest` | version or dist-tag of `@agentfile/cli`; pin an exact version for a job that cannot change under you |
 | `sarif-file` | `agentfile.sarif` | where to write SARIF; empty string skips it |
 | `fail-on-findings` | `true` | whether findings fail the step |
 | `args` | none | extra arguments, e.g. `--strict` or `--max-warnings 5` |
