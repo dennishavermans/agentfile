@@ -1,0 +1,123 @@
+# Dogfooding the action.
+#
+# An action that is never run is exactly the failure mode agentfile describes,
+# so this runs it two ways on every change: once against a fixture with known
+# defects, to prove it reports and counts them, and once against this
+# repository the way the README tells people to wire it up, to prove the SARIF
+# it produces is something GitHub actually accepts.
+name: Action
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fixture:
+    name: Reports and counts known defects
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      # Two defects a human reads straight past: a bare * opens a YAML alias
+      # rather than a glob, so neither rule's frontmatter parses at all.
+      - name: Write a fixture with defects we can count
+        run: |
+          mkdir -p subject/.cursor/rules
+          cat > subject/.cursor/rules/python.mdc <<'RULE'
+          ---
+          description: Python rules
+          globs: *.py
+          ---
+          Use type hints.
+          RULE
+          cat > subject/AGENTS.md <<'DOC'
+          # Conventions
+          Use type hints.
+          DOC
+
+      - id: scan
+        uses: ./
+        with:
+          root: subject
+          fail-on-findings: false
+          sarif-file: fixture.sarif
+
+      - name: Assert it found them
+        run: |
+          set -euo pipefail
+          echo "exit-code=${{ steps.scan.outputs.exit-code }} findings=${{ steps.scan.outputs.findings }} errors=${{ steps.scan.outputs.errors }}"
+
+          test "${{ steps.scan.outputs.exit-code }}" = "1" \
+            || { echo "::error::expected exit 1 (findings), got '${{ steps.scan.outputs.exit-code }}'"; exit 1; }
+          test "${{ steps.scan.outputs.findings }}" -ge 1 \
+            || { echo "::error::expected at least one finding"; exit 1; }
+          test -s fixture.sarif \
+            || { echo "::error::no SARIF written"; exit 1; }
+
+          # A SARIF log GitHub will reject is worse than none, so check the
+          # shape rather than just that the file exists.
+          node -e '
+            const s = JSON.parse(require("node:fs").readFileSync("fixture.sarif", "utf8"));
+            if (s.version !== "2.1.0") throw new Error("unexpected SARIF version " + s.version);
+            const run = s.runs?.[0];
+            if (!run?.tool?.driver?.name) throw new Error("no tool driver");
+            if (!Array.isArray(run.results) || run.results.length === 0) throw new Error("no results");
+            for (const r of run.results) {
+              if (!r.ruleId) throw new Error("a result has no ruleId");
+              if (!r.locations?.[0]?.physicalLocation?.artifactLocation?.uri) {
+                throw new Error(r.ruleId + " has no file location");
+              }
+            }
+            console.log("SARIF ok:", run.results.length, "results from", run.tool.driver.name, run.tool.driver.version);
+          '
+
+  gating:
+    name: Gates the build when findings are present
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - run: |
+          mkdir -p subject/.cursor/rules
+          printf -- '---\ndescription: Python rules\nglobs: *.py\n---\nUse type hints.\n' > subject/.cursor/rules/python.mdc
+          printf '# Conventions\nUse type hints.\n' > subject/AGENTS.md
+
+      - id: gated
+        uses: ./
+        continue-on-error: true
+        with:
+          root: subject
+          fail-on-findings: true
+
+      # The default has to actually gate, or every adopter silently gets a
+      # reporting-only linter while believing their build is protected.
+      - name: The step must have failed
+        run: |
+          test "${{ steps.gated.outcome }}" = "failure" \
+            || { echo "::error::fail-on-findings: true did not fail the step"; exit 1; }
+          echo "gating works: outcome=${{ steps.gated.outcome }}"
+
+  self:
+    name: Wired up the way the README says
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: ./
+        id: agentfile
+        with:
+          fail-on-findings: false
+
+      - uses: github/codeql-action/upload-sarif@v4
+        if: always() && steps.agentfile.outputs.sarif-file != ''
+        with:
+          sarif_file: ${{ steps.agentfile.outputs.sarif-file }}
+          category: agentfile-check

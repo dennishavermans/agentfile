@@ -1,0 +1,171 @@
+# agentfile as two lines of YAML.
+#
+# A linter nobody remembers to run is a linter that reports nothing, which is
+# the same failure agentfile exists to describe. This is a composite action
+# rather than a Docker one so it starts in about a second and reuses whatever
+# Node the job already has.
+#
+# The action writes SARIF and stops there; it deliberately does not upload it.
+# Uploading needs `security-events: write`, and a security-adjacent tool should
+# make a job asking for that permission say so out loud rather than acquire it
+# as a side effect of a step called "run the linter".
+name: agentfile
+description: Find what is wrong with the AI agent configuration your repository already has.
+author: Dennis Havermans
+
+branding:
+  icon: check-circle
+  color: purple
+
+inputs:
+  command:
+    description: 'Analysis to run: check, validate, lint or audit. These are the four that produce findings against a file, so they are the four SARIF can describe.'
+    required: false
+    default: check
+  root:
+    description: Directory to analyse, relative to the workspace.
+    required: false
+    default: .
+  version:
+    description: 'Version or dist-tag of @agentfile/cli to run. Pin this for a reproducible job; `next` is the 2.0 line while it is in beta, and becomes `latest` at 2.0 stable.'
+    required: false
+    default: next
+  sarif-file:
+    description: Path to write the SARIF log to. Set to an empty string to skip SARIF entirely.
+    required: false
+    default: agentfile.sarif
+  fail-on-findings:
+    description: Fail the step when findings are reported. Set false to report without gating, which is the usual first step when adopting it on an existing repository.
+    required: false
+    default: 'true'
+  args:
+    description: Extra arguments appended to the command, for example `--strict` or `--max-warnings 5`.
+    required: false
+    default: ''
+
+outputs:
+  exit-code:
+    description: 'The CLI exit code: 0 clean, 1 findings, 2 the tool could not run.'
+    value: ${{ steps.run.outputs.exit-code }}
+  findings:
+    description: Total number of findings.
+    value: ${{ steps.run.outputs.findings }}
+  errors:
+    description: Number of findings at error severity.
+    value: ${{ steps.run.outputs.errors }}
+  warnings:
+    description: Number of findings at warning severity.
+    value: ${{ steps.run.outputs.warnings }}
+  sarif-file:
+    description: Path to the SARIF log, empty when SARIF was not requested.
+    value: ${{ steps.run.outputs.sarif-file }}
+
+runs:
+  using: composite
+  steps:
+    # Only install Node when the runner cannot already satisfy the engines
+    # constraint. Unconditionally calling setup-node here would silently change
+    # the Node version of the job that included us, which is rude for an action
+    # whose whole job is to read some files.
+    - id: node
+      shell: bash
+      run: |
+        if command -v node >/dev/null 2>&1 && [ "$(node -p 'process.versions.node.split(".")[0]')" -ge 22 ]; then
+          echo "satisfied=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "satisfied=false" >> "$GITHUB_OUTPUT"
+        fi
+
+    - if: steps.node.outputs.satisfied != 'true'
+      uses: actions/setup-node@v4
+      with:
+        node-version: 22
+
+    - id: run
+      shell: bash
+      env:
+        AGENTFILE_COMMAND: ${{ inputs.command }}
+        AGENTFILE_ROOT: ${{ inputs.root }}
+        AGENTFILE_VERSION: ${{ inputs.version }}
+        AGENTFILE_SARIF: ${{ inputs.sarif-file }}
+        AGENTFILE_FAIL: ${{ inputs.fail-on-findings }}
+        AGENTFILE_ARGS: ${{ inputs.args }}
+      run: |
+        set -uo pipefail
+        # GitHub runs this as `bash -e`, and exit 1 means findings, which is an
+        # expected outcome we have to inspect rather than die on.
+        set +e
+
+        case "$AGENTFILE_COMMAND" in
+          check|validate|lint|audit) ;;
+          *)
+            echo "::error::Unsupported command '$AGENTFILE_COMMAND'. Use check, validate, lint or audit."
+            exit 2
+            ;;
+        esac
+
+        PKG="@agentfile/cli@${AGENTFILE_VERSION}"
+        # shellcheck disable=SC2206
+        EXTRA=($AGENTFILE_ARGS)
+
+        # The human run is what a person reads in the log, so it goes first and
+        # its exit code is the one that decides the step.
+        echo "::group::agentfile $AGENTFILE_COMMAND"
+        npx --yes "$PKG" "$AGENTFILE_COMMAND" --root "$AGENTFILE_ROOT" ${EXTRA[@]+"${EXTRA[@]}"}
+        code=$?
+        echo "::endgroup::"
+
+        if [ "$code" -gt 1 ]; then
+          echo "::error::agentfile could not run (exit $code). This is a problem with the invocation or the tool, not with the repository."
+          echo "exit-code=$code" >> "$GITHUB_OUTPUT"
+          echo "sarif-file=" >> "$GITHUB_OUTPUT"
+          exit "$code"
+        fi
+
+        errors=0; warnings=0; findings=0; sarif_out=""
+
+        if [ -n "$AGENTFILE_SARIF" ]; then
+          # Written before the step can fail, so an `if: always()` upload step
+          # still has something to upload when findings gate the build.
+          mkdir -p "$(dirname "$AGENTFILE_SARIF")"
+          npx --yes "$PKG" "$AGENTFILE_COMMAND" --root "$AGENTFILE_ROOT" --format sarif ${EXTRA[@]+"${EXTRA[@]}"} > "$AGENTFILE_SARIF"
+          sarif_code=$?
+          if [ "$sarif_code" -gt 1 ]; then
+            echo "::error::agentfile could not produce SARIF (exit $sarif_code)."
+            exit "$sarif_code"
+          fi
+          sarif_out="$AGENTFILE_SARIF"
+
+          read -r findings errors warnings < <(node -e '
+            const fs = require("node:fs");
+            let results = [];
+            try { results = JSON.parse(fs.readFileSync(process.argv[1], "utf8")).runs?.[0]?.results ?? []; } catch {}
+            const at = (level) => results.filter((r) => r.level === level).length;
+            console.log(results.length, at("error"), at("warning"));
+          ' "$AGENTFILE_SARIF")
+
+          {
+            echo "### agentfile $AGENTFILE_COMMAND"
+            echo
+            echo "| severity | count |"
+            echo "| --- | --- |"
+            echo "| error | $errors |"
+            echo "| warning | $warnings |"
+            echo "| total | $findings |"
+          } >> "$GITHUB_STEP_SUMMARY"
+        fi
+
+        {
+          echo "exit-code=$code"
+          echo "findings=$findings"
+          echo "errors=$errors"
+          echo "warnings=$warnings"
+          echo "sarif-file=$sarif_out"
+        } >> "$GITHUB_OUTPUT"
+
+        if [ "$code" -eq 1 ] && [ "$AGENTFILE_FAIL" = "true" ]; then
+          echo "::error::agentfile $AGENTFILE_COMMAND reported findings. Set fail-on-findings: false to report without gating."
+          exit 1
+        fi
+
+        exit 0
