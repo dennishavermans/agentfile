@@ -80,6 +80,14 @@ jobs:
 
       - name: Analyse
         run: |
+          # GitHub runs `run:` blocks as `bash -e {0}`, so -e is already on
+          # before the first line of this script and `set -uo pipefail` does
+          # not turn it off. Findings exit 1 and are the expected outcome on
+          # these repositories, so -e has to be switched off explicitly or the
+          # step dies on the first command that finds anything — which is what
+          # made every repository except expo fail here, and made the exit code
+          # handling below unreachable.
+          set +e
           set -uo pipefail
           BIN="$GITHUB_WORKSPACE/agentfile/packages/cli/dist/bin.js"
           failed=0
@@ -128,6 +136,10 @@ jobs:
       - name: Summarise what was found
         if: always()
         run: |
+          # Same reason as the Analyse step: -e arrives from the runner. A
+          # summary of a failed run is exactly when a report is unreadable, and
+          # reporting that must not itself fail the job.
+          set +e
           set -uo pipefail
           {
             echo "### ${{ matrix.repository }}"
