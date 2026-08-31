@@ -53,9 +53,9 @@
   "devDependencies": {
     "@agentfile/ui": "^0.1.0-beta.0",
     "@types/node": "^22.19.0",
-    "tsx": "^4.21.0",
+    "tsx": "^4.23.12",
     "typescript": "^6.0.2",
-    "vitest": "^4.1.0"
+    "vitest": "^4.1.11"
   },
   "peerDependencies": {
     "@agentfile/ui": "^0.1.0-beta.0"
