@@ -9,6 +9,57 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.0.1] — 2026-08-31
+
+Five correctness fixes, all found by running 2.0.0 against a repository small
+enough to sit under the scan cap. Truncation had been hiding them: on a large
+monorepo the bounded-scan guard suppresses exactly the checks that were wrong,
+so none of these could surface until the scan was complete.
+
+### Fixed
+
+- **A nested rule directory now scopes its globs to what it governs.** Cursor
+  and Claude both let a subproject carry its own rule directory, and its globs
+  are relative to that subproject. They were matched against the repository root
+  instead, which was wrong in both directions at once:
+  `python/.cursor/rules/python.mdc` with `globs: *.py` was reported as never
+  applying while `python/conftest.py` sat beside it, and was reported as
+  applying the moment any unrelated `*.py` existed at the repository root — an
+  answer about a different file entirely. `governedDirectory` already computed
+  the right base for unscoped rules; it is now used for scoped ones too. A
+  leading `/` is the author anchoring to the root and is left alone.
+
+- **An unresolved alias points at the alias, not at line 1.** The error the YAML
+  library throws for `globs: *.py` carries no position, so the finding was
+  hardcoded to the first line of the frontmatter — correct only when the broken
+  key happened to be first. This is the code path behind the most common finding
+  agentfile produces, and SARIF turns that line into a code-scanning annotation,
+  so a wrong line put a marker on innocent code. Parsing succeeds in this case
+  and only conversion fails, so the alias is still a real node with a real
+  range; the finding now uses it.
+
+- **A bare path in a skill can mean the repository root.** A link like
+  `services/mcp/src/lib/instructions.ts` in a `SKILL.md` has two readings:
+  relative to the file, which is what Markdown says, and relative to the
+  repository root, which is how people write paths in a document *about* a
+  repository. Only the first was tried, so a file sitting at the root was
+  reported as a broken reference at error severity. Both readings are now
+  checked before a link is called broken; `./` and `../` are left alone, since
+  those state where the file is.
+
+- **A bad invocation exits 2, and a missing `--root` is a bad invocation.**
+  [docs/stability.md](docs/stability.md) makes exit 1 a fact about the
+  repository and exit 2 a fact about the invocation. Commander's own failures —
+  an unknown option, a malformed argument — exited 1, which CI reads as findings
+  at error severity. Worse, `--root` naming a path that does not exist scanned
+  nothing, reported "no agent configuration found" and exited 0, so a typo in a
+  CI job read as a permanently clean repository. `--root` must now name a
+  directory that exists, checked at parse time so every command gets it.
+  `--help` and `--version` keep their exit 0.
+
+- **`doctor` says "1 rule applies everywhere".** The count was pluralised and
+  the verb was not.
+
 ## [2.0.0] — 2026-08-31
 
 The 2.0 line, stable. `npm install @agentfile/cli` now resolves to it, which is
