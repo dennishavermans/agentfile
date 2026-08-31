@@ -44,7 +44,24 @@ describe("parseFrontmatter", () => {
     expect(parsed.diagnostics.length).toBeGreaterThan(0);
     expect(parsed.diagnostics[0].code).toBe("AGF003");
     expect(parsed.diagnostics[0].suggestion).toContain('"*.py"');
+    expect(parsed.diagnostics[0].location?.line).toBe(2);
     expect(parsed.data).toBeUndefined();
+  });
+
+  // The error `toJS` throws for an unresolved alias carries no position, so
+  // line 2 was reported for every one of them — right only when the broken key
+  // is the first frontmatter line. langwatch/scenario has five of these and two
+  // put `globs:` under `description:`, where the finding pointed at the
+  // description instead. SARIF turns that into a code-scanning annotation on
+  // the wrong line of someone else's file.
+  it("points at the alias, not at the first line of the frontmatter", () => {
+    const parsed = parseFrontmatter(
+      "rule.mdc",
+      "---\ndescription: React and TSX component development guidelines\nglobs: *.tsx\nalwaysApply: false\n---\nBody\n",
+    );
+
+    expect(parsed.diagnostics[0].code).toBe("AGF003");
+    expect(parsed.diagnostics[0].location?.line).toBe(3);
   });
 
   it("handles an empty frontmatter block", () => {

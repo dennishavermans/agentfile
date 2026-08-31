@@ -10,7 +10,7 @@
  * Positions are 1-based, matching editors, `tsc`, and ESLint.
  */
 
-import { LineCounter, parseDocument } from "yaml";
+import { isAlias, LineCounter, parseDocument, visit } from "yaml";
 import type { ZodError, ZodIssue } from "zod";
 import { type Diagnostic, diagnostic, type Location } from "../diagnostics/index.js";
 
@@ -91,6 +91,33 @@ export function loadYamlSource(file: string, text: string): YamlSource {
   // an unresolved alias, and real repositories write exactly that (Cursor itself
   // tolerates it). A file agentfile cannot read must become a finding, never a
   // crash that takes the whole scan down with it.
+  /**
+   * Where the first alias sits.
+   *
+   * The error `toJS` throws for an unresolved alias carries no position, so
+   * line 1 used to be reported for every one of them. That is right only when
+   * the broken key happens to be the first line, and `globs: *.py` is usually
+   * not — it sits under `description:`. A wrong line is worse than none here,
+   * because SARIF turns it into a code-scanning annotation on innocent code.
+   *
+   * The document itself still knows: parsing succeeded, so the alias is a real
+   * node with a real range.
+   */
+  const firstAliasLocation = (): Location => {
+    let found: Location | undefined;
+
+    visit(document, {
+      Alias(_key, node) {
+        if (found || !isAlias(node) || !node.range) return;
+        const start = lineCounter.linePos(node.range[0]);
+        found = { file, line: start.line, column: start.col };
+        return visit.BREAK;
+      },
+    });
+
+    return found ?? { file, line: 1, column: 1 };
+  };
+
   let value: unknown;
   if (!diagnostics.length) {
     try {
@@ -104,7 +131,7 @@ export function loadYamlSource(file: string, text: string): YamlSource {
             "The file parses as YAML but cannot be converted to a value. A bare `*` starts a " +
             "YAML alias, so a value like `globs: *.py` needs quoting to mean the literal glob.",
           suggestion: 'Quote the value, e.g. globs: "*.py".',
-          location: { file, line: 1, column: 1 },
+          location: firstAliasLocation(),
           data: { name: error instanceof Error ? error.name : "Error" },
         }),
       );
