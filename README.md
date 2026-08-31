@@ -771,6 +771,12 @@ resolving to the last stable version.
 `workflow_dispatch` runs the same thing as a dry run, which is worth doing once
 before the first real tag.
 
+Two tag namespaces live in this repository and only one of them releases
+anything. A version tag is `vX.Y.Z` and publishes; the GitHub Action's moving
+major tag is `v1` and publishes nothing. The release workflow filters on
+`v*.*.*` so that re-pointing `v1` at a newer commit, which happens every time
+the Action changes, cannot start a release.
+
 ### One-time setup
 
 - An `NPM_TOKEN` secret with publish rights, in a repository environment named
