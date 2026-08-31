@@ -7,8 +7,8 @@ import { fileURLToPath } from "node:url";
 import { type Contract, discoverAgents, generate, loadContract, resolveAgent, validateContract } from "@agentfile/core";
 import { createPatch } from "diff";
 import express from "express";
-import yaml from "js-yaml";
 import open from "open";
+import YAML from "yaml";
 
 export type AgentStatus = {
   name: string;
@@ -293,9 +293,13 @@ export async function startUiServer(options: UiServerOptions = {}): Promise<void
         rules: incomingRules,
       };
 
-      const yamlContent = yaml.dump(nextContract, {
+      // The same library core validates with, rather than a second one: this
+      // string is written to a temp file and parsed straight back by
+      // validateContract below, so one parser writing and another reading is a
+      // formatting disagreement waiting to happen.
+      const yamlContent = YAML.stringify(nextContract, {
         lineWidth: 120,
-        noRefs: true,
+        aliasDuplicateObjects: false,
       });
       validateContractContent(root, yamlContent);
 
