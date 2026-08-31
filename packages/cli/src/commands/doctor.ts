@@ -131,7 +131,11 @@ function reportContextBudget(result: DiscoveryResult): void {
   logger.info(`roughly ${estimate.estimatedTokens.toLocaleString("en-US")} tokens ${chalk.gray("(estimated)")}`);
 
   if (always.alwaysLoadedDirectives) {
-    logger.info(`${formatCount(always.alwaysLoadedDirectives, "rule")} apply everywhere`);
+    // The verb has to agree too: formatCount pluralises the noun, so without
+    // this a repository with one always-loaded rule reads "1 rule apply
+    // everywhere" in the first screen of output anyone ever sees.
+    const applies = always.alwaysLoadedDirectives === 1 ? "applies" : "apply";
+    logger.info(`${formatCount(always.alwaysLoadedDirectives, "rule")} ${applies} everywhere`);
   }
 
   console.log();
