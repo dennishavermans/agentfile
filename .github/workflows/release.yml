@@ -13,7 +13,12 @@ name: Release
 on:
   push:
     tags:
-      - "v*"
+      # Release tags only, and "release tag" here means a version. The Action's
+      # moving major tag is `v1`, which `v*` also matched, so pushing it sent
+      # this workflow off to publish version "1" of three packages that are on
+      # 2.0.0-beta.3. Requiring two dots keeps `v2.0.0-beta.3` and excludes
+      # `v1`, which is the whole distinction.
+      - "v*.*.*"
   workflow_dispatch:
     inputs:
       dry-run:
