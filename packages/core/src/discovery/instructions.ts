@@ -28,9 +28,9 @@ import {
   findImports,
   governedDirectory,
   hierarchicalApplicability,
-  scopedPatterns,
   originFor,
   provenanceOf,
+  scopedPatterns,
 } from "./shared.js";
 
 export interface DiscoveredInstructions {
