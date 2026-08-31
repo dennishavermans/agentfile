@@ -1,0 +1,84 @@
+# Keep `next` from pointing at something older than `latest`.
+#
+# `next` is only ever written by a prerelease publish, so every stable release
+# leaves it behind: after 2.0.0 shipped, `next` still resolved to
+# 2.0.0-beta.3. That is worse than it sounds, because `@next` is the install
+# line printed in a beta's release notes and repeated in anything written while
+# the beta was current, so the people most likely to use it are the ones who
+# arrive from older material and get superseded code.
+#
+# The rule is that `next` means "the newest thing published", which is `latest`
+# whenever no prerelease is ahead of it. When one is ahead — a 2.1.0-beta.1
+# published before a 2.0.1 backport — `next` stays where it is.
+name: Dist tags
+
+on:
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    name: Point next at the newest published version
+    runs-on: ubuntu-latest
+    environment: release
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          registry-url: "https://registry.npmjs.org"
+
+      # semver is a root devDependency rather than something borrowed from the
+      # tree: comparing a prerelease against a release is subtle enough that it
+      # should not rest on whichever version some other package happened to
+      # hoist.
+      - run: npm ci
+
+      - name: Move next forward where it is behind
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          for package in core cli agentfile; do
+            name="@agentfile/$package"
+            latest=$(npm view "$name" dist-tags.latest)
+            next=$(npm view "$name" dist-tags.next 2>/dev/null || true)
+
+            if [ -z "$latest" ]; then
+              echo "::warning::$name has no latest tag; skipping"
+              continue
+            fi
+
+            verdict=$(node -e '
+              const semver = require("semver");
+              const [latest, next] = process.argv.slice(1);
+              if (!next) { console.log("set"); }
+              else if (semver.gt(latest, next)) { console.log("behind"); }
+              else { console.log("ok"); }
+            ' "$latest" "$next")
+
+            case "$verdict" in
+              ok)
+                echo "$name: next=$next is not behind latest=$latest, leaving it"
+                ;;
+              set|behind)
+                echo "$name: next=${next:-<unset>} -> $latest"
+                npm dist-tag add "$name@$latest" next
+                ;;
+            esac
+          done
+
+          echo
+          echo "### Dist tags" >> "$GITHUB_STEP_SUMMARY"
+          echo >> "$GITHUB_STEP_SUMMARY"
+          echo "| package | latest | next |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| --- | --- | --- |" >> "$GITHUB_STEP_SUMMARY"
+          for package in core cli agentfile; do
+            name="@agentfile/$package"
+            echo "| \`$name\` | $(npm view "$name" dist-tags.latest) | $(npm view "$name" dist-tags.next 2>/dev/null || echo '—') |" >> "$GITHUB_STEP_SUMMARY"
+          done

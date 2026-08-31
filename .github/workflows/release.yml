@@ -188,3 +188,13 @@ jobs:
             --title "$GITHUB_REF_NAME" \
             --notes-file notes.md \
             ${{ needs.verify.outputs.prerelease == 'true' && '--prerelease' || '' }}
+
+  # A stable release leaves `next` pointing at the last prerelease, which is
+  # older than what was just published. Reusing the maintenance workflow rather
+  # than repeating the loop keeps one definition of what `next` means.
+  dist-tags:
+    name: Dist tags
+    needs: [verify, publish]
+    if: github.event_name == 'push' && needs.verify.outputs.prerelease != 'true'
+    uses: ./.github/workflows/dist-tags.yml
+    secrets: inherit
