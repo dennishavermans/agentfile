@@ -329,9 +329,82 @@ A key nobody recognises is an error, not a shrug — a silently ignored `sevrity
 
 Turning a code `off` in this file is a repository-wide decision, recorded in a committed file. It is a different thing from an `agentfile-disable` comment, which silences one finding at one line and is reported when it goes stale.
 
+## GitHub Action
+
+Two lines in a workflow, rather than a command someone has to remember:
+
+```yaml
+- uses: dennishavermans/agentfile@v1
+```
+
+The action runs `check` against the repository root, writes `agentfile.sarif`,
+and fails the step when there are findings.
+
+Uploading that SARIF is a separate step on purpose. It needs
+`security-events: write`, and a job that asks for write access to your security
+alerts should say so where you can see it, rather than acquire it as a side
+effect of a step called "run the linter":
+
+```yaml
+name: agentfile
+on: [push, pull_request]
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  agentfile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dennishavermans/agentfile@v1
+        id: agentfile
+        with:
+          fail-on-findings: false   # report first, gate once the count is down
+      - uses: github/codeql-action/upload-sarif@v4
+        if: always()
+        with:
+          sarif_file: ${{ steps.agentfile.outputs.sarif-file }}
+          category: agentfile-check
+```
+
+`if: always()` matters once you turn gating on: without it, the upload is
+skipped exactly when there is something to upload.
+
+### Inputs
+
+| input | default | what it does |
+| --- | --- | --- |
+| `command` | `check` | `check`, `validate`, `lint` or `audit` — the four that produce findings against a file |
+| `root` | `.` | directory to analyse |
+| `version` | `next` | version or dist-tag of `@agentfile/cli`; pin it for a reproducible job |
+| `sarif-file` | `agentfile.sarif` | where to write SARIF; empty string skips it |
+| `fail-on-findings` | `true` | whether findings fail the step |
+| `args` | none | extra arguments, e.g. `--strict` or `--max-warnings 5` |
+
+### Outputs
+
+| output | what it is |
+| --- | --- |
+| `exit-code` | `0` clean, `1` findings, `2` the tool could not run |
+| `findings` / `errors` / `warnings` | counts, for a later step to act on |
+| `sarif-file` | path to the log, empty when SARIF was not requested |
+
+Running more than one command means more than one upload, and each needs its
+own `category` (`agentfile-check`, `agentfile-audit`) or the second will close
+the first one's alerts.
+
+`version` defaults to `next` because 2.0 is in beta and `latest` still points at
+the v1 CLI. That default becomes `latest` at 2.0 stable.
+
+---
+
 ## CI output
 
-`check`, `validate`, `lint` and `audit` emit **SARIF 2.1.0** with `--format sarif`, which GitHub code scanning reads:
+`check`, `validate`, `lint` and `audit` emit **SARIF 2.1.0** with `--format
+sarif`, which GitHub code scanning reads. The action above is the packaged
+version of this; by hand it is:
 
 ```yaml
 - run: npx @agentfile/cli check --format sarif > agentfile.sarif
