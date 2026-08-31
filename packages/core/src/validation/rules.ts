@@ -33,7 +33,7 @@ const configurationIntegrity: Rule = {
   id: "configuration-integrity",
   layer: "structural",
   description: "Schema violations, unparsable files, and references that point at nothing",
-  emits: ["AGF001", "AGF002", "AGF003", "AGF004"],
+  emits: ["AGF001", "AGF002", "AGF003", "AGF004", "AGF006"],
   run: (context) => ({ diagnostics: [...context.discoveryDiagnostics] }),
 };
 

@@ -844,7 +844,25 @@ describe("discover", () => {
     for (let index = 0; index < 20; index++) files[`/repo/file-${index}.md`] = "x";
 
     const result = discover({ root: ROOT, fs: memoryFileSystem(files), maxFiles: 5 });
-    expect(result.diagnostics.some((item) => item.message.includes("truncated"))).toBe(true);
+    const finding = result.diagnostics.find((item) => item.code === "AGF006");
+
+    expect(finding).toBeDefined();
+    expect(finding?.message).toContain("truncated");
+    expect(finding?.severity).toBe("warning");
+  });
+
+  // This assertion is the one that was missing. The truncation warning used to
+  // be emitted as AGF002, "configuration file not found", and no test noticed
+  // because the only assertion was on the word "truncated" in the message. A
+  // code carries its meaning into `agentfile rule`, into a SARIF ruleId, and
+  // into whatever `severity:` entry a user writes to silence it, so the code is
+  // the part worth pinning.
+  it("does not report truncation as a missing configuration file", () => {
+    const files: Record<string, string> = { "/repo/AGENTS.md": "x" };
+    for (let index = 0; index < 20; index++) files[`/repo/file-${index}.md`] = "x";
+
+    const result = discover({ root: ROOT, fs: memoryFileSystem(files), maxFiles: 5 });
+    expect(result.diagnostics.map((item) => item.code)).not.toContain("AGF002");
   });
 
   it("resolves discovered configuration for a path", () => {

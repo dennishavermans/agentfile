@@ -9,6 +9,46 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.0.0] — 2026-08-31
+
+The 2.0 line, stable. `npm install @agentfile/cli` now resolves to it, which is
+the substantive part of this release: `latest` pointed at the v1 CLI throughout
+the beta, so every command in the README failed for anyone who followed it.
+[docs/migration-v2.md](docs/migration-v2.md) covers what changes for an existing
+repository; the three beta entries below carry the detail of what 2.0 is.
+
+### Breaking
+
+- **Truncation is `AGF006`, not `AGF002`.** One code carried two unrelated
+  meanings: "configuration file not found" and "the repository scan stopped
+  early". They are different problems with different severities, and merging
+  them meant `agentfile rule AGF002` explained the wrong one, a SARIF `ruleId`
+  mislabelled it, and a `severity: AGF002: off` written to quiet truncation
+  noise also silenced genuine missing-file errors. Diagnostic codes are
+  append-only, so this had to land before the meaning froze at stable.
+
+  `AGF002` keeps its registered meaning and is unchanged. Anything matching on
+  the truncation warning by code needs to look for `AGF006`.
+
+### Added
+
+- **A GitHub Action.** `uses: dennishavermans/agentfile@v1` runs `check`, writes
+  SARIF, and fails the step on findings. It deliberately does not upload the
+  SARIF: that needs `security-events: write`, and a job asking for write access
+  to security alerts should say so where a reader can see it rather than acquire
+  it inside a step called "run the linter". The README shows the upload step.
+
+### Fixed
+
+- **`--format sarif` is discoverable.** It has worked on `check`, `validate`,
+  `lint` and `audit` since it landed, but every command's `--help` said
+  `human or json`, so the CLI contradicted the README. Corrected on those four;
+  the rest reject SARIF deliberately and were already accurate.
+
+- **The truncation warning is covered by a test that pins its code.** The
+  existing test asserted the word "truncated" appeared in the message, which is
+  exactly why the `AGF002` overload survived unnoticed.
+
 ## [2.0.0-beta.3] — 2026-08-28
 
 ### Fixed

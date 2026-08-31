@@ -74,7 +74,7 @@ export function discover(options: DiscoverOptions): DiscoveryResult {
   if (scan.truncated) {
     diagnostics.push(
       diagnostic({
-        code: "AGF002",
+        code: "AGF006",
         severity: "warning",
         message: "Repository scan was truncated, so the report may be incomplete",
         explanation: scan.truncationReason ?? "A scan limit was reached.",

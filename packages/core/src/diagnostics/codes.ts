@@ -85,6 +85,17 @@ export const DIAGNOSTIC_CODES = {
     defaultSeverity: "warning",
     status: "active",
   },
+  AGF006: {
+    name: "scan-truncated",
+    title: "Repository scan stopped early, so the report is incomplete",
+    band: "configuration",
+    // A warning about the report rather than about the repository. Nothing in
+    // the configuration is wrong; agentfile simply did not read all of it, and
+    // every "nothing matches" and "does not exist" below it is weaker as a
+    // result.
+    defaultSeverity: "warning",
+    status: "active",
+  },
 
   // ─── AGF1xx — skills ────────────────────────────────────────────────────
   AGF101: {
