@@ -170,6 +170,14 @@ describe("findImports", () => {
   it("strips trailing sentence punctuation", () => {
     expect(findImports("Read @docs/style.md.")).toEqual(["docs/style.md"]);
   });
+
+  // Biome's CLAUDE.md credits its maintainers as markdown links. The capture
+  // used to run through the `](` into the URL, pick up a `/`, and report all
+  // twenty-two of them as broken imports.
+  it("does not mistake a markdown link for an import", () => {
+    expect(findImports("- [Victorien Elvinger @Conaclos](https://github.com/Conaclos)")).toEqual([]);
+    expect(findImports("- [@arendjr](https://github.com/arendjr)")).toEqual([]);
+  });
 });
 
 // ─── AGENTS.md ─────────────────────────────────────────────────────────────
@@ -307,12 +315,25 @@ describe("discoverClaudeRules", () => {
     });
   });
 
-  it("reports malformed frontmatter without losing the file", () => {
+  // This test used to expect AGF003 here, on the belief that frontmatter which
+  // fails a YAML parse means a broken rule. Measured on Claude Code 2.1.238: a
+  // rule whose frontmatter reads `description: nested: colons: everywhere`
+  // still loads its body into context. The parse error is the linter's, not
+  // the program's.
+  it("keeps a rule whose frontmatter is not YAML, because Claude Code does", () => {
     const { fs, scan } = scanOf({ "/repo/.claude/rules/bad.md": "---\npaths: [unclosed\n---\n\nBody" });
     const found = discoverClaudeRules(ROOT, scan, fs);
 
-    expect(found.diagnostics[0].code).toBe("AGF003");
+    expect(found.diagnostics).toEqual([]);
     expect(found.instructions).toHaveLength(1);
+    expect(found.instructions[0].body).toContain("Body");
+  });
+
+  it("still reports a frontmatter fence that never closes", () => {
+    const { fs, scan } = scanOf({ "/repo/.claude/rules/bad.md": "---\npaths: ['src/**']\n\nBody" });
+    const found = discoverClaudeRules(ROOT, scan, fs);
+
+    expect(found.diagnostics.map((item) => item.code)).toContain("AGF003");
   });
 });
 
@@ -478,6 +499,22 @@ describe("discoverCopilotInstructions", () => {
 // ─── Skills ────────────────────────────────────────────────────────────────
 
 describe("discoverSkills", () => {
+  // trigger.dev's drizzle skill: an unquoted description carrying
+  // `conventions: `, rejected by every strict YAML parser. Measured on Claude
+  // Code 2.1.238: the skill loads, and the agent echoes the description back
+  // verbatim. agentfile 2.1.0 reported it as a parse error and as having no
+  // description at all.
+  it("reads a description no strict YAML parser accepts, because the loader does", () => {
+    const { fs, scan } = scanOf({
+      "/repo/.claude/skills/drizzle/SKILL.md":
+        "---\nname: drizzle\ndescription: Covers this repo's conventions: a dedicated schema, pooler-safe connections.\n---\n\nBody.\n",
+    });
+    const found = discoverSkills(ROOT, scan, fs);
+
+    expect(found.diagnostics).toEqual([]);
+    expect(found.skills[0].description).toContain("pooler-safe connections");
+  });
+
   it("reads the specification fields as first-class data", () => {
     const { fs, scan } = scanOf({
       "/repo/.claude/skills/pdf-processing/SKILL.md": [
@@ -594,6 +631,19 @@ describe("discoverSkills", () => {
 // ─── Subagents ─────────────────────────────────────────────────────────────
 
 describe("discoverCommands", () => {
+  // Measured on Claude Code 2.1.238: a command whose frontmatter reads
+  // `description: uses: colons, badly: everywhere` is listed with exactly
+  // that description.
+  it("carries a colon-laden description through, because the loader does", () => {
+    const { fs, scan } = scanOf({
+      "/repo/.claude/commands/colonful.md": "---\ndescription: uses: colons, badly: everywhere\n---\n\nSay hi.\n",
+    });
+    const found = discoverCommands(ROOT, scan, fs);
+
+    expect(found.diagnostics).toEqual([]);
+    expect(found.commands[0].description).toBe("uses: colons, badly: everywhere");
+  });
+
   it("reads a Claude Code command with its frontmatter", () => {
     const { fs, scan } = scanOf({
       "/repo/.claude/commands/deploy.md": [
@@ -864,6 +914,48 @@ describe("import checking", () => {
         "/repo/apps/web/CLAUDE.md": "@style.md",
         "/repo/apps/web/style.md": "styles",
       }),
+    });
+
+    expect(result.diagnostics.filter((item) => item.code === "AGF004")).toHaveLength(0);
+  });
+
+  // n8n's `.github/CLAUDE.md` opens with `@../AGENTS.md`, and the target is a
+  // real file at the root. The old resolver used the directory the file
+  // governs — the root — so `..` escaped the repository and the import was
+  // reported missing.
+  it("resolves an import upward from the importing file's own directory", () => {
+    const result = discover({
+      root: ROOT,
+      fs: memoryFileSystem({
+        "/repo/.github/CLAUDE.md": "@../AGENTS.md",
+        "/repo/AGENTS.md": "# Shared guidance",
+      }),
+    });
+
+    expect(result.diagnostics.filter((item) => item.code === "AGF004")).toHaveLength(0);
+  });
+
+  // Measured on Claude Code 2.1.238: a chain of imports loads `sub/leaf.md`
+  // from `sub/mid.md` while an identically named file at the root stays
+  // unloaded. Root-relative is not a fallback, so an import that only
+  // resolves that way is genuinely broken.
+  it("does not resolve an import against the repository root, because Claude Code does not", () => {
+    const result = discover({
+      root: ROOT,
+      fs: memoryFileSystem({
+        "/repo/apps/web/CLAUDE.md": "@docs/setup.md",
+        "/repo/docs/setup.md": "only exists at the root",
+      }),
+    });
+
+    const found = result.diagnostics.find((item) => item.code === "AGF004");
+    expect(found?.message).toContain("docs/setup.md");
+  });
+
+  it("stays silent on an import that escapes the repository", () => {
+    const result = discover({
+      root: ROOT,
+      fs: memoryFileSystem({ "/repo/CLAUDE.md": "@../shared/notes.md" }),
     });
 
     expect(result.diagnostics.filter((item) => item.code === "AGF004")).toHaveLength(0);
