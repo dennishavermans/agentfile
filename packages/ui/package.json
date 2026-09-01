@@ -34,7 +34,7 @@
     "clsx": "^2.1.1",
     "diff": "^8.0.4",
     "express": "^5.2.1",
-    "lucide-react": "^1.7.0",
+    "lucide-react": "^1.35.0",
     "open": "^11.0.0",
     "tailwind-merge": "^3.5.0",
     "yaml": "^2.9.0",
