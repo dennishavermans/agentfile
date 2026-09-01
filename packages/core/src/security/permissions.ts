@@ -23,7 +23,14 @@
  *     syntax. `Bash(command:rm *)` is ignored with a startup warning.
  *   • Environment runners (`npx`, `devbox run`, `docker exec`, …) are not
  *     stripped wrappers, so `Bash(devbox run *)` allows `devbox run rm -rf .`.
+ *   • A command is split on `&&`, `||`, `;`, `|`, `|&`, `&` and newlines, and a
+ *     rule must match each subcommand on its own. A rule that spans a separator
+ *     matches nothing — including `Bash(curl * | sh)` in a deny list.
+ *   • The words before the first `*` are all that limit a rule, so in
+ *     `Bash(git * main)` only `git` limits it.
+ *   • A tool name is a single identifier. `Stop Task` matches no tool.
  *
+
  * Source: https://code.claude.com/docs/en/permissions
  */
 
@@ -60,6 +67,50 @@ const PRIMARY_CONTENT_FIELDS: ReadonlyArray<{ field: string; tools: readonly str
  * the mistake this analyser exists to catch in other people's configuration.
  */
 const ENVIRONMENT_RUNNERS = ["direnv exec", "devbox run", "mise exec", "docker exec", "npx"];
+
+/**
+ * The first shell operator that splits a rule into subcommands, if any.
+ *
+ * Documented: "The recognized command separators are `&&`, `||`, `;`, `|`,
+ * `|&`, `&`, and newlines. A rule must match each subcommand independently."
+ * Splitting happens before matching, which is why `Bash(safe-cmd *)` does not
+ * cover `safe-cmd && other-cmd` even though `*` matches any text.
+ *
+ * Quoting matters and is the difference between a useful check and a noisy one.
+ * A pipe inside `--jq '.[] | {a}'` or `sed 's|a|b|'` is a character in an
+ * argument, not an operator, and 161 rules in a 344-file sample are that shape.
+ * `>&` is a redirection, not a background operator, so `2>&1` is not a split —
+ * without that, `Bash(bash -i >& /dev/tcp/*)` reads as a dead deny rule.
+ */
+function commandSeparatorIn(specifier: string): string | undefined {
+  let quote: string | undefined;
+
+  for (let index = 0; index < specifier.length; index++) {
+    const character = specifier[index];
+
+    if (quote) {
+      if (character === quote) quote = undefined;
+      continue;
+    }
+    if (character === "\\") {
+      index++;
+      continue;
+    }
+    if (character === '"' || character === "'") {
+      quote = character;
+      continue;
+    }
+    if (character === ";") return ";";
+    if (character === "\n") return "a newline";
+    if (character === "|") return specifier[index + 1] === "|" ? "||" : specifier[index + 1] === "&" ? "|&" : "|";
+    if (character === "&") {
+      if (specifier[index - 1] === ">") continue;
+      return specifier[index + 1] === "&" ? "&&" : "&";
+    }
+  }
+
+  return undefined;
+}
 
 function locationOf(rule: PermissionRule): Location {
   return { file: rule.provenance.file, line: rule.provenance.line };
@@ -391,6 +442,191 @@ function unstrippedRunner(rule: PermissionRule): Diagnostic[] {
   ];
 }
 
+/**
+ * AGF506 for a rule that spans a command separator.
+ *
+ * Documented: a command is split on `&&`, `||`, `;`, `|`, `|&`, `&` and
+ * newlines, and "a rule must match each subcommand independently". The split
+ * happens before matching, so no subcommand ever contains the separator — and a
+ * rule whose text spans one is compared against fragments it cannot equal.
+ *
+ * The shape is common and it looks right. `Bash(cd src && go build:*)` reads as
+ * approval for that exact sequence. `Bash(curl * | sh)` in a deny list reads as
+ * a block on the oldest trick there is. Neither matches anything: in a 344-file
+ * sample, 62 allow rules and 67 deny rules are written this way.
+ */
+function separatorSpanningRule(rule: PermissionRule): Diagnostic[] {
+  const { tool, specifier } = parsePermissionRule(rule.rule);
+  if (tool !== "Bash" || !specifier) return [];
+
+  const separator = commandSeparatorIn(specifier);
+  if (!separator) return [];
+
+  const [first] = specifier.split(/\s*(?:\|\||\||;|&&|&)\s*/);
+
+  return [
+    diagnostic({
+      code: "AGF506",
+      severity: "error",
+      message: `Permission rule ${rule.rule} matches nothing: ${separator} splits a command before rules are matched`,
+      explanation: [
+        `Claude Code splits a command on \`&&\`, \`||\`, \`;\`, \`|\`, \`|&\`, \`&\` and newlines,`,
+        "then matches each subcommand on its own. No subcommand contains the separator,",
+        "so a rule whose text spans one is compared against fragments it cannot equal.",
+        "",
+        rule.effect === "deny"
+          ? "Nothing is denied by this rule. A deny rule written across a pipe is a common\nway to try to block `curl … | sh`, and it does not block it — each half is\nmatched separately, and neither half is this rule."
+          : `Nothing is ${rule.effect === "ask" ? "gated" : "approved"} by this rule. The command it was written for still prompts.`,
+        `\nPermission syntax:\n  ${PERMISSIONS_DOC}#compound-commands`,
+      ].join("\n"),
+      suggestion:
+        rule.effect === "deny"
+          ? `Write one rule per subcommand you want to stop, such as "Bash(${first.trim() || "curl *"})" — a deny on any subcommand stops the whole command.`
+          : `Write one rule per subcommand. Claude Code needs a rule matching every part before it runs the whole thing.`,
+      location: locationOf(rule),
+      data: { rule: rule.rule, effect: rule.effect, separator, problem: "separator-spanning-rule" },
+    }),
+  ];
+}
+
+/**
+ * AGF506 for an allow rule whose wildcard stands where the subcommand goes.
+ *
+ * Documented: "Claude Code matches everything before the first `*` as written,
+ * so those words are what limit the rule", with a startup warning "about an
+ * allow rule with a `*` before the subcommand, such as `Bash(git * main)`".
+ *
+ * The text after the wildcard still narrows what matches, so this is not an
+ * unbounded grant — it is a rule whose limit is one word long when it reads as
+ * though it were three. In `Bash(git * main)` only `git` limits it, so
+ * `git push --force main` is approved.
+ */
+function wildcardBeforeSubcommand(rule: PermissionRule): Diagnostic[] {
+  if (rule.effect !== "allow") return [];
+
+  const { tool, specifier } = parsePermissionRule(rule.rule);
+  if (tool !== "Bash" || !specifier) return [];
+
+  const words = specifier.trim().split(/\s+/);
+  if (words.length < 3 || words[1] !== "*" || words[0].includes("*")) return [];
+
+  return [
+    diagnostic({
+      code: "AGF506",
+      message: `Allow rule ${rule.rule} is limited only by "${words[0]}"`,
+      explanation: [
+        "Claude Code matches everything before the first `*` as written, and those words",
+        `are what limit the rule. Here that is \`${words[0]}\` alone: the wildcard stands where`,
+        "the subcommand goes, so every subcommand is approved as long as the rest of the",
+        "command still matches.",
+        "",
+        `\`${rule.rule}\` approves \`${words[0]} ${words.slice(2).join(" ")}\` whatever runs in place of the`,
+        "wildcard. Claude Code warns about this shape at startup.",
+        `\nPermission syntax:\n  ${PERMISSIONS_DOC}#wildcard-patterns`,
+      ].join("\n"),
+      suggestion: `Name the subcommand and put the wildcard after it, one rule per subcommand you want approved.`,
+      location: locationOf(rule),
+      data: { rule: rule.rule, effect: rule.effect, program: words[0], problem: "wildcard-before-subcommand" },
+    }),
+  ];
+}
+
+/**
+ * AGF506 for a tool name that no tool can have.
+ *
+ * Documented: a tool label can differ from its canonical name — "the tool
+ * labeled `Stop Task` in the transcript has the canonical name `TaskStop`" —
+ * and "permission rules and hook matchers match the canonical name only".
+ *
+ * Only names that cannot be canonical are reported, which in practice means
+ * names containing whitespace. Checking against a list of known tools would
+ * catch more, and would also start reporting every tool added after this
+ * version shipped. A structural rule cannot drift, and it turns out to catch
+ * something else worth catching: JSON has no comments, so a `// ─── Git ───`
+ * line written into a permissions array is a rule, and an inert one. All 27
+ * matches in a 344-file sample are exactly that.
+ */
+function impossibleToolName(rule: PermissionRule): Diagnostic[] {
+  const { tool } = parsePermissionRule(rule.rule);
+  if (!/\s/.test(tool.trim())) return [];
+
+  const looksLikeComment = /^(?:\/\/|#|\/\*)/.test(tool.trim());
+
+  return [
+    diagnostic({
+      code: "AGF506",
+      severity: "error",
+      message: looksLikeComment
+        ? `${rule.effect} entry ${JSON.stringify(rule.rule)} is a permission rule, not a comment`
+        : `Permission rule ${rule.rule} names no tool, because a tool name cannot contain a space`,
+      explanation: [
+        looksLikeComment
+          ? "JSON has no comments, so this line is an entry in the permissions array like\nany other. Claude Code reads it as a tool name, finds no such tool, and the\nentry does nothing."
+          : "A tool name is a single identifier. The label shown in the transcript can differ\nfrom it — the tool labelled `Stop Task` is canonically `TaskStop` — and rules\nmatch the canonical name only.",
+        "",
+        rule.effect === "allow"
+          ? "Nothing is approved by this entry."
+          : `Nothing is ${rule.effect === "ask" ? "gated" : "denied"} by this entry, and Claude Code warns about it at startup.`,
+        `\nTool names:\n  https://code.claude.com/docs/en/tools-reference`,
+      ].join("\n"),
+      suggestion: looksLikeComment
+        ? "Remove the entry. To label a group of rules, use a key Claude Code ignores, or keep the note outside the settings file."
+        : "Use the canonical tool name, which is one word — `TaskStop` rather than `Stop Task`.",
+      location: locationOf(rule),
+      data: { rule: rule.rule, effect: rule.effect, problem: "impossible-tool-name" },
+    }),
+  ];
+}
+
+/**
+ * AGF506, informational, for an allow rule trying to pin a network tool to a host.
+ *
+ * Documented as a caution rather than a defect: "Bash permission patterns that
+ * try to constrain command arguments are fragile. For example,
+ * `Bash(curl http://github.com/ *)` intends to restrict curl to GitHub URLs, but
+ * won't match variations like" options before the URL, `https`, redirects,
+ * variables, and extra spaces.
+ *
+ * Recorded, not raised. The rule does work for the commands it matches — the
+ * point is that the ones it misses still prompt, and that this is not a network
+ * boundary. An exact-match rule is not reported: it covers one command
+ * precisely, which is the opposite of fragile.
+ */
+function fragileArgumentPattern(rule: PermissionRule): Diagnostic[] {
+  if (rule.effect !== "allow") return [];
+
+  const { tool, specifier } = parsePermissionRule(rule.rule);
+  if (tool !== "Bash" || !specifier) return [];
+  if (!/^\s*(?:curl|wget)[\s.]/.test(specifier) || !specifier.includes("*")) return [];
+
+  const host = specifier.match(/https?:\/\/([^\s/*:"']+)/);
+  if (!host) return [];
+  if (/^(?:localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\]|host\.docker\.internal)$/i.test(host[1])) return [];
+
+  return [
+    diagnostic({
+      code: "AGF506",
+      severity: "info",
+      message: `Allow rule ${rule.rule} does not confine ${host[1]} to itself`,
+      explanation: [
+        `The rule matches the text of the command, so it covers the spelling written here`,
+        "and not the others that reach the same place: options before the URL, `https` for",
+        "`http`, a redirect through a shortener, the URL held in a variable, or an extra",
+        "space. Those still prompt rather than being approved, so nothing is granted by",
+        "accident — but this is not a network boundary, and it reads like one.",
+        "",
+        "Claude Code's own guidance is to deny `curl` and `wget` outright and allow",
+        "`WebFetch(domain:…)` instead, which matches on the hostname after the URL is",
+        "resolved, and to enforce anything stricter in a PreToolUse hook.",
+        `\nPermission syntax:\n  ${PERMISSIONS_DOC}`,
+      ].join("\n"),
+      suggestion: `No action needed if this is a convenience. To make it a boundary, deny \`Bash(curl *)\` and \`Bash(wget *)\` and allow \`WebFetch(domain:${host[1]})\`.`,
+      location: locationOf(rule),
+      data: { rule: rule.rule, effect: rule.effect, host: host[1], problem: "fragile-argument-pattern" },
+    }),
+  ];
+}
+
 /** True when `broad` covers everything `narrow` would match, per prefix semantics. */
 function covers(broad: ParsedRule, narrow: ParsedRule): boolean {
   if (broad.tool !== narrow.tool) return false;
@@ -489,18 +725,40 @@ function bypassMode(configuration: AgentConfiguration): Diagnostic[] {
     );
 }
 
+/**
+ * Every finding for one rule.
+ *
+ * A rule that spans a command separator matches nothing, and every other check
+ * here asks whether a rule matches too much or too little. Those questions do
+ * not arise for a rule that matches nothing, so that finding is reported alone
+ * rather than alongside three consequences of it. `Bash(curl:* | sh)` is dead
+ * because of the pipe; that its colon is also misplaced is not the reader's
+ * problem, and the fix for the pipe does not leave the colon behind.
+ */
+function findingsFor(rule: PermissionRule): Diagnostic[] {
+  const named = impossibleToolName(rule);
+  if (named.length) return named;
+
+  const dead = separatorSpanningRule(rule);
+  if (dead.length) return dead;
+
+  return [
+    ...missingWordBoundary(rule),
+    ...misplacedColonWildcard(rule),
+    ...unanchoredAllowGlob(rule),
+    ...unapprovableWrapper(rule),
+    ...mcpRuleWithSpecifier(rule),
+    ...primaryContentFieldRule(rule),
+    ...unstrippedRunner(rule),
+    ...wildcardBeforeSubcommand(rule),
+    ...fragileArgumentPattern(rule),
+  ];
+}
+
 /** Every permission finding for a configuration. */
 export function auditPermissions(configuration: AgentConfiguration): Diagnostic[] {
   return [
-    ...configuration.permissions.flatMap((rule) => [
-      ...missingWordBoundary(rule),
-      ...misplacedColonWildcard(rule),
-      ...unanchoredAllowGlob(rule),
-      ...unapprovableWrapper(rule),
-      ...mcpRuleWithSpecifier(rule),
-      ...primaryContentFieldRule(rule),
-      ...unstrippedRunner(rule),
-    ]),
+    ...configuration.permissions.flatMap(findingsFor),
     ...shadowedAllow(configuration),
     ...bypassMode(configuration),
   ];

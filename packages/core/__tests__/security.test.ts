@@ -63,6 +63,11 @@ function server(overrides: Partial<McpServerEntry> = {}): McpServerEntry {
   };
 }
 
+/** The `problem` tag of each finding, for asserting one check's silence. */
+function problems(findings: { data?: Record<string, unknown> }[]): unknown[] {
+  return findings.map((finding) => finding.data?.problem);
+}
+
 function rule(effect: PermissionRule["effect"], expression: string): PermissionRule {
   return { effect, rule: expression, provenance: provenance(".claude/settings.json", { line: 7 }) };
 }
@@ -723,7 +728,7 @@ describe("auditPermissions", () => {
 
     it("still reports it where the documentation defines it", () => {
       expect(audit([rule("allow", "Bash(git:* push)")])[0]?.data?.problem).toBe("misplaced-colon-wildcard");
-      expect(audit([rule("deny", "Bash(curl:* | sh)")])[0]?.data?.problem).toBe("misplaced-colon-wildcard");
+      expect(audit([rule("deny", "Bash(curl:* http://x)")])[0]?.data?.problem).toBe("misplaced-colon-wildcard");
       expect(audit([rule("deny", "PowerShell(Get:* Item)")])[0]?.data?.problem).toBe("misplaced-colon-wildcard");
     });
 
@@ -894,6 +899,164 @@ describe("auditPermissions", () => {
       expect(audit([rule("allow", "Bash(git commit *)")])).toHaveLength(0);
       // `npm` is not `npx`, and a runner named inside an argument is not the program.
       expect(audit([rule("allow", "Bash(echo npx *)")])).toHaveLength(0);
+    });
+  });
+
+  // ─── compound-command separators ───────────────────────────────────────
+
+  describe("rules that span a command separator", () => {
+    it("reports a deny rule written across a pipe, which is the common shape", () => {
+      const findings = audit([rule("deny", "Bash(curl * | sh)")]);
+      expect(findings).toHaveLength(1);
+      expect(findings[0].code).toBe("AGF506");
+      expect(findings[0].severity).toBe("error");
+      expect(findings[0].data?.problem).toBe("separator-spanning-rule");
+      expect(findings[0].data?.separator).toBe("|");
+      expect(findings[0].explanation).toContain("Nothing is denied by this rule");
+      // The suggested replacement must not carry the same defect forward.
+      expect(findings[0].suggestion).toContain("Bash(curl *)");
+    });
+
+    it("recognises every documented separator", () => {
+      const cases: Array<[string, string]> = [
+        ["Bash(cd src && go build)", "&&"],
+        ["Bash(npm test || echo fail)", "||"],
+        ["Bash(cd src; ls)", ";"],
+        ["Bash(env | grep PATH)", "|"],
+        ["Bash(make |& tee log)", "|&"],
+        ["Bash(sleep 1 &)", "&"],
+      ];
+      for (const [expression, separator] of cases) {
+        const findings = audit([rule("allow", expression)]);
+        expect(findings, expression).toHaveLength(1);
+        expect(findings[0].data?.separator, expression).toBe(separator);
+      }
+    });
+
+    it("ignores a separator character inside quotes, which is an argument", () => {
+      // 161 rules in a 344-file sample are this shape. Without quote handling
+      // this check would be wrong more often than right.
+      expect(audit([rule("allow", `Bash(gh pr view * --json x --jq '.[] | {a}')`)])).toHaveLength(0);
+      expect(audit([rule("allow", "Bash(sed -i 's|a|b|g' file.txt)")])).toHaveLength(0);
+      expect(audit([rule("allow", 'Bash(grep -rn "a\\|b" --include="*.go")')])).toHaveLength(0);
+    });
+
+    it("does not mistake a redirection for a background operator", () => {
+      // `2>&1` and `>&` are redirects. Reading them as separators would report
+      // two real reverse-shell deny rules as dead.
+      expect(audit([rule("allow", "Bash(make lint-fix 2>&1)")])).toHaveLength(0);
+      expect(audit([rule("deny", "Bash(bash -i >& /dev/tcp/*)")])).toHaveLength(0);
+    });
+
+    it("is reported instead of, not alongside, the shape checks it makes moot", () => {
+      // The rule is dead because of the pipe. That its colon is also misplaced
+      // is not the reader's problem, and fixing the pipe does not leave it.
+      const findings = audit([rule("deny", "Bash(curl:* | sh)")]);
+      expect(findings).toHaveLength(1);
+      expect(findings[0].data?.problem).toBe("separator-spanning-rule");
+    });
+
+    it("leaves ordinary single commands alone", () => {
+      expect(audit([rule("allow", "Bash(npm run build)")])).toHaveLength(0);
+      expect(audit([rule("deny", "Bash(git push --force-with-lease)")])).toHaveLength(0);
+    });
+  });
+
+  // ─── wildcard in the subcommand slot ───────────────────────────────────
+
+  describe("wildcard before the subcommand", () => {
+    it("reports the documented shape and says what actually limits the rule", () => {
+      const findings = audit([rule("allow", "Bash(git * main)")]);
+      expect(findings).toHaveLength(1);
+      expect(findings[0].data?.problem).toBe("wildcard-before-subcommand");
+      expect(findings[0].data?.program).toBe("git");
+      expect(findings[0].message).toContain('limited only by "git"');
+    });
+
+    it("stays silent when the wildcard is where it belongs", () => {
+      expect(audit([rule("allow", "Bash(git log *)")])).toHaveLength(0);
+      expect(audit([rule("allow", "Bash(npm run *)")])).toHaveLength(0);
+      // A path glob is a single token, not a wildcard standing for a subcommand.
+      expect(audit([rule("allow", "Bash(./scripts/**)")])).toHaveLength(0);
+      expect(audit([rule("allow", "Bash(PYTHONPATH=*:*)")])).toHaveLength(0);
+      // The wildcard must be a bare `*`, not part of a longer argument. This one
+      // does draw a word-boundary finding, correctly — `*.js*` also covers
+      // `.jsx` and `.json` — but the subcommand slot is not the problem.
+      expect(problems(audit([rule("allow", "Bash(node *.js*)")]))).not.toContain("wildcard-before-subcommand");
+      // Two tokens is a trailing wildcard, which is the normal form.
+      expect(audit([rule("allow", "Bash(docker *)")])).toHaveLength(0);
+      // Three tokens, but the subcommand is named — the wildcard is stuck to it
+      // rather than standing in for it. A word-boundary problem, not this one.
+      expect(problems(audit([rule("allow", "Bash(npm run* --silent)")]))).not.toContain("wildcard-before-subcommand");
+      expect(problems(audit([rule("allow", "Bash(git log-* main)")]))).not.toContain("wildcard-before-subcommand");
+    });
+
+    it("does not report deny or ask rules, which the warning is not about", () => {
+      expect(audit([rule("deny", "Bash(git * main)")])).toHaveLength(0);
+      expect(audit([rule("ask", "Bash(git * main)")])).toHaveLength(0);
+    });
+  });
+
+  // ─── tool names that cannot exist ──────────────────────────────────────
+
+  describe("impossible tool names", () => {
+    it("reports a transcript label used as a tool name", () => {
+      const findings = audit([rule("deny", "Stop Task")]);
+      expect(findings).toHaveLength(1);
+      expect(findings[0].severity).toBe("error");
+      expect(findings[0].data?.problem).toBe("impossible-tool-name");
+      expect(findings[0].suggestion).toContain("TaskStop");
+    });
+
+    it("reports a comment written into a permissions array", () => {
+      // JSON has no comments, so this is a rule. All 27 whitespace-bearing tool
+      // names in a 344-file sample are exactly this.
+      const findings = audit([rule("allow", "// === Git Read Operations ===")]);
+      expect(findings).toHaveLength(1);
+      expect(findings[0].message).toContain("not a comment");
+      expect(findings[0].suggestion).toContain("Remove the entry");
+    });
+
+    it("leaves every real tool-name shape alone", () => {
+      // Deliberately not a list of known tools: that would report every tool
+      // added after this version shipped.
+      for (const expression of [
+        "TaskStop",
+        "WebFetch",
+        "NotebookEdit",
+        "mcp__github__get_issue",
+        "mcp__puppeteer__*",
+        'Bash(git commit -m "a message with spaces")',
+        "Read(./some path/file.txt)",
+      ]) {
+        expect(audit([rule("deny", expression)]), expression).toHaveLength(0);
+      }
+    });
+  });
+
+  // ─── fragile argument patterns ─────────────────────────────────────────
+
+  describe("fragile argument patterns", () => {
+    it("records a curl rule pinned to a host, without raising it", () => {
+      const findings = audit([rule("allow", "Bash(curl https://github.com/*)")]);
+      expect(findings).toHaveLength(1);
+      expect(findings[0].severity).toBe("info");
+      expect(findings[0].data?.problem).toBe("fragile-argument-pattern");
+      expect(findings[0].data?.host).toBe("github.com");
+      expect(findings[0].suggestion).toContain("WebFetch(domain:github.com)");
+    });
+
+    it("says nothing about an exact-match rule, which is precise rather than fragile", () => {
+      expect(audit([rule("allow", "Bash(curl -s https://example.com/api/health)")])).toHaveLength(0);
+    });
+
+    it("says nothing about loopback, where the warning is not the point", () => {
+      expect(audit([rule("allow", "Bash(curl -s http://localhost:*)")])).toHaveLength(0);
+      expect(audit([rule("allow", "Bash(curl -sf http://127.0.0.1:*)")])).toHaveLength(0);
+    });
+
+    it("says nothing about a curl rule with no host at all", () => {
+      expect(audit([rule("allow", "Bash(curl -s *)")])).toHaveLength(0);
     });
   });
 
