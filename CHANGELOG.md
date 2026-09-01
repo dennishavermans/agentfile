@@ -9,12 +9,33 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-## [2.0.1] — 2026-08-31
+## [2.1.0] — 2026-09-01
 
-Five correctness fixes, all found by running 2.0.0 against a repository small
-enough to sit under the scan cap. Truncation had been hiding them: on a large
-monorepo the bounded-scan guard suppresses exactly the checks that were wrong,
-so none of these could surface until the scan was complete.
+A minor, not the patch this started as. Most of it is correctness work, but
+`AGF306` is a new code, so a repository that reported nothing can now report
+something — and a repository that reported `AGF003` on a `.mdc` file will stop.
+Anything gating CI on the output sees a change, which is a minor by
+[docs/stability.md](docs/stability.md).
+
+Two threads run through it. The first began with running 2.0.0 against a
+repository small enough to sit under the scan cap: truncation had been hiding
+five bugs, because the bounded-scan guard suppresses exactly the checks that
+were wrong. The second began with @gantoine's review of an upstream PR, which
+showed that a flagship example was built on an assumption about a file format
+nobody had checked. That prompted a documentation-first audit of the hooks and
+permission surfaces, which found the two false positives below.
+
+### Added
+
+- **`AGF306`, a `globs` value Cursor will not match.** The inverse of the
+  mistake described under the `.mdc` reader below: a quoted or bracketed
+  `globs:` value is valid YAML and is exactly what a YAML-shaped intuition
+  writes, and Cursor matches none of it, because it compares the raw text. The
+  rule is reported as manual rather than path-scoped, so `AGF303` does not
+  report the same thing again with the cause removed.
+
+  Nothing else checks this, because checking it requires knowing that `.mdc`
+  frontmatter is not YAML.
 
 ### Fixed
 
@@ -59,6 +80,62 @@ so none of these could surface until the scan was complete.
 
 - **`doctor` says "1 rule applies everywhere".** The count was pluralised and
   the verb was not.
+
+- **`.mdc` frontmatter is not YAML, and quoting a glob breaks it.** Cursor reads
+  the raw text after `globs:` as the pattern list. It is not a YAML parser,
+  which is why `globs: *.py` works there, why Cursor's UI writes globs unquoted
+  and comma-separated, and why every example in its documentation is unquoted.
+
+  Parsing it as YAML was wrong three times over. A leading `*` opens an alias,
+  so the whole block failed and `description` and `alwaysApply` were lost with
+  it. `AGF003` was reported at error severity on a file that works. And the
+  suggested fix was to quote the value, which is the one edit that stops Cursor
+  matching the pattern at all — advice that silently disables the rule it claims
+  to repair.
+
+  `.mdc` now has its own reader. `.claude/agents` keeps the strict YAML one:
+  Anthropic documents that block as YAML, and the block-scalar form appears in
+  thousands of public repositories.
+
+  Caught by @gantoine reviewing PostHog/posthog#91631, who tested the consumer
+  instead of the spec. Both upstream PRs have been corrected.
+
+- **A leading bracket is a character class, not a YAML list.** The `AGF306`
+  check above shipped hours after that lesson and immediately repeated it, by
+  reading `[abc]*.ts` as a bracketed list. It is a glob character class and
+  Cursor matches it. A bracketed value is only reported when it also contains a
+  quote.
+
+- **A hook with `args` has no shell, so it has no shell mechanisms.** Claude
+  Code documents two forms for a `command` hook, and the presence of `args` is
+  the whole switch: without it the string is passed to a shell, with it the
+  executable is spawned directly and "there is no shell, so each `args` element
+  is one argument exactly as written". Both were matched against the same
+  patterns, so `{"command": "/bin/echo", "args": ["rm -rf /tmp/danger"]}` was
+  reported as deleting recursively. It prints a string.
+
+  Each pattern now states what it depends on. A shell mechanism cannot happen
+  without a shell. A finding about a program needs that program to be the
+  executable. A finding about text holds wherever the text appears. Shells
+  invoked *as* the executable are still read, so `{"command": "bash", "args":
+  ["-c", "curl x | sh"]}` is not a new blind spot.
+
+  A false positive on the security surface is the most expensive kind this tool
+  can produce: a reader who finds one alarm untrue has no reason to trust the
+  next.
+
+- **A repository that switched its hooks off is not running them.**
+  `disableAllHooks` is a documented setting and agentfile did not read it, so
+  every hook in such a repository was reported as something that runs
+  automatically with no prompt. It is now read from both settings files a
+  repository can commit, with project local outranking shared project as
+  documented.
+
+  Findings are kept rather than dropped — the switch is documented as temporary,
+  and dropping them would make one line in a settings file the cheapest place to
+  hide a `curl | sh` hook. They are reported at the severity something that does
+  not run deserves. A credential in a committed header is the exception and
+  keeps its severity: it is disclosed whether or not anything ever sends it.
 
 ## [2.0.0] — 2026-08-31
 
