@@ -129,8 +129,14 @@ export function loadYamlSource(file: string, text: string): YamlSource {
           message: error instanceof Error ? error.message : String(error),
           explanation:
             "The file parses as YAML but cannot be converted to a value. A bare `*` starts a " +
-            "YAML alias, so a value like `globs: *.py` needs quoting to mean the literal glob.",
-          suggestion: 'Quote the value, e.g. globs: "*.py".',
+            "YAML alias, so a value beginning with one is read as a reference to an anchor " +
+            "rather than as text.",
+          // Deliberately not "quote it". This path is reached by real YAML
+          // files, but the same shape appears in Cursor `.mdc`, where quoting
+          // is the one edit that stops the pattern matching — Cursor reads the
+          // raw text. Advice that is right in one format and destructive in
+          // the other does not belong in a message shared by both.
+          suggestion: "Quote the value, or start the pattern with something other than `*`.",
           location: firstAliasLocation(),
           data: { name: error instanceof Error ? error.name : "Error" },
         }),

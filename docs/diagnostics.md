@@ -308,6 +308,38 @@ Three deliberate limits, all stated in the finding rather than hidden:
 
 ---
 
+### `AGF306` unmatchable-glob-syntax · warning · active
+A Cursor `.mdc` rule whose `globs` value is quoted or bracketed, which Cursor
+will not match.
+
+`.mdc` frontmatter looks like YAML and is not. Cursor reads the raw text after
+`globs:` as a comma-separated pattern list, so the punctuation does not
+disappear the way a YAML parser would make it disappear — it becomes part of
+the pattern. `globs: "*.py"` asks for a file literally named `"*.py"`, quote
+characters included. Nothing matches, and the rule silently never attaches.
+
+```
+globs: "*.py"              # nothing matches, quotes are part of the pattern
+globs: ["src/**/*.ts"]     # nothing matches, brackets are part of the pattern
+globs: *.py                # correct: Cursor matches this
+globs: src/**/*.ts, docs/**/*.md   # correct: bare and comma-separated
+```
+
+The instinct is backwards here, which is why this code exists. Quoting is the
+right fix for a leading `*` in YAML and the wrong one in `.mdc`, and a tool that
+does not know the difference will confidently tell you to break a working rule.
+Cursor's own UI writes globs unquoted, and every example in its documentation is
+unquoted.
+
+A rule reported under this code is not also reported under
+[`AGF303`](#agf303-unreachable-configuration--warning--active). The pattern does
+match nothing, so `AGF303` would be true, but it would be the same finding with
+the cause removed.
+
+Note that this is about Cursor's reader, not about the file being invalid. A
+bare `globs: *.py` is invalid YAML and is *not* reported here or anywhere else:
+Cursor is the only program that reads these files, and it reads that correctly.
+
 ## AGF4xx — context budget
 
 ### `AGF401` context-overload · warning · active

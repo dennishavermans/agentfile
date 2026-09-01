@@ -43,7 +43,7 @@ describe("parseFrontmatter", () => {
 
     expect(parsed.diagnostics.length).toBeGreaterThan(0);
     expect(parsed.diagnostics[0].code).toBe("AGF003");
-    expect(parsed.diagnostics[0].suggestion).toContain('"*.py"');
+    expect(parsed.diagnostics[0].suggestion).toContain("Quote the value, or start the pattern");
     expect(parsed.diagnostics[0].location?.line).toBe(2);
     expect(parsed.data).toBeUndefined();
   });

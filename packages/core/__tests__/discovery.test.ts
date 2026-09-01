@@ -329,13 +329,47 @@ describe("discoverCursorRules", () => {
 
   it("treats globs as path-scoped", () => {
     const { fs, scan } = scanOf({
-      "/repo/.cursor/rules/api.mdc": '---\ndescription: API\nglobs: ["src/api/**"]\nalwaysApply: false\n---\n\nBody',
+      "/repo/.cursor/rules/api.mdc": "---\ndescription: API\nglobs: src/api/**\nalwaysApply: false\n---\n\nBody",
     });
 
     expect(discoverCursorRules(ROOT, scan, fs).instructions[0].applies).toEqual({
       kind: "paths",
       patterns: ["src/api/**"],
     });
+  });
+
+  // `.mdc` is not YAML. Cursor takes the raw text after `globs:`, so the list
+  // form is a pattern containing brackets and quotes, and matches nothing.
+  it("reports the YAML list form as unmatchable rather than reading it", () => {
+    const { fs, scan } = scanOf({
+      "/repo/.cursor/rules/api.mdc": '---\nglobs: ["src/api/**"]\nalwaysApply: false\n---\n\nBody',
+    });
+
+    const found = discoverCursorRules(ROOT, scan, fs);
+    expect(found.diagnostics[0].code).toBe("AGF306");
+    expect(found.diagnostics[0].suggestion).toBe("Write the patterns bare and comma-separated: globs: src/api/**");
+    // Not path-scoped: it would otherwise be reported dead a second time.
+    expect(found.instructions[0].applies).toEqual({ kind: "manual" });
+  });
+
+  it("reports a quoted glob as unmatchable", () => {
+    const { fs, scan } = scanOf({
+      "/repo/.cursor/rules/py.mdc": '---\nglobs: "*.py"\nalwaysApply: false\n---\n\nBody',
+    });
+
+    const found = discoverCursorRules(ROOT, scan, fs);
+    expect(found.diagnostics[0].code).toBe("AGF306");
+    expect(found.diagnostics[0].suggestion).toBe("Write the patterns bare and comma-separated: globs: *.py");
+  });
+
+  // The shape that started all this. Invalid YAML, valid Cursor, and the one
+  // thing agentfile must not tell anyone to quote.
+  it("reads a bare-asterisk glob as the pattern Cursor matches on", () => {
+    const { fs, scan } = scanOf({ "/repo/.cursor/rules/py.mdc": "---\nglobs: *.py\n---\n\nBody" });
+
+    const found = discoverCursorRules(ROOT, scan, fs);
+    expect(found.diagnostics).toEqual([]);
+    expect(found.instructions[0].applies).toEqual({ kind: "paths", patterns: ["*.py"] });
   });
 
   it("treats a description with no globs as agent-selected", () => {
@@ -362,7 +396,7 @@ describe("discoverCursorRules", () => {
   // whenever an unrelated *.py existed at the root.
   it("scopes a nested rule's globs to the directory it governs", () => {
     const { fs, scan } = scanOf({
-      "/repo/python/.cursor/rules/py.mdc": '---\nglobs: "*.py"\nalwaysApply: false\n---\n\nBody',
+      "/repo/python/.cursor/rules/py.mdc": "---\nglobs: *.py\nalwaysApply: false\n---\n\nBody",
     });
 
     expect(discoverCursorRules(ROOT, scan, fs).instructions[0].applies).toEqual({
@@ -373,7 +407,7 @@ describe("discoverCursorRules", () => {
 
   it("leaves a root rule's globs alone", () => {
     const { fs, scan } = scanOf({
-      "/repo/.cursor/rules/py.mdc": '---\nglobs: "*.py"\nalwaysApply: false\n---\n\nBody',
+      "/repo/.cursor/rules/py.mdc": "---\nglobs: *.py\nalwaysApply: false\n---\n\nBody",
     });
 
     expect(discoverCursorRules(ROOT, scan, fs).instructions[0].applies).toEqual({
@@ -385,7 +419,7 @@ describe("discoverCursorRules", () => {
   // A leading slash is the author anchoring to the repository root themselves.
   it("does not nest a pattern the author anchored to the root", () => {
     const { fs, scan } = scanOf({
-      "/repo/python/.cursor/rules/py.mdc": '---\nglobs: "/scripts/*.py"\nalwaysApply: false\n---\n\nBody',
+      "/repo/python/.cursor/rules/py.mdc": "---\nglobs: /scripts/*.py\nalwaysApply: false\n---\n\nBody",
     });
 
     expect(discoverCursorRules(ROOT, scan, fs).instructions[0].applies).toEqual({
