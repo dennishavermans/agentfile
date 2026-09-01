@@ -35,7 +35,7 @@
     "diff": "^8.0.4",
     "express": "^5.2.1",
     "lucide-react": "^1.7.0",
-    "open": "^11.0.0",
+    "open": "^11.0.2",
     "tailwind-merge": "^3.5.0",
     "yaml": "^2.9.0",
     "zod": "^4.4.3"
