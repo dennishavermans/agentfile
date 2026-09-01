@@ -21,7 +21,7 @@ jobs:
     name: Reports and counts known defects
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       # Two defects a human reads straight past: a bare * opens a YAML alias
       # rather than a glob, so neither rule's frontmatter parses at all.
@@ -80,7 +80,7 @@ jobs:
     name: Gates the build when findings are present
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - run: |
           mkdir -p subject/.cursor/rules
@@ -109,7 +109,7 @@ jobs:
       contents: read
       security-events: write
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - uses: ./
         id: agentfile
