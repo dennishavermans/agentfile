@@ -935,16 +935,26 @@ describe("auditPermissions", () => {
   // ─── compound-command separators ───────────────────────────────────────
 
   describe("rules that span a command separator", () => {
-    it("reports a deny rule written across a pipe, which is the common shape", () => {
-      const findings = audit([rule("deny", "Bash(curl * | sh)")]);
+    it("reports an allow rule written across a pipe", () => {
+      const findings = audit([rule("allow", "Bash(cd src && go build)")]);
       expect(findings).toHaveLength(1);
       expect(findings[0].code).toBe("AGF506");
       expect(findings[0].severity).toBe("error");
       expect(findings[0].data?.problem).toBe("separator-spanning-rule");
-      expect(findings[0].data?.separator).toBe("|");
-      expect(findings[0].explanation).toContain("Nothing is denied by this rule");
+      expect(findings[0].data?.separator).toBe("&&");
       // The suggested replacement must not carry the same defect forward.
-      expect(findings[0].suggestion).toContain("Bash(curl *)");
+      expect(findings[0].suggestion).toContain("Bash(cd src)");
+    });
+
+    it("says nothing about a deny rule, because a deny spanning a separator works", () => {
+      // Measured against Claude Code 2.1.238, not read: with `printf` and `tee`
+      // both allowed, adding `deny: ["Bash(printf hi | tee out.txt)"]` blocks the
+      // command. Deny is matched against the whole command as well as the parts.
+      // An earlier version of this check called 67 real deny rules dead, on the
+      // strength of a documented sentence written about allow semantics.
+      expect(audit([rule("deny", "Bash(curl * | sh)")])).toHaveLength(0);
+      expect(audit([rule("deny", "Bash(wget * | bash)")])).toHaveLength(0);
+      expect(audit([rule("ask", "Bash(cd src && go build)")])).toHaveLength(0);
     });
 
     it("recognises every documented separator", () => {
@@ -979,9 +989,10 @@ describe("auditPermissions", () => {
     });
 
     it("is reported instead of, not alongside, the shape checks it makes moot", () => {
-      // The rule is dead because of the pipe. That its colon is also misplaced
-      // is not the reader's problem, and fixing the pipe does not leave it.
-      const findings = audit([rule("deny", "Bash(curl:* | sh)")]);
+      // The rule grants nothing because of the pipe. That its colon is also
+      // misplaced is not the reader's problem, and fixing the pipe does not
+      // leave it behind.
+      const findings = audit([rule("allow", "Bash(curl:* | sh)")]);
       expect(findings).toHaveLength(1);
       expect(findings[0].data?.problem).toBe("separator-spanning-rule");
     });

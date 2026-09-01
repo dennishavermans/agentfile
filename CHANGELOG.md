@@ -64,12 +64,20 @@ that same afternoon, before it shipped.
   page documents is now detected — 16 of 16 against a fixture built from the
   page itself, up from 7.
 
-  A rule that spans a command separator matches nothing. A command is split on
-  `&&`, `||`, `;`, `|`, `|&`, `&` and newlines *before* rules are matched, so a
-  rule whose text spans one is compared against fragments it cannot equal. This
-  is the one worth having: 126 rules in the corpus, 67 of them denies.
-  `Bash(curl * | sh)` in a deny list is how people try to block the oldest trick
-  there is, and it blocks nothing; `Bash(cd src && go build:*)` approves nothing.
+  An **allow** rule that spans a command separator grants nothing. A command is
+  split on `&&`, `||`, `;`, `|`, `|&`, `&` and newlines *before* rules are
+  matched, so `Bash(cd src && go build:*)` is compared against fragments it
+  cannot equal and the command still prompts. 61 rules in the corpus.
+
+  Allow only, and that limit came from running Claude Code rather than reading
+  about it. With `printf` and `tee` as the two halves, so neither is a built-in
+  read-only command: allowing both subcommands separately runs; allowing only
+  the whole compound is refused; allowing both and *denying* the whole compound
+  is also refused. So a deny rule spanning a separator does block —
+  `Bash(curl * | sh)` in a deny list works — and an earlier version of this
+  check called 67 such rules dead on the strength of a documented sentence
+  written about allow semantics.
+
   Two details decide whether the check is useful or noise — a pipe inside
   `sed 's|a|b|'` is an argument, not an operator, and 161 rules are that shape;
   and `>&` is a redirection, so reading it as a separator would report the real

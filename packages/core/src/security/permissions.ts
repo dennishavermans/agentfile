@@ -461,19 +461,32 @@ function unstrippedRunner(rule: PermissionRule): Diagnostic[] {
 }
 
 /**
- * AGF506 for a rule that spans a command separator.
+ * AGF506 for an allow rule that spans a command separator.
  *
  * Documented: a command is split on `&&`, `||`, `;`, `|`, `|&`, `&` and
- * newlines, and "a rule must match each subcommand independently". The split
- * happens before matching, so no subcommand ever contains the separator — and a
- * rule whose text spans one is compared against fragments it cannot equal.
+ * newlines, and "a rule must match each subcommand independently".
  *
- * The shape is common and it looks right. `Bash(cd src && go build:*)` reads as
- * approval for that exact sequence. `Bash(curl * | sh)` in a deny list reads as
- * a block on the oldest trick there is. Neither matches anything: in a 344-file
- * sample, 62 allow rules and 67 deny rules are written this way.
+ * Allow rules only, and that limit was measured rather than read. Against
+ * Claude Code 2.1.238, with `printf` and `tee` as the two halves so neither is
+ * a built-in read-only command:
+ *
+ *   allow both subcommands separately          -> runs
+ *   allow only `Bash(printf hi | tee out.txt)` -> refused
+ *   allow both, deny the same whole compound   -> refused
+ *
+ * The first two say an allow rule spanning a separator grants nothing, which is
+ * what the documented sentence implies. The third says a deny rule spanning one
+ * still blocks, which it does not — deny is also matched against the whole
+ * command, not only against the pieces. Confirmed on `|` and on `&&`.
+ *
+ * So `Bash(curl * | sh)` in a deny list does its job, and an earlier version of
+ * this check called 67 such rules dead on the strength of a sentence written
+ * about allow semantics. `Bash(cd src && go build:*)` in an allow list really
+ * does grant nothing.
  */
 function separatorSpanningRule(rule: PermissionRule): Diagnostic[] {
+  if (rule.effect !== "allow") return [];
+
   const { tool, specifier } = parsePermissionRule(rule.rule);
   if (tool !== "Bash" || !specifier) return [];
 
@@ -486,21 +499,18 @@ function separatorSpanningRule(rule: PermissionRule): Diagnostic[] {
     diagnostic({
       code: "AGF506",
       severity: "error",
-      message: `Permission rule ${rule.rule} matches nothing: ${separator} splits a command before rules are matched`,
+      message: `Allow rule ${rule.rule} approves nothing: ${separator} splits a command before rules are matched`,
       explanation: [
         `Claude Code splits a command on \`&&\`, \`||\`, \`;\`, \`|\`, \`|&\`, \`&\` and newlines,`,
-        "then matches each subcommand on its own. No subcommand contains the separator,",
-        "so a rule whose text spans one is compared against fragments it cannot equal.",
+        "then requires an allow rule for each subcommand on its own. No subcommand",
+        "contains the separator, so this rule is compared against fragments it cannot",
+        "equal, and the command it was written for still prompts.",
         "",
-        rule.effect === "deny"
-          ? "Nothing is denied by this rule. A deny rule written across a pipe is a common\nway to try to block `curl … | sh`, and it does not block it — each half is\nmatched separately, and neither half is this rule."
-          : `Nothing is ${rule.effect === "ask" ? "gated" : "approved"} by this rule. The command it was written for still prompts.`,
+        "Deny rules are not affected: those are also matched against the whole command,",
+        "so a deny spanning a separator does block.",
         `\nPermission syntax:\n  ${PERMISSIONS_DOC}#compound-commands`,
       ].join("\n"),
-      suggestion:
-        rule.effect === "deny"
-          ? `Write one rule per subcommand you want to stop, such as "Bash(${first.trim() || "curl *"})" — a deny on any subcommand stops the whole command.`
-          : `Write one rule per subcommand. Claude Code needs a rule matching every part before it runs the whole thing.`,
+      suggestion: `Write one rule per subcommand — starting with "Bash(${first.trim() || "..."})". Claude Code needs a rule matching every part before it runs the whole thing.`,
       location: locationOf(rule),
       data: { rule: rule.rule, effect: rule.effect, separator, problem: "separator-spanning-rule" },
     }),
