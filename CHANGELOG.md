@@ -207,6 +207,18 @@ that same afternoon, before it shipped.
   not run deserves. A credential in a committed header is the exception and
   keeps its severity: it is disclosed whether or not anything ever sends it.
 
+- **`Bash(find:*)` and `Bash(find *)` are the same rule.** The documentation
+  says so — "the `:*` suffix is an equivalent way to write a trailing wildcard"
+  — but every check that reads the command word saw only the space form, so the
+  same rule got two verdicts depending on which spelling its author chose.
+
+  Found by running against chain33, a 733-star repository cloned in full. It
+  writes all 45 of its permission rules in the `:*` form and agentfile reported
+  nothing; one of them is `Bash(find:*)`, which does not cover `find -exec`.
+  The missed spelling is the more common one: across 12,556 rules,
+  `Bash(find:*)` appears 77 times against 26 for `Bash(find *)`. Normalising it
+  adds 111 findings that were always true.
+
 - **Two permission checks fired on rules the documentation defines.** Neither
   appeared against fixtures.
 
