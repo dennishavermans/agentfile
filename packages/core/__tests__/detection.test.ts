@@ -56,10 +56,42 @@ const SKILL = (body: string, description = "Deploys the service to production wh
 
 const CASES: Case[] = [
   {
-    defect: "a rule file whose YAML frontmatter does not parse",
+    // An unclosed fence, which breaks the file under any reading: there is no
+    // frontmatter block, so the whole file becomes body text and the agent has
+    // no name or description at all.
+    //
+    // This case used to be a `description` containing `: `, on the reasoning
+    // that Anthropic documents the block as YAML and a plain scalar with a
+    // colon does not parse. Both halves are true and the conclusion was wrong.
+    // Claude Code 2.1.238 loads such a file and reads the description
+    // correctly, verified by listing its subagents; it also loads
+    // `description: [unclosed`, which no strict parser accepts. Documented as
+    // YAML is not the same as parsed strictly, which is the same mistake as
+    // reading `.mdc` as YAML, made again on the next surface along.
+    defect: "a subagent file whose frontmatter fence is never closed",
     code: "AGF003",
-    broken: { [`${ROOT}/.cursor/rules/py.mdc`]: "---\nglobs: *.py\n---\n\nUse type hints.\n" },
-    fixed: { [`${ROOT}/.cursor/rules/py.mdc`]: '---\nglobs: "*.py"\n---\n\nUse type hints.\n' },
+    broken: {
+      [`${ROOT}/.claude/agents/reviewer.md`]: "---\nname: reviewer\ndescription: Reviews code\n\nReview the code.\n",
+    },
+    fixed: {
+      [`${ROOT}/.claude/agents/reviewer.md`]:
+        "---\nname: reviewer\ndescription: Reviews code\n---\n\nReview the code.\n",
+    },
+  },
+  {
+    // The inverse of AGF003, and the reason the two cannot share a rule.
+    // Quoting is the fix in YAML and the defect in `.mdc`: Cursor matches on
+    // the raw text, so the quotes become part of the pattern.
+    defect: "a Cursor rule whose globs are quoted, which Cursor will not match",
+    code: "AGF306",
+    broken: {
+      [`${ROOT}/.cursor/rules/py.mdc`]: '---\nglobs: "*.py"\n---\n\nUse type hints.\n',
+      [`${ROOT}/app.py`]: "x = 1\n",
+    },
+    fixed: {
+      [`${ROOT}/.cursor/rules/py.mdc`]: "---\nglobs: *.py\n---\n\nUse type hints.\n",
+      [`${ROOT}/app.py`]: "x = 1\n",
+    },
   },
   {
     // `@path` is Claude Code syntax. AGENTS.md is plain Markdown with no import
@@ -100,11 +132,11 @@ const CASES: Case[] = [
     code: "AGF303",
     broken: {
       [`${ROOT}/AGENTS.md`]: "- Use pnpm\n",
-      [`${ROOT}/.cursor/rules/api.mdc`]: '---\nglobs: "services/api/**"\n---\n\nValidate every input.\n',
+      [`${ROOT}/.cursor/rules/api.mdc`]: "---\nglobs: services/api/**\n---\n\nValidate every input.\n",
     },
     fixed: {
       [`${ROOT}/AGENTS.md`]: "- Use pnpm\n",
-      [`${ROOT}/.cursor/rules/api.mdc`]: '---\nglobs: "services/api/**"\n---\n\nValidate every input.\n',
+      [`${ROOT}/.cursor/rules/api.mdc`]: "---\nglobs: services/api/**\n---\n\nValidate every input.\n",
       [`${ROOT}/services/api/index.ts`]: "export const handler = () => {};\n",
     },
   },
@@ -287,7 +319,7 @@ describe("a bounded scan never proves a file is missing", () => {
 
   it("does not call a glob dead when the scan could not see the directory", () => {
     const files = {
-      [`${ROOT}/.cursor/rules/api.mdc`]: '---\nglobs: "services/api/**"\n---\n\nValidate every input.\n',
+      [`${ROOT}/.cursor/rules/api.mdc`]: "---\nglobs: services/api/**\n---\n\nValidate every input.\n",
       [`${ROOT}/services/api/index.ts`]: "export const handler = () => {};\n",
     };
 
@@ -303,7 +335,7 @@ describe("a bounded scan never proves a file is missing", () => {
 
   it("still calls a glob dead when its directory is genuinely absent", () => {
     const files = {
-      [`${ROOT}/.cursor/rules/api.mdc`]: '---\nglobs: "services/api/**"\n---\n\nValidate every input.\n',
+      [`${ROOT}/.cursor/rules/api.mdc`]: "---\nglobs: services/api/**\n---\n\nValidate every input.\n",
     };
 
     const result = runValidation({

@@ -1,9 +1,14 @@
 /**
  * YAML frontmatter parsing for markdown configuration files.
  *
- * Every markdown-based agent format in use — SKILL.md, `.claude/rules/*.md`,
- * `.claude/agents/*.md`, Cursor `.mdc`, Copilot `*.instructions.md` — is
- * "optional YAML frontmatter, then markdown". One parser serves all of them.
+ * Most markdown-based agent formats — SKILL.md, `.claude/rules/*.md`,
+ * `.claude/agents/*.md`, Copilot `*.instructions.md` — are "optional YAML
+ * frontmatter, then markdown", and `parseFrontmatter` serves all of them.
+ * Anthropic documents the subagent block as YAML, so strictness is correct
+ * there.
+ *
+ * Cursor `.mdc` is the exception and has its own reader below. It looks like
+ * YAML and is not.
  */
 
 import { type Diagnostic, diagnostic } from "../diagnostics/index.js";
@@ -127,6 +132,116 @@ export function parseFrontmatter(file: string, text: string): ParsedFrontmatter 
 // the same field. These helpers normalise without inventing meaning.
 
 /** Reads a string field. Returns undefined for absent or non-string values. */
+/**
+ * Cursor `.mdc` frontmatter, read the way Cursor reads it.
+ *
+ * Cursor takes the raw text after `key:` as the value. It is not a YAML
+ * parser, which is why `globs: *.py` works there, why Cursor's own UI writes
+ * globs unquoted and comma-separated, and why every example in its docs is
+ * unquoted.
+ *
+ * Parsing these as YAML was wrong in a way that cost more than it looks. A
+ * leading `*` is a YAML alias, so the whole block failed and agentfile lost
+ * `description` and `alwaysApply` along with the glob — then reported an error
+ * on a file that works. Worse, it advised quoting the value, which is the one
+ * edit that stops Cursor matching the pattern at all.
+ *
+ * The format is flat: `key: value` lines, no nesting, no types beyond
+ * `alwaysApply`. Anything a real YAML parser would do to the value — resolving
+ * aliases, stripping quotes, coercing numbers — would be a divergence from the
+ * only program that reads these files.
+ */
+export function parseCursorFrontmatter(file: string, text: string): ParsedFrontmatter {
+  const lines = text.split("\n");
+
+  if ((lines[0] ?? "").trim() !== "---") {
+    return { body: text, bodyLine: 1, hasFrontmatter: false, diagnostics: [] };
+  }
+
+  let closingIndex = -1;
+  for (let index = 1; index < lines.length; index++) {
+    if (lines[index].trim() === "---") {
+      closingIndex = index;
+      break;
+    }
+  }
+
+  if (closingIndex === -1) {
+    return {
+      body: text,
+      bodyLine: 1,
+      hasFrontmatter: false,
+      diagnostics: [
+        diagnostic({
+          code: "AGF003",
+          message: "Frontmatter block is never closed",
+          explanation:
+            "The file opens with `---` but has no closing `---`, so the frontmatter cannot be read " +
+            "and the whole file is treated as body text.",
+          suggestion: "Add a closing `---` after the frontmatter fields.",
+          location: { file, line: 1, column: 1 },
+        }),
+      ],
+    };
+  }
+
+  const data: Record<string, unknown> = {};
+  for (let index = 1; index < closingIndex; index++) {
+    const match = lines[index].match(/^([A-Za-z_][\w-]*):[ \t]?(.*)$/);
+    if (!match) continue;
+
+    const [, key, rest] = match;
+    const value = rest.trim();
+    // `alwaysApply` is the one field Cursor reads as a boolean. Everything
+    // else stays the literal text, quotes and all, because that is what
+    // Cursor will try to match with.
+    data[key] = key === "alwaysApply" && (value === "true" || value === "false") ? value === "true" : value;
+  }
+
+  return {
+    data,
+    body: lines.slice(closingIndex + 1).join("\n"),
+    bodyLine: closingIndex + 2,
+    hasFrontmatter: true,
+    diagnostics: [],
+  };
+}
+
+/**
+ * Claude Code subagent frontmatter, read the way Claude Code reads it.
+ *
+ * Anthropic documents this block as YAML and documents that "YAML that doesn't
+ * parse" means Claude Code "reads no fields from the file, skips it, and writes
+ * the parse error to the debug log". Both are true, and together they are
+ * misleading: the parser Claude Code actually uses is not a strict one, and
+ * almost nothing a person writes by hand fails it.
+ *
+ * Tested against Claude Code 2.1.238 rather than inferred. A file whose
+ * frontmatter reads `description: [unclosed` — rejected by `yaml`, `js-yaml`
+ * and Ruby's Psych alike — loads as a working subagent, and its description
+ * comes through as the literal string `[unclosed`. So does PostHog's, whose
+ * five agent files carry an unquoted `description` containing `Context: ` and
+ * are rejected by all three parsers. agentfile reported those five at error
+ * severity, and they work.
+ *
+ * The fix is the same shape as the Cursor one: try YAML first, because the
+ * structured fields (`hooks`, `mcpServers`, `experimental`) are real mappings
+ * and a strict parse reads them properly. When that fails, fall back to the
+ * flat `key: value` reading rather than declaring the file broken, because
+ * that is what the program reading it does.
+ */
+export function parseAgentFrontmatter(file: string, text: string): ParsedFrontmatter {
+  const strict = parseFrontmatter(file, text);
+
+  // An unclosed fence is a real defect in either reading: there is no
+  // frontmatter block at all, and the whole file becomes body text.
+  const unclosed = strict.diagnostics.some((item) => item.message === "Frontmatter block is never closed");
+  if (!strict.diagnostics.length || unclosed) return strict;
+
+  const lenient = parseCursorFrontmatter(file, text);
+  return { ...lenient, diagnostics: [] };
+}
+
 export function stringField(data: Record<string, unknown> | undefined, key: string): string | undefined {
   const value = data?.[key];
   return typeof value === "string" ? value : undefined;

@@ -43,6 +43,27 @@ function resolveRelative(directory: string, target: string): string | undefined 
   return segments.join("/");
 }
 
+/**
+ * The paths a link could mean, in the order an agent would find them.
+ *
+ * `./api.md` and `../../tools/x.md` are explicitly relative and have exactly
+ * one reading. A bare path like `services/mcp/src/lib/x.ts` has two: relative
+ * to the skill, which is what Markdown says, and relative to the repository
+ * root, which is how people actually write paths in a document *about* a
+ * repository. PostHog has one of each in the same skill directory.
+ *
+ * Both are tried before a link is called broken. Reporting the Markdown
+ * reading as missing while the file sits at the root is a false error on
+ * configuration that works, which is worse than saying nothing.
+ */
+function candidatePaths(directory: string, target: string): string[] {
+  const explicitlyRelative = target.startsWith("./") || target.startsWith("../");
+  const paths = [resolveRelative(directory, target)];
+  if (!explicitlyRelative) paths.push(resolveRelative("", target));
+
+  return [...new Set(paths.filter((path): path is string => path !== undefined))];
+}
+
 interface BodyLink {
   target: string;
   line: number;
@@ -66,8 +87,8 @@ function bodyLinks(skill: SkillEntry): BodyLink[] {
 /**
  * AGF004 for every skill link that resolves to no file.
  *
- * Resolution is against the scan's file list, so a link is only reported when
- * the repository genuinely does not contain it — a link pointing outside the
+ * A link is only reported when the repository contains it under none of its
+ * plausible readings — see candidatePaths — and a link pointing outside the
  * repository is skipped rather than guessed at.
  */
 export interface SkillReferenceOptions {
@@ -114,20 +135,26 @@ export function checkSkillReferences(
       const target = link.target.split("#")[0];
       if (!target) continue;
 
-      const resolved = resolveRelative(directory, target);
-      if (resolved === undefined) continue; // escapes the root; not ours to check
-      if (exists(resolved)) continue;
+      const candidates = candidatePaths(directory, target);
+      if (!candidates.length) continue; // escapes the root; not ours to check
+      if (candidates.some(exists)) continue;
+
+      const resolved = candidates[0];
+      const where =
+        candidates.length > 1
+          ? `Checked ${candidates[0]} (relative to the skill) and ${candidates[1]} (relative to the repository root), and neither is in the repository. `
+          : `Resolved to ${resolved}, and no such file is in the repository. `;
 
       diagnostics.push(
         diagnostic({
           code: "AGF004",
           message: `Skill "${skill.name || basenameOf(skill.provenance.file)}" links to ${target}, which does not exist`,
           explanation:
-            `Resolved to ${resolved}, and no such file is in the repository. ` +
+            where +
             "The agent will follow the link, find nothing, and continue with less information than the skill said it would have — without reporting anything.",
           suggestion: `Add ${resolved}, or correct the link.`,
           location: { file: skill.provenance.file, line: link.line },
-          data: { skill: skill.name, target, resolved },
+          data: { skill: skill.name, target, resolved, checked: candidates.join(", ") },
         }),
       );
     }

@@ -7,7 +7,7 @@
  */
 
 import { join } from "node:path";
-import type { Diagnostic } from "../diagnostics/index.js";
+import { type Diagnostic, diagnostic } from "../diagnostics/index.js";
 import type { FileSystem } from "../fs/index.js";
 import {
   ALWAYS,
@@ -20,7 +20,13 @@ import {
   type SourceFile,
   slugify,
 } from "../ir/index.js";
-import { booleanField, globListField, parseFrontmatter, stringField } from "../parsers/frontmatter.js";
+import {
+  booleanField,
+  globListField,
+  parseCursorFrontmatter,
+  parseFrontmatter,
+  stringField,
+} from "../parsers/frontmatter.js";
 import { normalizePath } from "../paths/index.js";
 import { filesNamed, filesUnder, type RepositoryScan } from "./scan.js";
 import {
@@ -30,6 +36,7 @@ import {
   hierarchicalApplicability,
   originFor,
   provenanceOf,
+  scopedPatterns,
 } from "./shared.js";
 
 export interface DiscoveredInstructions {
@@ -152,7 +159,7 @@ export function discoverClaudeRules(root: string, scan: RepositoryScan, fs: File
       bodyLine: parsed.bodyLine,
       // A path-scoped rule is glob-scoped. An unscoped rule follows the file's
       // own position in the tree, matching how nested rule directories behave.
-      applies: paths?.length ? appliesToPaths(paths) : hierarchicalApplicability(file),
+      applies: paths?.length ? appliesToPaths(scopedPatterns(file, paths)) : hierarchicalApplicability(file),
       provenance,
     });
     result.sources.push(sourceOf(file, "claude", "rule", text));
@@ -178,18 +185,29 @@ export function discoverCursorRules(root: string, scan: RepositoryScan, fs: File
     const text = readFile(fs, root, file);
     if (text === undefined) continue;
 
-    const parsed = parseFrontmatter(file, text);
+    // Cursor's own reader, not YAML. See parseCursorFrontmatter.
+    const parsed = parseCursorFrontmatter(file, text);
     result.diagnostics.push(...parsed.diagnostics);
 
     const alwaysApply = booleanField(parsed.data, "alwaysApply");
+    const rawGlobs = stringField(parsed.data, "globs");
     const globs = globListField(parsed.data, "globs");
     const description = stringField(parsed.data, "description");
 
+    const unmatchable = unmatchableGlobDiagnostics(file, rawGlobs);
+    result.diagnostics.push(...unmatchable);
+
+    // A glob Cursor cannot match is not a path scope, so an unmatchable one
+    // falls through to manual. Treating it as a scope would report the rule
+    // dead a second time under AGF303 — true, but the same finding with the
+    // cause stripped off.
+    const pathScoped = !unmatchable.length && globs?.length;
+
     const applies = alwaysApply
       ? ALWAYS
-      : globs?.length
-        ? appliesToPaths(globs)
-        : description
+      : pathScoped
+        ? appliesToPaths(scopedPatterns(file, globs as string[]))
+        : description && !unmatchable.length
           ? MODEL_SELECTED
           : MANUAL;
 
@@ -228,6 +246,53 @@ export function discoverLegacyCursorRules(root: string, scan: RepositoryScan, fs
   }
 
   return result;
+}
+
+/**
+ * Globs written in a shape Cursor will not match.
+ *
+ * Cursor takes the raw text after `globs:` as the pattern list, so quoting or
+ * bracketing it does not produce a string — it produces a pattern containing
+ * the punctuation. `globs: "*.py"` asks for a file literally named `"*.py"`,
+ * quotes included, and nothing matches. The rule then never attaches, with no
+ * error anywhere, which is the failure this project exists to surface.
+ *
+ * Worth stating plainly because the instinct is backwards here: quoting is the
+ * right fix in YAML and the wrong one in `.mdc`. Cursor's documentation shows
+ * every glob unquoted and comma-separated.
+ */
+function unmatchableGlobDiagnostics(file: string, globs: string | undefined): Diagnostic[] {
+  const value = globs?.trim();
+  if (!value) return [];
+
+  const quoted = /^(["']).*\1$/.test(value);
+  // A YAML flow sequence, not a glob character class. `[abc]*.ts` and
+  // `[a-z]*/**` are legal patterns that open with `[`, so a leading bracket
+  // alone proves nothing; the quotes are what make it a list someone typed
+  // expecting YAML to unwrap them.
+  const bracketed = value.startsWith("[") && value.endsWith("]") && /["']/.test(value);
+  if (!quoted && !bracketed) return [];
+
+  const bare = bracketed
+    ? value
+        .replace(/^\[|\]$/g, "")
+        .replace(/["']/g, "")
+        .trim()
+    : value.slice(1, -1);
+
+  return [
+    diagnostic({
+      code: "AGF306",
+      message: `Cursor will not match globs written as ${bracketed ? "a list" : "a quoted string"}: ${value}`,
+      explanation:
+        "Cursor reads the text after `globs:` as the pattern list rather than as YAML, so the " +
+        `${bracketed ? "brackets and quotes" : "quote characters"} become part of the pattern. ` +
+        "Nothing matches, and the rule silently never attaches to any file.",
+      suggestion: `Write the patterns bare and comma-separated: globs: ${bare}`,
+      location: { file, line: 1 },
+      data: { value, form: bracketed ? "list" : "quoted" },
+    }),
+  ];
 }
 
 // ─── GitHub Copilot ────────────────────────────────────────────────────────

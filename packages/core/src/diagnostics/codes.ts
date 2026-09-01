@@ -222,6 +222,17 @@ export const DIAGNOSTIC_CODES = {
     status: "active",
   },
 
+  AGF306: {
+    name: "unmatchable-glob-syntax",
+    title: "Glob is written in a form the platform will not match",
+    band: "resolution",
+    // A warning, not an error: the file is well-formed and the intent is
+    // obvious. What is wrong is that the platform reading it will not match
+    // the pattern, so the rule silently never attaches.
+    defaultSeverity: "warning",
+    status: "active",
+  },
+
   // ─── AGF4xx — context budget ────────────────────────────────────────────
   AGF401: {
     name: "context-overload",

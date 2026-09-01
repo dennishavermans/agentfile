@@ -9,6 +9,244 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.1.0] — 2026-09-01
+
+A minor, not the patch this started as. Most of it is correctness work, but
+`AGF306` is a new code, so a repository that reported nothing can now report
+something — and a repository that reported `AGF003` on a `.mdc` file will stop.
+Anything gating CI on the output sees a change, which is a minor by
+[docs/stability.md](docs/stability.md).
+
+Three threads run through it. The first began with running 2.0.0 against a
+repository small enough to sit under the scan cap: truncation had been hiding
+five bugs, because the bounded-scan guard suppresses exactly the checks that
+were wrong. The second began with @gantoine's review of an upstream PR, which
+showed that a flagship example was built on an assumption about a file format
+nobody had checked. That prompted a documentation-first audit of the hooks and
+permission surfaces.
+
+The third was running the permission analyser over 12,556 rules from 344
+`.claude/settings.json` files in public repositories. Fixtures only contain
+what someone thought to write down; the corpus found two checks firing on
+documented-valid syntax, and caught a third false positive in a check added
+that same afternoon, before it shipped.
+
+### Added
+
+- **Three documented ways a permission rule does not do what it says.** All
+  three are `AGF506`, which already means "permission rule does not grant what
+  it appears to", so no new code is involved.
+
+  An `mcp__` rule with parentheses is *skipped* when the settings file loads —
+  discarded whole, not narrowed. As a deny rule that is the worst thing a
+  permissions file can contain: it reads as a restriction, a reviewer counts it
+  as one, and the tool is unrestricted. Claude Code says so in the
+  invalid-settings dialog and in `claude doctor`, but not in the diff where the
+  rule was added.
+
+  A tool's primary content field cannot be parameter-matched — `command` on Bash
+  and PowerShell, `file_path` on Read, Edit and Write, `path` on Grep and Glob,
+  `notebook_path` on NotebookEdit, `url` on WebFetch. Claude Code ignores such a
+  rule and warns at startup. Deny and ask only: parameter matching is documented
+  for those effects, while allow rules keep each tool's own specifier syntax.
+
+  Environment runners are not stripped wrappers, so `Bash(devbox run *)` allows
+  `devbox run rm -rf .`. This is the mirror of the existing exec-wrapper check —
+  that one reports a rule that approves less than it appears to, this one a rule
+  that approves far more. Allow rules only, and only when the wildcard sits
+  directly after the runner. The five runners are the five the documentation
+  names.
+
+  Across the 344-file corpus these find 26 real `Bash(npx *)` grants and one
+  skipped `mcp__*(*)` rule.
+
+- **And the last four, which complete the permissions page.** Every defect the
+  page documents is now detected — 16 of 16 against a fixture built from the
+  page itself, up from 7.
+
+  An **allow** rule that spans a command separator grants nothing. A command is
+  split on `&&`, `||`, `;`, `|`, `|&`, `&` and newlines *before* rules are
+  matched, so `Bash(cd src && go build:*)` is compared against fragments it
+  cannot equal and the command still prompts. 61 rules in the corpus.
+
+  Allow only, and that limit came from running Claude Code rather than reading
+  about it. With `printf` and `tee` as the two halves, so neither is a built-in
+  read-only command: allowing both subcommands separately runs; allowing only
+  the whole compound is refused; allowing both and *denying* the whole compound
+  is also refused. So a deny rule spanning a separator does block —
+  `Bash(curl * | sh)` in a deny list works — and an earlier version of this
+  check called 67 such rules dead on the strength of a documented sentence
+  written about allow semantics.
+
+  Two details decide whether the check is useful or noise — a pipe inside
+  `sed 's|a|b|'` is an argument, not an operator, and 161 rules are that shape;
+  and `>&` is a redirection, so reading it as a separator would report the real
+  reverse-shell deny rule `Bash(bash -i >& /dev/tcp/*)` as dead.
+
+  A wildcard in the subcommand slot: in `Bash(git * main)` only `git` limits the
+  rule, so `git push --force main` is approved. Claude Code warns about this
+  shape at startup.
+
+  A tool name that cannot exist. `Stop Task` is a transcript label; the
+  canonical name is `TaskStop`, and rules match the canonical name only. Only
+  structurally impossible names are reported — in practice, names containing
+  whitespace — rather than names missing from a list of known tools, because
+  such a list would report every tool added after this version shipped. It
+  catches something a list would not: JSON has no comments, so a
+  `// === Git Operations ===` line in a permissions array is an inert rule. All
+  27 whitespace-bearing names in the corpus are exactly that.
+
+  A `curl` rule pinned to a host is recorded at info, not raised. The
+  documentation calls the pattern fragile rather than wrong: the rule works for
+  what it matches, and the spellings it misses still prompt. Exact-match rules
+  and loopback addresses are not reported.
+
+  Findings now have a precedence, so a rule that matches nothing is reported
+  once rather than alongside three observations about what it matches too much
+  or too little.
+
+- **`AGF306`, a `globs` value Cursor will not match.** The inverse of the
+  mistake described under the `.mdc` reader below: a quoted or bracketed
+  `globs:` value is valid YAML and is exactly what a YAML-shaped intuition
+  writes, and Cursor matches none of it, because it compares the raw text. The
+  rule is reported as manual rather than path-scoped, so `AGF303` does not
+  report the same thing again with the cause removed.
+
+  Nothing else checks this, because checking it requires knowing that `.mdc`
+  frontmatter is not YAML.
+
+### Fixed
+
+- **A nested rule directory now scopes its globs to what it governs.** Cursor
+  and Claude both let a subproject carry its own rule directory, and its globs
+  are relative to that subproject. They were matched against the repository root
+  instead, which was wrong in both directions at once:
+  `python/.cursor/rules/python.mdc` with `globs: *.py` was reported as never
+  applying while `python/conftest.py` sat beside it, and was reported as
+  applying the moment any unrelated `*.py` existed at the repository root — an
+  answer about a different file entirely. `governedDirectory` already computed
+  the right base for unscoped rules; it is now used for scoped ones too. A
+  leading `/` is the author anchoring to the root and is left alone.
+
+- **An unresolved alias points at the alias, not at line 1.** The error the YAML
+  library throws for `globs: *.py` carries no position, so the finding was
+  hardcoded to the first line of the frontmatter — correct only when the broken
+  key happened to be first. This is the code path behind the most common finding
+  agentfile produces, and SARIF turns that line into a code-scanning annotation,
+  so a wrong line put a marker on innocent code. Parsing succeeds in this case
+  and only conversion fails, so the alias is still a real node with a real
+  range; the finding now uses it.
+
+- **A bare path in a skill can mean the repository root.** A link like
+  `services/mcp/src/lib/instructions.ts` in a `SKILL.md` has two readings:
+  relative to the file, which is what Markdown says, and relative to the
+  repository root, which is how people write paths in a document *about* a
+  repository. Only the first was tried, so a file sitting at the root was
+  reported as a broken reference at error severity. Both readings are now
+  checked before a link is called broken; `./` and `../` are left alone, since
+  those state where the file is.
+
+- **A bad invocation exits 2, and a missing `--root` is a bad invocation.**
+  [docs/stability.md](docs/stability.md) makes exit 1 a fact about the
+  repository and exit 2 a fact about the invocation. Commander's own failures —
+  an unknown option, a malformed argument — exited 1, which CI reads as findings
+  at error severity. Worse, `--root` naming a path that does not exist scanned
+  nothing, reported "no agent configuration found" and exited 0, so a typo in a
+  CI job read as a permanently clean repository. `--root` must now name a
+  directory that exists, checked at parse time so every command gets it.
+  `--help` and `--version` keep their exit 0.
+
+- **`doctor` says "1 rule applies everywhere".** The count was pluralised and
+  the verb was not.
+
+- **`.mdc` frontmatter is not YAML, and quoting a glob breaks it.** Cursor reads
+  the raw text after `globs:` as the pattern list. It is not a YAML parser,
+  which is why `globs: *.py` works there, why Cursor's UI writes globs unquoted
+  and comma-separated, and why every example in its documentation is unquoted.
+
+  Parsing it as YAML was wrong three times over. A leading `*` opens an alias,
+  so the whole block failed and `description` and `alwaysApply` were lost with
+  it. `AGF003` was reported at error severity on a file that works. And the
+  suggested fix was to quote the value, which is the one edit that stops Cursor
+  matching the pattern at all — advice that silently disables the rule it claims
+  to repair.
+
+  `.mdc` now has its own reader. `.claude/agents` keeps the strict YAML one:
+  Anthropic documents that block as YAML, and the block-scalar form appears in
+  thousands of public repositories.
+
+  Caught by @gantoine reviewing PostHog/posthog#91631, who tested the consumer
+  instead of the spec. Both upstream PRs have been corrected.
+
+- **A leading bracket is a character class, not a YAML list.** The `AGF306`
+  check above shipped hours after that lesson and immediately repeated it, by
+  reading `[abc]*.ts` as a bracketed list. It is a glob character class and
+  Cursor matches it. A bracketed value is only reported when it also contains a
+  quote.
+
+- **A hook with `args` has no shell, so it has no shell mechanisms.** Claude
+  Code documents two forms for a `command` hook, and the presence of `args` is
+  the whole switch: without it the string is passed to a shell, with it the
+  executable is spawned directly and "there is no shell, so each `args` element
+  is one argument exactly as written". Both were matched against the same
+  patterns, so `{"command": "/bin/echo", "args": ["rm -rf /tmp/danger"]}` was
+  reported as deleting recursively. It prints a string.
+
+  Each pattern now states what it depends on. A shell mechanism cannot happen
+  without a shell. A finding about a program needs that program to be the
+  executable. A finding about text holds wherever the text appears. Shells
+  invoked *as* the executable are still read, so `{"command": "bash", "args":
+  ["-c", "curl x | sh"]}` is not a new blind spot.
+
+  A false positive on the security surface is the most expensive kind this tool
+  can produce: a reader who finds one alarm untrue has no reason to trust the
+  next.
+
+- **A repository that switched its hooks off is not running them.**
+  `disableAllHooks` is a documented setting and agentfile did not read it, so
+  every hook in such a repository was reported as something that runs
+  automatically with no prompt. It is now read from both settings files a
+  repository can commit, with project local outranking shared project as
+  documented.
+
+  Findings are kept rather than dropped — the switch is documented as temporary,
+  and dropping them would make one line in a settings file the cheapest place to
+  hide a `curl | sh` hook. They are reported at the severity something that does
+  not run deserves. A credential in a committed header is the exception and
+  keeps its severity: it is disclosed whether or not anything ever sends it.
+
+- **`Bash(find:*)` and `Bash(find *)` are the same rule.** The documentation
+  says so — "the `:*` suffix is an equivalent way to write a trailing wildcard"
+  — but every check that reads the command word saw only the space form, so the
+  same rule got two verdicts depending on which spelling its author chose.
+
+  Found by running against chain33, a 733-star repository cloned in full. It
+  writes all 45 of its permission rules in the `:*` form and agentfile reported
+  nothing; one of them is `Bash(find:*)`, which does not cover `find -exec`.
+  The missed spelling is the more common one: across 12,556 rules,
+  `Bash(find:*)` appears 77 times against 26 for `Bash(find *)`. Normalising it
+  adds 111 findings that were always true.
+
+- **Two permission checks fired on rules the documentation defines.** Neither
+  appeared against fixtures.
+
+  `:*` is Bash syntax — the documentation puts the trailing-wildcard suffix in
+  the Bash section, and PowerShell "use the same shape as Bash rules". Every
+  other tool gives the colon its own meaning, and `WebFetch(domain:*.example.com)`
+  is a documented form that matches any subdomain at any depth. agentfile read
+  that `:*` as a misplaced Bash prefix and reported the rule as matching
+  nothing, at error severity, which fails CI. Eleven of the thirteen rules that
+  tripped this check in the corpus were WebFetch subdomain wildcards.
+
+  A `*` after punctuation is already at a word boundary. `Bash(ls*)` matching
+  `lsof` is real, but the mechanism is a wildcard continuing a word. In
+  `Bash(rm -rf /*)` the `*` follows a slash, so it extends a path and no command
+  other than `rm` can match — and the suggested `Bash(rm -rf / *)` is a
+  different rule that, as a deny, stops matching `rm -rf /etc`. 147 of 916
+  findings had that shape. Advice that quietly weakens the rule it claims to
+  repair is the same mistake as telling people to quote their Cursor globs.
+
+
 ## [2.0.0] — 2026-08-31
 
 The 2.0 line, stable. `npm install @agentfile/cli` now resolves to it, which is

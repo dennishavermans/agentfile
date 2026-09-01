@@ -29,7 +29,7 @@
     "tag": "beta"
   },
   "dependencies": {
-    "@agentfile/core": "^2.0.0",
+    "@agentfile/core": "^2.1.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "diff": "^8.0.4",

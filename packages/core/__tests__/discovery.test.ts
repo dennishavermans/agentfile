@@ -329,13 +329,59 @@ describe("discoverCursorRules", () => {
 
   it("treats globs as path-scoped", () => {
     const { fs, scan } = scanOf({
-      "/repo/.cursor/rules/api.mdc": '---\ndescription: API\nglobs: ["src/api/**"]\nalwaysApply: false\n---\n\nBody',
+      "/repo/.cursor/rules/api.mdc": "---\ndescription: API\nglobs: src/api/**\nalwaysApply: false\n---\n\nBody",
     });
 
     expect(discoverCursorRules(ROOT, scan, fs).instructions[0].applies).toEqual({
       kind: "paths",
       patterns: ["src/api/**"],
     });
+  });
+
+  // `.mdc` is not YAML. Cursor takes the raw text after `globs:`, so the list
+  // form is a pattern containing brackets and quotes, and matches nothing.
+  it("reports the YAML list form as unmatchable rather than reading it", () => {
+    const { fs, scan } = scanOf({
+      "/repo/.cursor/rules/api.mdc": '---\nglobs: ["src/api/**"]\nalwaysApply: false\n---\n\nBody',
+    });
+
+    const found = discoverCursorRules(ROOT, scan, fs);
+    expect(found.diagnostics[0].code).toBe("AGF306");
+    expect(found.diagnostics[0].suggestion).toBe("Write the patterns bare and comma-separated: globs: src/api/**");
+    // Not path-scoped: it would otherwise be reported dead a second time.
+    expect(found.instructions[0].applies).toEqual({ kind: "manual" });
+  });
+
+  // `[abc]*.ts` is a character class, a perfectly ordinary glob. An early
+  // version of AGF306 flagged any leading `[` and called it a YAML list.
+  it("does not mistake a glob character class for a YAML list", () => {
+    const { fs, scan } = scanOf({
+      "/repo/.cursor/rules/cc.mdc": "---\nglobs: [abc]*.ts\n---\n\nBody",
+    });
+
+    const found = discoverCursorRules(ROOT, scan, fs);
+    expect(found.diagnostics).toEqual([]);
+    expect(found.instructions[0].applies).toEqual({ kind: "paths", patterns: ["[abc]*.ts"] });
+  });
+
+  it("reports a quoted glob as unmatchable", () => {
+    const { fs, scan } = scanOf({
+      "/repo/.cursor/rules/py.mdc": '---\nglobs: "*.py"\nalwaysApply: false\n---\n\nBody',
+    });
+
+    const found = discoverCursorRules(ROOT, scan, fs);
+    expect(found.diagnostics[0].code).toBe("AGF306");
+    expect(found.diagnostics[0].suggestion).toBe("Write the patterns bare and comma-separated: globs: *.py");
+  });
+
+  // The shape that started all this. Invalid YAML, valid Cursor, and the one
+  // thing agentfile must not tell anyone to quote.
+  it("reads a bare-asterisk glob as the pattern Cursor matches on", () => {
+    const { fs, scan } = scanOf({ "/repo/.cursor/rules/py.mdc": "---\nglobs: *.py\n---\n\nBody" });
+
+    const found = discoverCursorRules(ROOT, scan, fs);
+    expect(found.diagnostics).toEqual([]);
+    expect(found.instructions[0].applies).toEqual({ kind: "paths", patterns: ["*.py"] });
   });
 
   it("treats a description with no globs as agent-selected", () => {
@@ -354,6 +400,44 @@ describe("discoverCursorRules", () => {
   it("uses the description as the title when there is one", () => {
     const { fs, scan } = scanOf({ "/repo/.cursor/rules/a.mdc": "---\ndescription: Nice title\n---\n\nBody" });
     expect(discoverCursorRules(ROOT, scan, fs).instructions[0].title).toBe("Nice title");
+  });
+
+  // A subproject's rule directory scopes its globs to that subproject. Matched
+  // at the repository root instead, `python/.cursor/rules` writing `globs: *.py`
+  // was called dead while python/conftest.py sat beside it, and called live
+  // whenever an unrelated *.py existed at the root.
+  it("scopes a nested rule's globs to the directory it governs", () => {
+    const { fs, scan } = scanOf({
+      "/repo/python/.cursor/rules/py.mdc": "---\nglobs: *.py\nalwaysApply: false\n---\n\nBody",
+    });
+
+    expect(discoverCursorRules(ROOT, scan, fs).instructions[0].applies).toEqual({
+      kind: "paths",
+      patterns: ["python/*.py"],
+    });
+  });
+
+  it("leaves a root rule's globs alone", () => {
+    const { fs, scan } = scanOf({
+      "/repo/.cursor/rules/py.mdc": "---\nglobs: *.py\nalwaysApply: false\n---\n\nBody",
+    });
+
+    expect(discoverCursorRules(ROOT, scan, fs).instructions[0].applies).toEqual({
+      kind: "paths",
+      patterns: ["*.py"],
+    });
+  });
+
+  // A leading slash is the author anchoring to the repository root themselves.
+  it("does not nest a pattern the author anchored to the root", () => {
+    const { fs, scan } = scanOf({
+      "/repo/python/.cursor/rules/py.mdc": "---\nglobs: /scripts/*.py\nalwaysApply: false\n---\n\nBody",
+    });
+
+    expect(discoverCursorRules(ROOT, scan, fs).instructions[0].applies).toEqual({
+      kind: "paths",
+      patterns: ["scripts/*.py"],
+    });
   });
 });
 
@@ -802,6 +886,34 @@ describe("discover", () => {
     expect(result.hasContract).toBe(false);
     expect(result.configuration.instructions).toHaveLength(3);
     expect(result.platforms).toEqual(["agents-md", "copilot", "cursor"]);
+  });
+
+  it("carries disableAllHooks into the IR, from either settings file", () => {
+    // Without this the hook auditor cannot see the switch, and reports every
+    // hook in the repository as something that runs.
+    const shared = discover({
+      root: ROOT,
+      fs: memoryFileSystem({
+        "/repo/.claude/settings.json": JSON.stringify({
+          disableAllHooks: true,
+          hooks: { PreToolUse: [{ matcher: "Bash", hooks: [{ type: "command", command: "echo hi" }] }] },
+        }),
+      }),
+    });
+
+    const entry = shared.configuration.settings.find((s) => s.key === "disableAllHooks");
+    expect(entry?.value).toBe("true");
+    expect(entry?.provenance.scope).toBe("project");
+
+    const local = discover({
+      root: ROOT,
+      fs: memoryFileSystem({ "/repo/.claude/settings.local.json": JSON.stringify({ disableAllHooks: false }) }),
+    });
+
+    // Recorded even when false: the resolver needs it to outrank a lower file.
+    const localEntry = local.configuration.settings.find((s) => s.key === "disableAllHooks");
+    expect(localEntry?.value).toBe("false");
+    expect(localEntry?.provenance.scope).toBe("local");
   });
 
   it("finds nothing, quietly, in an empty repository", () => {

@@ -5,6 +5,8 @@ export {
   globListField,
   listField,
   mapField,
+  parseAgentFrontmatter,
+  parseCursorFrontmatter,
   parseFrontmatter,
   stringField,
 } from "./frontmatter.js";

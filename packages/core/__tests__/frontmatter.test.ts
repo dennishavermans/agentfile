@@ -5,6 +5,7 @@ import {
   globListField,
   listField,
   mapField,
+  parseAgentFrontmatter,
   parseFrontmatter,
   stringField,
 } from "../src/parsers/index.ts";
@@ -43,8 +44,25 @@ describe("parseFrontmatter", () => {
 
     expect(parsed.diagnostics.length).toBeGreaterThan(0);
     expect(parsed.diagnostics[0].code).toBe("AGF003");
-    expect(parsed.diagnostics[0].suggestion).toContain('"*.py"');
+    expect(parsed.diagnostics[0].suggestion).toContain("Quote the value, or start the pattern");
+    expect(parsed.diagnostics[0].location?.line).toBe(2);
     expect(parsed.data).toBeUndefined();
+  });
+
+  // The error `toJS` throws for an unresolved alias carries no position, so
+  // line 2 was reported for every one of them — right only when the broken key
+  // is the first frontmatter line. langwatch/scenario has five of these and two
+  // put `globs:` under `description:`, where the finding pointed at the
+  // description instead. SARIF turns that into a code-scanning annotation on
+  // the wrong line of someone else's file.
+  it("points at the alias, not at the first line of the frontmatter", () => {
+    const parsed = parseFrontmatter(
+      "rule.mdc",
+      "---\ndescription: React and TSX component development guidelines\nglobs: *.tsx\nalwaysApply: false\n---\nBody\n",
+    );
+
+    expect(parsed.diagnostics[0].code).toBe("AGF003");
+    expect(parsed.diagnostics[0].location?.line).toBe(3);
   });
 
   it("handles an empty frontmatter block", () => {
@@ -142,5 +160,46 @@ describe("globListField", () => {
     expect(globListField({}, "paths")).toBeUndefined();
     expect(globListField({ paths: 7 }, "paths")).toBeUndefined();
     expect(globListField({ paths: [] }, "paths")).toBeUndefined();
+  });
+});
+
+describe("parseAgentFrontmatter", () => {
+  // Pinned to Claude Code 2.1.238, observed rather than inferred: each of these
+  // files was placed in `.claude/agents`, and `claude -p` listed all of them as
+  // available subagent types with their descriptions read correctly.
+  it("reads frontmatter that no strict YAML parser accepts", () => {
+    const unclosed = parseAgentFrontmatter("a.md", "---\nname: a\ndescription: [unclosed\n---\n\nBody.\n");
+    expect(unclosed.diagnostics).toHaveLength(0);
+    expect(stringField(unclosed.data, "description")).toBe("[unclosed");
+
+    // PostHog's shape: an unquoted description carrying `Context: `.
+    const colon = parseAgentFrontmatter(
+      "b.md",
+      "---\nname: b\ndescription: Reviews code. Examples: Context: the user asked.\nmodel: opus\n---\n\nBody.\n",
+    );
+    expect(colon.diagnostics).toHaveLength(0);
+    expect(stringField(colon.data, "description")).toBe("Reviews code. Examples: Context: the user asked.");
+    expect(stringField(colon.data, "model")).toBe("opus");
+  });
+
+  it("still uses the strict parse when it succeeds, so structured fields keep their shape", () => {
+    const parsed = parseAgentFrontmatter(
+      "c.md",
+      "---\nname: c\ndescription: A thing\ntools:\n  - Read\n  - Write\n---\n\nBody.\n",
+    );
+    expect(parsed.diagnostics).toHaveLength(0);
+    expect(parsed.data?.tools).toEqual(["Read", "Write"]);
+  });
+
+  it("still reports an unclosed fence, which breaks the file under any reading", () => {
+    const parsed = parseAgentFrontmatter("d.md", "---\nname: d\ndescription: A thing\n\nBody.\n");
+    expect(parsed.diagnostics.map((x) => x.code)).toEqual(["AGF003"]);
+    expect(parsed.hasFrontmatter).toBe(false);
+  });
+
+  it("leaves a file with no frontmatter alone", () => {
+    const parsed = parseAgentFrontmatter("e.md", "# Just documentation\n");
+    expect(parsed.diagnostics).toHaveLength(0);
+    expect(parsed.hasFrontmatter).toBe(false);
   });
 });

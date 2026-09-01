@@ -29,8 +29,16 @@ export const SETTINGS_FILES: ReadonlyArray<{ path: string; scope: ConfigScope }>
   { path: ".claude/settings.local.json", scope: "local" },
 ];
 
-/** Settings keys worth carrying into the IR, because their value changes what is permitted. */
-const REPORTED_KEYS = ["permissions.defaultMode", "permissions.additionalDirectories"] as const;
+/**
+ * Settings keys worth carrying into the IR, because their value changes what is
+ * permitted or whether a declared thing runs at all.
+ *
+ * `disableAllHooks` is the second kind. Documented: "To temporarily disable all
+ * hooks without removing them, set `"disableAllHooks": true` in your settings
+ * file." Without reading it, every hook in such a repository is reported as
+ * something that runs, and none of them do.
+ */
+const REPORTED_KEYS = ["permissions.defaultMode", "permissions.additionalDirectories", "disableAllHooks"] as const;
 
 export interface DiscoveredSettings {
   hooks: HookEntry[];
@@ -286,6 +294,12 @@ export function discoverSettings(root: string, scan: RepositoryScan, fs: FileSys
     result.permissions.push(...permissions.permissions);
     result.settings.push(...permissions.settings);
     result.diagnostics.push(...permissions.diagnostics);
+
+    // Recorded whether true or false: the resolver needs to see a `false` here
+    // to know it outranks a `true` in a lower-precedence file.
+    if (typeof parsed.disableAllHooks === "boolean") {
+      result.settings.push({ key: "disableAllHooks", value: String(parsed.disableAllHooks), provenance });
+    }
 
     result.sources.push({
       path: entry.path,

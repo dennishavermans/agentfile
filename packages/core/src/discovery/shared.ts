@@ -61,6 +61,30 @@ export function hierarchicalApplicability(file: string): Applicability {
   return directory === ROOT_PATH ? ALWAYS : appliesToDirectory(directory);
 }
 
+/**
+ * Globs in a nested rule directory are relative to what that directory
+ * governs, not to the repository root.
+ *
+ * Cursor and Claude both let a subproject carry its own rule directory, and a
+ * rule in `python/.cursor/rules` writing `globs: *.py` means the Python files
+ * beside it. Matching that at the root got it wrong in both directions: the
+ * rule was reported dead while `python/conftest.py` sat next to it, and it was
+ * reported live whenever any unrelated `*.py` happened to exist at the root —
+ * a reachability answer that had nothing to do with the rule.
+ *
+ * A leading `/` is the author anchoring to the repository root themselves, so
+ * that reading is preserved rather than nested a second time.
+ */
+export function scopedPatterns(file: string, patterns: readonly string[]): string[] {
+  const directory = governedDirectory(file);
+
+  return patterns.map((pattern) => {
+    const trimmed = pattern.trim();
+    if (trimmed.startsWith("/")) return trimmed.slice(1);
+    return directory === ROOT_PATH ? trimmed : `${directory}/${trimmed}`;
+  });
+}
+
 export function provenanceOf(
   file: string,
   platform: PlatformId,

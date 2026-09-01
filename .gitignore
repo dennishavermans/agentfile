@@ -3,6 +3,9 @@ dist/
 *.tsbuildinfo
 REWORK.md
 
+# macOS
+.DS_Store
+
 # agentfile generated files
 .ai-agents
 AGENTS.md

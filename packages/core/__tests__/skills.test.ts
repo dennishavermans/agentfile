@@ -415,6 +415,41 @@ describe("checkSkillReferences", () => {
       ]),
     ).toEqual([]);
   });
+
+  // PostHog writes both readings inside one skill directory: `../../../tools/x`
+  // reaches the root by traversal, and `services/mcp/src/lib/x.ts` reaches it by
+  // convention. Only the first used to resolve, so the second was reported as a
+  // missing file while it sat at the root of the repository.
+  it("accepts a bare path that exists at the repository root", () => {
+    expect(
+      checkSkillReferences(
+        configurationOf(skill({ body: "See [instructions](services/mcp/src/lib/instructions.ts)." })),
+        [".claude/skills/deploy/SKILL.md", "services/mcp/src/lib/instructions.ts"],
+      ),
+    ).toEqual([]);
+  });
+
+  it("names both readings when a bare path exists under neither", () => {
+    const [found] = checkSkillReferences(configurationOf(skill({ body: "See [notes](services/api.md)." })), [
+      ".claude/skills/deploy/SKILL.md",
+    ]);
+
+    expect(found.code).toBe("AGF004");
+    expect(found.data?.checked).toBe(".claude/skills/deploy/services/api.md, services/api.md");
+    expect(found.explanation).toContain("relative to the repository root");
+  });
+
+  // `./` is a statement about where the file is, so a root-level file of the
+  // same name is a different file and does not answer the link.
+  it("does not rescue an explicitly relative link with a root-level file", () => {
+    const [found] = checkSkillReferences(configurationOf(skill({ body: "See [notes](./services/api.md)." })), [
+      ".claude/skills/deploy/SKILL.md",
+      "services/api.md",
+    ]);
+
+    expect(found.code).toBe("AGF004");
+    expect(found.data?.checked).toBe(".claude/skills/deploy/services/api.md");
+  });
 });
 
 // ─── Portability ───────────────────────────────────────────────────────────
