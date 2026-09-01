@@ -2,8 +2,10 @@
  * Structural validation of skills.
  *
  * Everything checked here is a specification requirement with a source, so the
- * findings are errors rather than opinions. Quality judgements live in
- * `quality.ts` and are warnings.
+ * findings carry a citation rather than an opinion. Severity, though, follows
+ * what the programs do rather than what the specification says: a violation
+ * that a loader shrugs off is a warning, however clearly the spec forbids it.
+ * Quality judgements live in `quality.ts`.
  */
 
 import { type Diagnostic, diagnostic, type Location } from "../diagnostics/index.js";
@@ -27,9 +29,12 @@ export function skillDirectoryName(skill: SkillEntry): string | undefined {
 /**
  * AGF102 for the two fields the specification requires.
  *
- * A skill with no description is not a weak skill, it is an unusable one: the
- * description is the only thing an agent sees before deciding whether to load
- * it, so without one the skill can never be selected.
+ * Neither absence breaks the skill. Measured on Claude Code 2.1.238: a
+ * SKILL.md with no frontmatter at all still loads, is listed with its first
+ * heading standing in for the description, and resolves when invoked by name.
+ * What a missing description costs is discovery — the description is what an
+ * agent weighs when deciding to load a skill unprompted, and a stand-in
+ * heading carries far less than a written one.
  */
 function checkRequiredFields(skill: SkillEntry): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
@@ -53,7 +58,7 @@ function checkRequiredFields(skill: SkillEntry): Diagnostic[] {
         code: "AGF102",
         message: `Skill "${skill.name || basenameOf(skill.provenance.file)}" has no description`,
         explanation:
-          "The description is the only thing an agent sees before deciding whether to load a skill, so a skill without one can never be selected. " +
+          "The skill still loads and can be invoked by name, but the description is what an agent weighs when deciding to load it unprompted, so without one the skill is rarely chosen. " +
           `The specification requires it.\n\nSpecification:\n  ${SPEC_URL}`,
         suggestion: "Add a `description` saying what the skill does and when to use it.",
         location,
@@ -70,18 +75,38 @@ function checkConstraints(skill: SkillEntry): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
   const location = locationOf(skill);
 
-  for (const problem of checkName(skill.name, skillDirectoryName(skill))) {
+  // Name problems are specification violations, not load failures. Measured
+  // on Claude Code 2.1.238: a skill named `n8n:create-pr` in a `create-pr/`
+  // directory loads and is invoked as `create-pr`; a skill in a directory
+  // named `My_Weird.Skill` loads and is invoked as exactly that. The directory
+  // is the identity regardless of what the frontmatter says or whether either
+  // satisfies the specification's grammar — so a wrong name misleads readers
+  // and cross-references rather than breaking the skill, and reporting it at
+  // error severity would fail CI over configuration that works.
+  const problems = checkName(skill.name, skillDirectoryName(skill));
+  const mismatch = problems.some((problem) => problem.kind === "directory-mismatch");
+
+  for (const problem of problems) {
     // An absent name is AGF102's job; this is about a name that is present and wrong.
     if (problem.kind === "empty") continue;
+
+    // A name that both breaks the grammar and differs from its directory is
+    // one fact, not two: the declared name is not what the skill loads as.
+    if (problem.kind === "invalid-characters" && mismatch) continue;
+
+    const decorative = problem.kind === "invalid-characters" || problem.kind === "directory-mismatch";
 
     diagnostics.push(
       diagnostic({
         code: "AGF101",
+        severity: decorative ? "warning" : undefined,
         message: `Skill "${skill.name}": ${describeNameProblem(skill.name, problem)}`,
         explanation:
           problem.kind === "directory-mismatch"
-            ? `Platforms locate a skill by its directory, so the skill will load as "${problem.directory}" while its own frontmatter calls it "${skill.name}". Anything referring to it by the frontmatter name will not find it.\n\nSpecification:\n  ${SPEC_URL}`
-            : `Specification:\n  ${SPEC_URL}`,
+            ? `Platforms locate a skill by its directory, so the skill will load as "${problem.directory}" while its own frontmatter calls it "${skill.name}". The skill works; anything referring to it by the frontmatter name will not find it.\n\nSpecification:\n  ${SPEC_URL}`
+            : problem.kind === "invalid-characters"
+              ? `The skill still loads — platforms take the identity from the directory, not from this field — but a stricter loader may reject it, and the specification's grammar exists so a name works everywhere.\n\nSpecification:\n  ${SPEC_URL}`
+              : `Specification:\n  ${SPEC_URL}`,
         suggestion:
           problem.kind === "directory-mismatch"
             ? `Rename the directory to "${skill.name}", or change \`name\` to "${problem.directory}".`
