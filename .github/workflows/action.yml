@@ -23,8 +23,11 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      # Two defects a human reads straight past: a bare * opens a YAML alias
-      # rather than a glob, so neither rule's frontmatter parses at all.
+      # Two defects a human reads straight past. The import names a file that
+      # does not exist, so the instructions it promises are silently absent —
+      # measured on Claude Code, imports resolve from the declaring file and
+      # nothing else, so there is no path on which this loads. The bare * in
+      # the rule's globs is the shape Cursor cannot match.
       - name: Write a fixture with defects we can count
         run: |
           mkdir -p subject/.cursor/rules
@@ -35,8 +38,9 @@ jobs:
           ---
           Use type hints.
           RULE
-          cat > subject/AGENTS.md <<'DOC'
+          cat > subject/CLAUDE.md <<'DOC'
           # Conventions
+          Read @docs/style.md before writing code.
           Use type hints.
           DOC
 
@@ -85,7 +89,7 @@ jobs:
       - run: |
           mkdir -p subject/.cursor/rules
           printf -- '---\ndescription: Python rules\nglobs: *.py\n---\nUse type hints.\n' > subject/.cursor/rules/python.mdc
-          printf '# Conventions\nUse type hints.\n' > subject/AGENTS.md
+          printf '# Conventions\nRead @docs/style.md before writing code.\nUse type hints.\n' > subject/CLAUDE.md
 
       - id: gated
         uses: ./
