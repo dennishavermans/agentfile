@@ -17,15 +17,48 @@ something — and a repository that reported `AGF003` on a `.mdc` file will stop
 Anything gating CI on the output sees a change, which is a minor by
 [docs/stability.md](docs/stability.md).
 
-Two threads run through it. The first began with running 2.0.0 against a
+Three threads run through it. The first began with running 2.0.0 against a
 repository small enough to sit under the scan cap: truncation had been hiding
 five bugs, because the bounded-scan guard suppresses exactly the checks that
 were wrong. The second began with @gantoine's review of an upstream PR, which
 showed that a flagship example was built on an assumption about a file format
 nobody had checked. That prompted a documentation-first audit of the hooks and
-permission surfaces, which found the two false positives below.
+permission surfaces.
+
+The third was running the permission analyser over 12,556 rules from 344
+`.claude/settings.json` files in public repositories. Fixtures only contain
+what someone thought to write down; the corpus found two checks firing on
+documented-valid syntax, and caught a third false positive in a check added
+that same afternoon, before it shipped.
 
 ### Added
+
+- **Three documented ways a permission rule does not do what it says.** All
+  three are `AGF506`, which already means "permission rule does not grant what
+  it appears to", so no new code is involved.
+
+  An `mcp__` rule with parentheses is *skipped* when the settings file loads —
+  discarded whole, not narrowed. As a deny rule that is the worst thing a
+  permissions file can contain: it reads as a restriction, a reviewer counts it
+  as one, and the tool is unrestricted. Claude Code says so in the
+  invalid-settings dialog and in `claude doctor`, but not in the diff where the
+  rule was added.
+
+  A tool's primary content field cannot be parameter-matched — `command` on Bash
+  and PowerShell, `file_path` on Read, Edit and Write, `path` on Grep and Glob,
+  `notebook_path` on NotebookEdit, `url` on WebFetch. Claude Code ignores such a
+  rule and warns at startup. Deny and ask only: parameter matching is documented
+  for those effects, while allow rules keep each tool's own specifier syntax.
+
+  Environment runners are not stripped wrappers, so `Bash(devbox run *)` allows
+  `devbox run rm -rf .`. This is the mirror of the existing exec-wrapper check —
+  that one reports a rule that approves less than it appears to, this one a rule
+  that approves far more. Allow rules only, and only when the wildcard sits
+  directly after the runner. The five runners are the five the documentation
+  names.
+
+  Across the 344-file corpus these find 26 real `Bash(npx *)` grants and one
+  skipped `mcp__*(*)` rule.
 
 - **`AGF306`, a `globs` value Cursor will not match.** The inverse of the
   mistake described under the `.mdc` reader below: a quoted or bracketed
@@ -136,6 +169,26 @@ permission surfaces, which found the two false positives below.
   hide a `curl | sh` hook. They are reported at the severity something that does
   not run deserves. A credential in a committed header is the exception and
   keeps its severity: it is disclosed whether or not anything ever sends it.
+
+- **Two permission checks fired on rules the documentation defines.** Neither
+  appeared against fixtures.
+
+  `:*` is Bash syntax — the documentation puts the trailing-wildcard suffix in
+  the Bash section, and PowerShell "use the same shape as Bash rules". Every
+  other tool gives the colon its own meaning, and `WebFetch(domain:*.example.com)`
+  is a documented form that matches any subdomain at any depth. agentfile read
+  that `:*` as a misplaced Bash prefix and reported the rule as matching
+  nothing, at error severity, which fails CI. Eleven of the thirteen rules that
+  tripped this check in the corpus were WebFetch subdomain wildcards.
+
+  A `*` after punctuation is already at a word boundary. `Bash(ls*)` matching
+  `lsof` is real, but the mechanism is a wildcard continuing a word. In
+  `Bash(rm -rf /*)` the `*` follows a slash, so it extends a path and no command
+  other than `rm` can match — and the suggested `Bash(rm -rf / *)` is a
+  different rule that, as a deny, stops matching `rm -rf /etc`. 147 of 916
+  findings had that shape. Advice that quietly weakens the rule it claims to
+  repair is the same mistake as telling people to quote their Cursor globs.
+
 
 ## [2.0.0] — 2026-08-31
 
