@@ -437,6 +437,7 @@ export type {
   HookAuditOptions,
   RiskMatch,
   RiskPattern,
+  RiskRequirement,
 } from "./security/index.js";
 export {
   auditCommands,
@@ -452,9 +453,11 @@ export {
   parsePermissionRule,
   RISK_PATTERNS,
   SECRET_VALUE_PATTERNS,
+  scanArgv,
   scanExpression,
   scanSecretValue,
   scanText,
+  shellScriptInArgv,
 } from "./security/index.js";
 // ─── Skills ────────────────────────────────────────────────────────────────
 export type { NameProblem, SkillSecurityOptions, SkillSecurityResult } from "./skills/index.js";

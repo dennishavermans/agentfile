@@ -13,10 +13,34 @@
 
 import type { Severity } from "../diagnostics/index.js";
 
+/**
+ * What has to be true before a pattern describes something real.
+ *
+ * The same text means different things depending on who parses it. A hook in
+ * shell form hands its command string to a shell, so `|`, `$` and `&&` do what
+ * they look like. A hook in exec form is spawned directly, and Claude Code
+ * documents the difference in as many words: "There is no shell, so each `args`
+ * element is one argument exactly as written", and "special characters such as
+ * apostrophes, `$`, and backticks pass through verbatim because there is no
+ * shell to interpret them."
+ *
+ * So each pattern states what it depends on. Without that the scanner cannot
+ * tell `/bin/echo "rm -rf /tmp"`, which prints twelve characters, from
+ * `rm -rf /tmp`, which does not.
+ */
+export type RiskRequirement =
+  /** A shell has to interpret the text. A pipe is only a pipe to a shell. */
+  | "shell"
+  /** The named program has to be the one being run, not merely mentioned. */
+  | "executable"
+  /** The text is the finding wherever it appears. Nothing has to interpret it. */
+  | "text";
+
 export interface RiskPattern {
   /** Stable kebab-case id, so a finding can be suppressed or tracked by name. */
   id: string;
   pattern: RegExp;
+  requires: RiskRequirement;
   severity: Severity;
   /** What was found, phrased as an observation. */
   title: string;
@@ -35,6 +59,7 @@ export const RISK_PATTERNS: readonly RiskPattern[] = [
   {
     id: "remote-script-execution",
     pattern: /\b(?:curl|wget)\b[^|\n]*\|\s*(?:sudo\s+)?(?:ba|z|k|da)?sh\b/,
+    requires: "shell",
     severity: "error",
     title: "downloads a script and pipes it straight into a shell",
     why: "Whatever the remote host serves at that moment runs with the developer's privileges. The content is never reviewed, is not pinned to a version, and can differ between runs.",
@@ -42,6 +67,7 @@ export const RISK_PATTERNS: readonly RiskPattern[] = [
   {
     id: "obfuscated-execution",
     pattern: /base64\s+(?:-d|-D|--decode)[^|\n]*\|\s*\w*sh\b|\|\s*base64\s+(?:-d|-D|--decode)[^|\n]*\|\s*\w*sh\b/,
+    requires: "shell",
     severity: "error",
     title: "decodes text and executes the result",
     why: "The command that will actually run is not readable in the file, so review of the file does not tell a reader what it does.",
@@ -49,6 +75,7 @@ export const RISK_PATTERNS: readonly RiskPattern[] = [
   {
     id: "eval-of-variable",
     pattern: /\beval\b[^\n]*\$\{?[A-Za-z_]/,
+    requires: "shell",
     severity: "error",
     title: "evaluates a variable as a command",
     why: "What runs depends on the variable's value at that moment, so the file's text does not determine its behaviour.",
@@ -56,6 +83,7 @@ export const RISK_PATTERNS: readonly RiskPattern[] = [
   {
     id: "hardcoded-private-key",
     pattern: /-----BEGIN (?:[A-Z ]+ )?PRIVATE KEY-----/,
+    requires: "text",
     severity: "error",
     title: "contains a private key",
     why: "A key committed to a repository is readable by everyone with access to it and by anything that mirrors it. It should be treated as already disclosed.",
@@ -63,6 +91,7 @@ export const RISK_PATTERNS: readonly RiskPattern[] = [
   {
     id: "hardcoded-credential",
     pattern: /\bAKIA[0-9A-Z]{16}\b|(?:secret|token|password|passwd|api[_-]?key)\s*[:=]\s*["'][^"'\n]{12,}["']/i,
+    requires: "text",
     severity: "error",
     title: "contains what looks like a credential",
     why: "A literal credential in a committed file is disclosed to everyone with repository access. This pattern also matches placeholders, so confirm before rotating anything.",
@@ -70,6 +99,7 @@ export const RISK_PATTERNS: readonly RiskPattern[] = [
   {
     id: "recursive-force-delete",
     pattern: /\brm\s+(?:-[a-zA-Z]*[rR][a-zA-Z]*f|-[a-zA-Z]*f[a-zA-Z]*[rR]|-r\s+-f|-f\s+-r)\b/,
+    requires: "executable",
     severity: "warning",
     title: "deletes recursively without prompting",
     why: "If the path is empty or unset at runtime, the deletion starts somewhere other than where the author intended, and there is no confirmation step to stop it.",
@@ -77,6 +107,7 @@ export const RISK_PATTERNS: readonly RiskPattern[] = [
   {
     id: "privilege-escalation",
     pattern: /(?:^|\s|\|)sudo\s/,
+    requires: "executable",
     severity: "warning",
     title: "requests elevated privileges",
     why: "An agent running this cannot judge whether elevation is warranted, and the effects reach outside the repository.",
@@ -84,6 +115,7 @@ export const RISK_PATTERNS: readonly RiskPattern[] = [
   {
     id: "credential-path-access",
     pattern: /(?:~|\$HOME|\$\{HOME\})\/\.(?:ssh|aws|gnupg|kube|docker|npmrc)\b|(?:^|\s)\.env(?:\.\w+)?\b/,
+    requires: "text",
     severity: "warning",
     title: "reads or writes a credential location",
     why: "These paths hold secrets for systems beyond this repository. Legitimate uses exist; each is worth confirming.",
@@ -91,6 +123,7 @@ export const RISK_PATTERNS: readonly RiskPattern[] = [
   {
     id: "insecure-transport",
     pattern: /\bcurl\b[^\n]*\s(?:-k|--insecure)\b|\bwget\b[^\n]*\s--no-check-certificate\b/,
+    requires: "executable",
     severity: "warning",
     title: "disables certificate verification",
     why: "The connection can be intercepted and its content replaced without the script noticing.",
@@ -98,6 +131,7 @@ export const RISK_PATTERNS: readonly RiskPattern[] = [
   {
     id: "world-writable",
     pattern: /\bchmod\s+(?:-R\s+)?0?777\b/,
+    requires: "executable",
     severity: "warning",
     title: "makes files writable by every user on the machine",
     why: "Any process on the machine can then modify them, including whatever runs next.",
@@ -105,6 +139,7 @@ export const RISK_PATTERNS: readonly RiskPattern[] = [
   {
     id: "outbound-network",
     pattern: /\b(?:curl|wget|nc|ncat|scp|rsync|ssh)\b/,
+    requires: "executable",
     severity: "info",
     title: "makes network calls",
     why: "Not a problem in itself. Recorded so that what a skill reaches out to is visible without reading every script.",
@@ -145,9 +180,75 @@ export function scanText(text: string): RiskMatch[] {
   return matches;
 }
 
-/** Matches in a single expression, such as a hook command or an argv entry. */
+/** Matches in a single expression that a shell will interpret, such as a hook command. */
 export function scanExpression(expression: string): RiskPattern[] {
   return RISK_PATTERNS.filter((pattern) => pattern.pattern.test(expression));
+}
+
+/**
+ * Programs that are themselves a shell, with the flag that introduces a script.
+ *
+ * Exec form removes the shell — unless the executable *is* one. A hook of
+ * `{"command": "bash", "args": ["-c", "curl x | sh"]}` pipes into a shell just as
+ * the shell-form spelling does, and treating that argv as opaque would turn a
+ * false-positive fix into a false negative. On this surface that is the worse
+ * trade, so the interpreter is recognised and its script scanned as shell text.
+ */
+const SHELL_INTERPRETERS: ReadonlyArray<{ programs: readonly string[]; scriptFlag: RegExp }> = [
+  { programs: ["sh", "bash", "zsh", "dash", "ash", "ksh", "fish"], scriptFlag: /^-[a-z]*c$/ },
+  { programs: ["pwsh", "powershell"], scriptFlag: /^-(?:c|command)$/i },
+  { programs: ["cmd"], scriptFlag: /^\/[ck]$/i },
+];
+
+/** The program an executable path resolves to, without directory, suffix, or case. */
+function programName(executable: string): string {
+  const base = executable.trim().split(/[\\/]/).pop() ?? "";
+  return base.replace(/\.exe$/i, "").toLowerCase();
+}
+
+/**
+ * The shell script inside an exec-form argv, when the executable is a shell.
+ *
+ * Undefined when nothing in the argv reaches a shell. `-EncodedCommand` is not
+ * recognised: its payload is base64, and pretending to have read it would be
+ * worse than saying nothing.
+ */
+export function shellScriptInArgv(executable: string, args: readonly string[]): string | undefined {
+  const program = programName(executable);
+  const shell = SHELL_INTERPRETERS.find((candidate) => candidate.programs.includes(program));
+  if (!shell) return undefined;
+
+  const at = args.findIndex((arg) => shell.scriptFlag.test(arg));
+  return at >= 0 ? args[at + 1] : undefined;
+}
+
+/**
+ * Matches an exec-form argv: one executable plus literal arguments, no shell.
+ *
+ * Two rules follow from there. A pattern that needs a shell is dropped outright,
+ * because the mechanism it describes cannot happen. A pattern about a program is
+ * kept only when the match starts at the executable, so `rm -rf /tmp` is a
+ * deletion and `/bin/echo "rm -rf /tmp"` is a string.
+ *
+ * A wrapper that runs its own arguments — `env`, `xargs`, `docker exec` — is not
+ * unwrapped here, so `env sudo rm -rf /` is missed. Prefix stripping is one
+ * problem with one answer, and a second copy of it in this module is how the two
+ * copies start disagreeing.
+ */
+export function scanArgv(executable: string, args: readonly string[]): RiskPattern[] {
+  const script = shellScriptInArgv(executable, args);
+  if (script !== undefined) return scanExpression(script);
+
+  const argv = [programName(executable), ...args].join(" ");
+
+  return RISK_PATTERNS.filter((pattern) => {
+    if (pattern.requires === "shell") return false;
+
+    const match = pattern.pattern.exec(argv);
+    if (!match) return false;
+
+    return pattern.requires === "text" || match.index === 0;
+  });
 }
 
 /**
