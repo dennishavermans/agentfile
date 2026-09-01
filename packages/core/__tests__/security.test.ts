@@ -757,6 +757,146 @@ describe("auditPermissions", () => {
     });
   });
 
+  // ─── mcp__ rules with parentheses ──────────────────────────────────────
+
+  describe("mcp__ rules with a specifier", () => {
+    it("reports a deny rule that denies nothing", () => {
+      const findings = audit([rule("deny", "mcp__github__get_issue(owner:acme)")]);
+      expect(findings).toHaveLength(1);
+      expect(findings[0].code).toBe("AGF506");
+      expect(findings[0].severity).toBe("error");
+      expect(findings[0].data?.problem).toBe("mcp-rule-with-specifier");
+      expect(findings[0].explanation).toContain("Nothing about mcp__github__get_issue is denied");
+      expect(findings[0].suggestion).toContain("--disallowedTools");
+    });
+
+    it("reports allow and ask rules too, since the rule is discarded whole", () => {
+      expect(audit([rule("allow", "mcp__github__get_issue(owner:acme)")])[0].data?.problem).toBe(
+        "mcp-rule-with-specifier",
+      );
+      expect(audit([rule("ask", "mcp__github__get_issue(owner:acme)")])[0].data?.problem).toBe(
+        "mcp-rule-with-specifier",
+      );
+    });
+
+    it("leaves valid mcp__ rules alone", () => {
+      expect(audit([rule("deny", "mcp__github__get_issue")])).toHaveLength(0);
+      expect(audit([rule("allow", "mcp__github__get_*")])).toHaveLength(0);
+      // A built-in tool whose specifier happens to name an MCP tool is not one.
+      expect(audit([rule("deny", "Bash(mcp__thing)")])).toHaveLength(0);
+    });
+  });
+
+  // ─── primary content fields ────────────────────────────────────────────
+
+  describe("primary content field rules", () => {
+    it("reports each documented field on each of its tools", () => {
+      const cases: Array<[string, string]> = [
+        ["Bash(command:rm *)", "command"],
+        ["PowerShell(command:Remove-Item *)", "command"],
+        ["Read(file_path:/etc/passwd)", "file_path"],
+        ["Edit(file_path:/etc/hosts)", "file_path"],
+        ["Write(file_path:/etc/hosts)", "file_path"],
+        ["Grep(path:/etc)", "path"],
+        ["Glob(path:/etc)", "path"],
+        ["NotebookEdit(notebook_path:secret.ipynb)", "notebook_path"],
+        ["WebFetch(url:https://evil.test)", "url"],
+      ];
+
+      for (const [expression, field] of cases) {
+        const findings = audit([rule("deny", expression)]);
+        expect(findings, expression).toHaveLength(1);
+        expect(findings[0].data?.field, expression).toBe(field);
+        expect(findings[0].severity, expression).toBe("error");
+      }
+    });
+
+    it("suggests the form that works, built from the value already written", () => {
+      expect(audit([rule("deny", "Bash(command:rm *)")])[0].suggestion).toContain("Bash(rm *)");
+      expect(audit([rule("deny", "Read(file_path:/etc/passwd)")])[0].suggestion).toContain("Read(/etc/passwd)");
+      // WebFetch matches a hostname, not a URL, so the value cannot be reused.
+      expect(audit([rule("deny", "WebFetch(url:https://evil.test)")])[0].suggestion).toContain(
+        "WebFetch(domain:<host>)",
+      );
+    });
+
+    it("ignores whitespace around the colon, as the documentation says Claude Code does", () => {
+      expect(audit([rule("deny", "Bash(command : rm *)")])[0]?.data?.problem).toBe("primary-content-field");
+    });
+
+    it("does not apply to allow rules, which do not do parameter matching", () => {
+      // "Deny and ask rules can match a top-level input parameter"; "allow rules
+      // continue to use each tool's own specifier syntax". So this is a Bash
+      // prefix rule with the documented `:*` trailing wildcard, and it works.
+      // Three configurations in a 344-file real-world sample write exactly this.
+      expect(audit([rule("allow", "Bash(command:*)")])).toHaveLength(0);
+      expect(audit([rule("allow", "Bash(command:rm *)")])).toHaveLength(0);
+      expect(audit([rule("ask", "Bash(command:rm *)")])[0]?.data?.problem).toBe("primary-content-field");
+    });
+
+    it("stays silent on parameter rules that are documented as working", () => {
+      // Negative fixtures. Each is a legitimate rule that resembles the defect.
+      expect(audit([rule("deny", "Agent(model:opus)")])).toHaveLength(0);
+      expect(audit([rule("deny", "Agent(isolation:worktree)")])).toHaveLength(0);
+      expect(audit([rule("deny", "Bash(run_in_background:true)")])).toHaveLength(0);
+      expect(audit([rule("allow", "WebFetch(domain:example.com)")])).toHaveLength(0);
+      expect(audit([rule("allow", "Read(./.env)")])).toHaveLength(0);
+      // `path` is Grep's primary field but not Agent's, so the tool has to match.
+      expect(audit([rule("deny", "Agent(path:/etc)")])).toHaveLength(0);
+    });
+
+    it("does not mistake a colon inside a command for parameter syntax", () => {
+      expect(audit([rule("allow", "Bash(ssh user@host:/srv/app)")])).toHaveLength(0);
+      expect(audit([rule("allow", "Bash(curl https://api.example.com)")])).toHaveLength(0);
+    });
+  });
+
+  // ─── environment runners ───────────────────────────────────────────────
+
+  describe("environment runners", () => {
+    it("reports an allow rule whose wildcard sits directly after the runner", () => {
+      for (const expression of [
+        "Bash(devbox run *)",
+        "Bash(direnv exec *)",
+        "Bash(mise exec *)",
+        "Bash(docker exec *)",
+        "Bash(npx *)",
+      ]) {
+        const findings = audit([rule("allow", expression)]);
+        expect(findings, expression).toHaveLength(1);
+        expect(findings[0].code, expression).toBe("AGF506");
+        expect(findings[0].severity, expression).toBe("error");
+        expect(findings[0].data?.problem, expression).toBe("unstripped-runner");
+      }
+    });
+
+    it("says what the rule actually approves, and how to narrow it", () => {
+      const findings = audit([rule("allow", "Bash(devbox run *)")]);
+      expect(findings[0].explanation).toContain("devbox run rm -rf .");
+      expect(findings[0].suggestion).toContain("Bash(devbox run npm test)");
+    });
+
+    it("stays silent once the inner command is constrained", () => {
+      // The documented fix, and one step looser than it. Both name the inner
+      // command, which is the thing the wildcard would otherwise leave open.
+      expect(audit([rule("allow", "Bash(devbox run npm test)")])).toHaveLength(0);
+      expect(audit([rule("allow", "Bash(devbox run npm *)")])).toHaveLength(0);
+      expect(audit([rule("allow", "Bash(npx -y prettier *)")])).toHaveLength(0);
+    });
+
+    it("does not report deny or ask rules, where matching more is not a grant", () => {
+      expect(audit([rule("deny", "Bash(devbox run *)")])).toHaveLength(0);
+      expect(audit([rule("ask", "Bash(docker exec *)")])).toHaveLength(0);
+    });
+
+    it("leaves ordinary prefix rules alone", () => {
+      expect(audit([rule("allow", "Bash(npm run *)")])).toHaveLength(0);
+      expect(audit([rule("allow", "Bash(git commit *)")])).toHaveLength(0);
+      // `npm` is not `npx`, and a runner named inside an argument is not the program.
+      expect(audit([rule("allow", "Bash(echo npx *)")])).toHaveLength(0);
+    });
+  });
+
   it("frames bypassPermissions in a local file as a personal-machine decision", () => {
     const findings = audit(
       [],

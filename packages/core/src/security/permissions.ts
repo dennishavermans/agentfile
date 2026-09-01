@@ -17,6 +17,12 @@
  *     allow rule covered by a deny rule is dead.
  *   • Exec wrappers (`watch`, `setsid`, `ionice`, `flock`) and `find` with
  *     `-exec`/`-delete` are not auto-approved by a prefix rule.
+ *   • An `mcp__` rule with parentheses is skipped when the settings file loads.
+ *     A deny rule written that way denies nothing.
+ *   • A tool's primary content field cannot be matched with `param:value`
+ *     syntax. `Bash(command:rm *)` is ignored with a startup warning.
+ *   • Environment runners (`npx`, `devbox run`, `docker exec`, …) are not
+ *     stripped wrappers, so `Bash(devbox run *)` allows `devbox run rm -rf .`.
  *
  * Source: https://code.claude.com/docs/en/permissions
  */
@@ -28,6 +34,32 @@ const PERMISSIONS_DOC = "https://code.claude.com/docs/en/permissions";
 
 /** Commands a prefix rule cannot auto-approve, per the documentation. */
 const EXEC_WRAPPERS = ["watch", "setsid", "ionice", "flock"];
+
+/**
+ * Fields that hold what a tool actually does, which `param:value` cannot match.
+ *
+ * Documented, and quoted here because the list is the whole check: "You can't
+ * match a tool's primary content field this way: `command` for Bash and
+ * PowerShell, `file_path` for Read, Edit, and Write, `path` for Grep and Glob,
+ * `notebook_path` for NotebookEdit, and `url` for WebFetch."
+ */
+const PRIMARY_CONTENT_FIELDS: ReadonlyArray<{ field: string; tools: readonly string[] }> = [
+  { field: "command", tools: ["Bash", "PowerShell"] },
+  { field: "file_path", tools: ["Read", "Edit", "Write"] },
+  { field: "path", tools: ["Grep", "Glob"] },
+  { field: "notebook_path", tools: ["NotebookEdit"] },
+  { field: "url", tools: ["WebFetch"] },
+];
+
+/**
+ * Runners that execute their arguments, and that Claude Code does not strip.
+ *
+ * The documentation names these five and says "such as", so this is the
+ * documented list rather than a complete one. Guessing at the rest — `uv run`,
+ * `bundle exec`, `pnpm dlx` — would be inventing platform behaviour, which is
+ * the mistake this analyser exists to catch in other people's configuration.
+ */
+const ENVIRONMENT_RUNNERS = ["direnv exec", "devbox run", "mise exec", "docker exec", "npx"];
 
 function locationOf(rule: PermissionRule): Location {
   return { file: rule.provenance.file, line: rule.provenance.line };
@@ -197,6 +229,168 @@ function unapprovableWrapper(rule: PermissionRule): Diagnostic[] {
   ];
 }
 
+/**
+ * AGF506 for an `mcp__` rule that carries a specifier.
+ *
+ * Documented: "When Claude Code loads a settings file, it skips any `mcp__` rule
+ * that has parentheses." Skipped, not narrowed — the rule is discarded whole.
+ *
+ * On a deny rule that is the worst outcome in a permissions file. The rule reads
+ * as a restriction, a reviewer counts it as one, and the tool it names is
+ * unrestricted. Claude Code does say so, in the invalid-settings dialog and in
+ * `claude doctor`, but only to whoever starts an interactive session — not to
+ * the reviewer reading the diff, which is where this is decided.
+ */
+function mcpRuleWithSpecifier(rule: PermissionRule): Diagnostic[] {
+  const { tool, specifier } = parsePermissionRule(rule.rule);
+  if (!tool.startsWith("mcp__") || specifier === undefined) return [];
+
+  return [
+    diagnostic({
+      code: "AGF506",
+      severity: "error",
+      message: `${rule.effect === "deny" ? "Deny" : rule.effect === "ask" ? "Ask" : "Allow"} rule ${rule.rule} is skipped when the settings file loads`,
+      explanation: [
+        "Claude Code skips any `mcp__` rule that has parentheses. The rule is discarded",
+        "whole rather than applied loosely, so it has no effect at all.",
+        "",
+        rule.effect === "deny"
+          ? `Nothing about ${tool} is denied. A deny rule that does not deny is the most\nexpensive kind of mistake in a permissions file: it reads as a restriction and\nis counted as one by whoever reviews it.`
+          : `Nothing about ${tool} is ${rule.effect === "ask" ? "gated" : "approved"} by this rule.`,
+        "",
+        "Claude Code reports the skipped rule in the invalid-settings dialog and in",
+        "`claude doctor`, so it is visible to whoever starts a session — but not in the",
+        "diff where the rule was added.",
+        `\nPermission syntax:\n  ${PERMISSIONS_DOC}`,
+      ].join("\n"),
+      suggestion:
+        rule.effect === "deny"
+          ? `Drop the parentheses to cover every use of the tool: "${tool}". To match one parameter on an MCP tool, pass the deny rule with \`--disallowedTools\` instead, which is the only place that works.`
+          : `Drop the parentheses to cover every use of the tool: "${tool}". Settings files cannot match a parameter on an MCP tool.`,
+      location: locationOf(rule),
+      data: { rule: rule.rule, effect: rule.effect, tool, problem: "mcp-rule-with-specifier" },
+    }),
+  ];
+}
+
+/**
+ * AGF506 for `param:value` naming a tool's primary content field.
+ *
+ * Documented: a rule like `Bash(command:rm *)` "would be bypassable by a
+ * compound command, so Claude Code ignores it and emits a startup warning".
+ *
+ * This is the shape someone writes when they have read about parameter matching
+ * and not the sentence that excludes these fields. It is also the most natural
+ * spelling: `command` really is the Bash tool's parameter, so the rule looks
+ * right, and the correct form drops the field name that made it look right.
+ *
+ * Only deny and ask rules, because only they do parameter matching: "Deny and
+ * ask rules can match a top-level input parameter", while "allow rules continue
+ * to use each tool's own specifier syntax". So `allow: ["Bash(command:*)"]` is
+ * not a parameter rule at all — it is a Bash prefix rule with the documented
+ * `:*` trailing wildcard, and it works. Three real configurations write exactly
+ * that, and reporting them would be inventing a defect.
+ */
+function primaryContentFieldRule(rule: PermissionRule): Diagnostic[] {
+  if (rule.effect === "allow") return [];
+
+  const { tool, specifier } = parsePermissionRule(rule.rule);
+  if (specifier === undefined) return [];
+
+  // Whitespace around the colon is ignored, per the documentation.
+  const parameter = specifier.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*:\s*([\s\S]*)$/);
+  if (!parameter) return [];
+
+  const [, field, value] = parameter;
+  const entry = PRIMARY_CONTENT_FIELDS.find((candidate) => candidate.field === field);
+  if (!entry?.tools.includes(tool)) return [];
+
+  const replacement = field === "url" ? `${tool}(domain:<host>)` : `${tool}(${value})`;
+
+  return [
+    diagnostic({
+      code: "AGF506",
+      severity: "error",
+      message: `Permission rule ${rule.rule} is ignored: \`${field}\` is ${tool}'s primary content field`,
+      explanation: [
+        `Parameter matching works on a tool's other input fields, but not on the one`,
+        `that carries what the tool does. A rule naming \`${field}\` on ${tool} would be`,
+        "bypassable by a compound command, so Claude Code ignores it and warns at",
+        "startup.",
+        "",
+        rule.effect === "deny"
+          ? "Nothing is denied. The rule reads as a restriction and is not one."
+          : `Nothing is ${rule.effect === "ask" ? "gated" : "approved"} by this rule.`,
+        "",
+        "The fields this applies to are `command` on Bash and PowerShell, `file_path` on",
+        "Read, Edit and Write, `path` on Grep and Glob, `notebook_path` on NotebookEdit,",
+        "and `url` on WebFetch.",
+        `\nPermission syntax:\n  ${PERMISSIONS_DOC}`,
+      ].join("\n"),
+      suggestion:
+        field === "url"
+          ? `Match the hostname instead: ${replacement}. WebFetch rules use a \`domain:\` prefix.`
+          : `Drop the field name and write the value as the specifier: ${replacement}.`,
+      location: locationOf(rule),
+      data: { rule: rule.rule, effect: rule.effect, field, tool, problem: "primary-content-field" },
+    }),
+  ];
+}
+
+/**
+ * AGF506 for an allow rule whose wildcard sits directly after an environment runner.
+ *
+ * Documented: these runners "are not in the list" of stripped wrappers, and
+ * "because these tools execute their arguments as a command, a rule like
+ * `Bash(devbox run *)` matches whatever comes after `run`, including
+ * `devbox run rm -rf .`".
+ *
+ * It is the mirror image of `unapprovableWrapper`. That one reports a rule that
+ * approves less than it looks like it does, which is an annoyance. This one
+ * reports a rule that approves more, which is an unbounded grant written in a
+ * form that does not read as one.
+ *
+ * Only the wildcard immediately after the runner is reported. `Bash(devbox run
+ * npm *)` constrains the inner command and is the shape the documentation
+ * recommends; the danger is specifically that the inner command is unconstrained.
+ */
+function unstrippedRunner(rule: PermissionRule): Diagnostic[] {
+  if (rule.effect !== "allow") return [];
+
+  const { tool, specifier } = parsePermissionRule(rule.rule);
+  if (tool !== "Bash" || !specifier) return [];
+
+  const command = specifier.trim();
+  const runner = ENVIRONMENT_RUNNERS.find((candidate) =>
+    new RegExp(`^${candidate.replace(/ /g, "\\s+")}\\s+\\*`).test(command),
+  );
+  if (!runner) return [];
+
+  return [
+    diagnostic({
+      code: "AGF506",
+      severity: "error",
+      message: `Allow rule ${rule.rule} approves any command, because ${runner} runs its arguments`,
+      explanation: [
+        `Claude Code strips a fixed set of wrappers before matching a Bash rule, and`,
+        `${runner} is not one of them. It is matched as written, and everything after it`,
+        `is the wildcard — so this rule approves \`${runner} rm -rf .\` exactly as readily`,
+        `as it approves the command it was written for.`,
+        "",
+        "The grant is unbounded. It is written in a form that reads as a narrow one,",
+        "which is why it is worth reporting rather than leaving to review.",
+        "",
+        "The runners the documentation names are direnv exec, devbox run, mise exec,",
+        "npx, and docker exec.",
+        `\nPermission syntax:\n  ${PERMISSIONS_DOC}#process-wrappers`,
+      ].join("\n"),
+      suggestion: `Name the inner command too, one rule per command you want approved: "Bash(${runner} npm test)".`,
+      location: locationOf(rule),
+      data: { rule: rule.rule, effect: rule.effect, runner, problem: "unstripped-runner" },
+    }),
+  ];
+}
+
 /** True when `broad` covers everything `narrow` would match, per prefix semantics. */
 function covers(broad: ParsedRule, narrow: ParsedRule): boolean {
   if (broad.tool !== narrow.tool) return false;
@@ -303,6 +497,9 @@ export function auditPermissions(configuration: AgentConfiguration): Diagnostic[
       ...misplacedColonWildcard(rule),
       ...unanchoredAllowGlob(rule),
       ...unapprovableWrapper(rule),
+      ...mcpRuleWithSpecifier(rule),
+      ...primaryContentFieldRule(rule),
+      ...unstrippedRunner(rule),
     ]),
     ...shadowedAllow(configuration),
     ...bypassMode(configuration),
