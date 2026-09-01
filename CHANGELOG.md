@@ -60,6 +60,43 @@ that same afternoon, before it shipped.
   Across the 344-file corpus these find 26 real `Bash(npx *)` grants and one
   skipped `mcp__*(*)` rule.
 
+- **And the last four, which complete the permissions page.** Every defect the
+  page documents is now detected — 16 of 16 against a fixture built from the
+  page itself, up from 7.
+
+  A rule that spans a command separator matches nothing. A command is split on
+  `&&`, `||`, `;`, `|`, `|&`, `&` and newlines *before* rules are matched, so a
+  rule whose text spans one is compared against fragments it cannot equal. This
+  is the one worth having: 126 rules in the corpus, 67 of them denies.
+  `Bash(curl * | sh)` in a deny list is how people try to block the oldest trick
+  there is, and it blocks nothing; `Bash(cd src && go build:*)` approves nothing.
+  Two details decide whether the check is useful or noise — a pipe inside
+  `sed 's|a|b|'` is an argument, not an operator, and 161 rules are that shape;
+  and `>&` is a redirection, so reading it as a separator would report the real
+  reverse-shell deny rule `Bash(bash -i >& /dev/tcp/*)` as dead.
+
+  A wildcard in the subcommand slot: in `Bash(git * main)` only `git` limits the
+  rule, so `git push --force main` is approved. Claude Code warns about this
+  shape at startup.
+
+  A tool name that cannot exist. `Stop Task` is a transcript label; the
+  canonical name is `TaskStop`, and rules match the canonical name only. Only
+  structurally impossible names are reported — in practice, names containing
+  whitespace — rather than names missing from a list of known tools, because
+  such a list would report every tool added after this version shipped. It
+  catches something a list would not: JSON has no comments, so a
+  `// === Git Operations ===` line in a permissions array is an inert rule. All
+  27 whitespace-bearing names in the corpus are exactly that.
+
+  A `curl` rule pinned to a host is recorded at info, not raised. The
+  documentation calls the pattern fragile rather than wrong: the rule works for
+  what it matches, and the spellings it misses still prompt. Exact-match rules
+  and loopback addresses are not reported.
+
+  Findings now have a precedence, so a rule that matches nothing is reported
+  once rather than alongside three observations about what it matches too much
+  or too little.
+
 - **`AGF306`, a `globs` value Cursor will not match.** The inverse of the
   mistake described under the `.mdc` reader below: a quoted or bracketed
   `globs:` value is valid YAML and is exactly what a YAML-shaped intuition
