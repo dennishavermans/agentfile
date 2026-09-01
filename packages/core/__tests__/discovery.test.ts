@@ -888,6 +888,34 @@ describe("discover", () => {
     expect(result.platforms).toEqual(["agents-md", "copilot", "cursor"]);
   });
 
+  it("carries disableAllHooks into the IR, from either settings file", () => {
+    // Without this the hook auditor cannot see the switch, and reports every
+    // hook in the repository as something that runs.
+    const shared = discover({
+      root: ROOT,
+      fs: memoryFileSystem({
+        "/repo/.claude/settings.json": JSON.stringify({
+          disableAllHooks: true,
+          hooks: { PreToolUse: [{ matcher: "Bash", hooks: [{ type: "command", command: "echo hi" }] }] },
+        }),
+      }),
+    });
+
+    const entry = shared.configuration.settings.find((s) => s.key === "disableAllHooks");
+    expect(entry?.value).toBe("true");
+    expect(entry?.provenance.scope).toBe("project");
+
+    const local = discover({
+      root: ROOT,
+      fs: memoryFileSystem({ "/repo/.claude/settings.local.json": JSON.stringify({ disableAllHooks: false }) }),
+    });
+
+    // Recorded even when false: the resolver needs it to outrank a lower file.
+    const localEntry = local.configuration.settings.find((s) => s.key === "disableAllHooks");
+    expect(localEntry?.value).toBe("false");
+    expect(localEntry?.provenance.scope).toBe("local");
+  });
+
   it("finds nothing, quietly, in an empty repository", () => {
     const result = discover({ root: ROOT, fs: memoryFileSystem({}) });
 
