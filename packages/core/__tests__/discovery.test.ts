@@ -352,6 +352,18 @@ describe("discoverCursorRules", () => {
     expect(found.instructions[0].applies).toEqual({ kind: "manual" });
   });
 
+  // `[abc]*.ts` is a character class, a perfectly ordinary glob. An early
+  // version of AGF306 flagged any leading `[` and called it a YAML list.
+  it("does not mistake a glob character class for a YAML list", () => {
+    const { fs, scan } = scanOf({
+      "/repo/.cursor/rules/cc.mdc": "---\nglobs: [abc]*.ts\n---\n\nBody",
+    });
+
+    const found = discoverCursorRules(ROOT, scan, fs);
+    expect(found.diagnostics).toEqual([]);
+    expect(found.instructions[0].applies).toEqual({ kind: "paths", patterns: ["[abc]*.ts"] });
+  });
+
   it("reports a quoted glob as unmatchable", () => {
     const { fs, scan } = scanOf({
       "/repo/.cursor/rules/py.mdc": '---\nglobs: "*.py"\nalwaysApply: false\n---\n\nBody',

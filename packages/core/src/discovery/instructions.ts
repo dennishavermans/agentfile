@@ -266,7 +266,11 @@ function unmatchableGlobDiagnostics(file: string, globs: string | undefined): Di
   if (!value) return [];
 
   const quoted = /^(["']).*\1$/.test(value);
-  const bracketed = value.startsWith("[");
+  // A YAML flow sequence, not a glob character class. `[abc]*.ts` and
+  // `[a-z]*/**` are legal patterns that open with `[`, so a leading bracket
+  // alone proves nothing; the quotes are what make it a list someone typed
+  // expecting YAML to unwrap them.
+  const bracketed = value.startsWith("[") && value.endsWith("]") && /["']/.test(value);
   if (!quoted && !bracketed) return [];
 
   const bare = bracketed
