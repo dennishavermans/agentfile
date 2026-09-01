@@ -9,6 +9,75 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.1.1] — 2026-09-01
+
+2.1.0 shipped with a claim it had only partly earned. The lesson of that
+release was that a parse error belongs to the linter, not the program — and
+the fix went to one of the five call sites that had the bug. This release
+comes from running 2.1.0 over ten popular repositories in full and measuring
+every error it produced against Claude Code 2.1.238. There were 69 findings at
+error severity. All 69 were wrong, in six distinct ways, and every fix below
+carries the measurement that grounds it. The same run's one true finding — an
+invisible U+2060 WORD JOINER inside a code span in trigger.dev's Cursor rules
+— still stands, now at the right line number.
+
+### Fixed
+
+- **A markdown link is not an import.** `AGF004`'s capture ran through
+  `[@user](https://…)` link syntax into the URL, picked up a `/`, and passed
+  the looks-like-a-path gate. Biome's CLAUDE.md credits twenty-two maintainers
+  exactly that way, and every one was an error. No real import target contains
+  a `]`, so the capture now stops there.
+
+- **An import resolves from the file that declares it.** n8n's
+  `.github/CLAUDE.md` opens with `@../AGENTS.md`, and the target is a real
+  18KB file. The resolver used the directory the file *governs* — the root —
+  so the `..` escaped the repository and the import was reported missing.
+  Measured: a chain of imports loads `sub/leaf.md` from `sub/mid.md` while an
+  identically named file at the root stays unloaded, so resolution is
+  file-relative and root-relative is not a fallback. That cuts both ways: an
+  import that only resolves against the root is genuinely broken and is now
+  reported, where before it passed. A target that escapes the repository is
+  never reported — a bounded scan cannot prove absence.
+
+- **Skills, commands, and `.claude/rules` read their frontmatter the way the
+  programs do.** The 2.1.0 lenient parser went to subagents only.
+  trigger.dev's `drizzle` skill — an unquoted description carrying
+  `conventions: ` — loads in Claude Code and echoes its description back
+  verbatim, while agentfile reported a parse error and a missing description.
+  Measured per surface: a command whose frontmatter reads
+  `description: uses: colons, badly: everywhere` is listed with exactly that
+  description, and a rule with the same shape still loads its body. All five
+  call sites now share the strict-then-lenient reading; an unclosed fence is
+  still an error in either reading.
+
+- **An emoji's joiner is rendered, not hidden.** `AGF505` flagged the ZERO
+  WIDTH JOINER inside PostHog's 🧑‍💻 — the codepoint that makes two
+  pictographs one glyph. A well-formed emoji ZWJ sequence is now exempt; a
+  joiner that joins nothing is still a finding.
+
+- **`AGF505` line numbers point at the file, not the body.** Skill and
+  subagent text starts after the frontmatter, and the scanner numbered it from
+  1 — PostHog's finding said lines 306 and 311 when the characters sat on 317
+  and 322. Skills and subagents now carry `bodyLine` through the IR, the same
+  anchor instructions already had.
+
+### Changed
+
+- **A skill name the loader ignores cannot be an error.** Measured: a skill
+  named `n8n:create-pr` in a `create-pr/` directory loads and is invoked as
+  `create-pr`, and a skill in a directory named `My_Weird.Skill` loads and is
+  invoked as exactly that. The directory is the identity, so `AGF101`'s
+  name-grammar and directory-mismatch findings drop to warning severity, and a
+  name that both breaks the grammar and mismatches its directory is one
+  finding, not two — n8n went from 44 errors to 22 warnings. `AGF102` drops
+  its default to warning for the same reason: a `SKILL.md` with no frontmatter
+  at all still loads, is listed with its first heading standing in for the
+  description, and resolves when invoked by name. Missing metadata degrades
+  discovery; it does not break the skill. Severity defaults are documented as
+  not stable in [docs/stability.md](docs/stability.md); pin them in
+  `agentfile.yaml` if CI depends on them.
+
 ## [2.1.0] — 2026-09-01
 
 A minor, not the patch this started as. Most of it is correctness work, but

@@ -116,10 +116,19 @@ A skill breaks a specification requirement:
 * two skills sharing a name, where which one loads depends on directory
   precedence the platforms do not document identically
 
-### `AGF102` missing-skill-metadata · error · active
+The two name findings are reported at warning severity rather than the code's
+default: measured on Claude Code, a skill whose name breaks the grammar or
+disagrees with its directory still loads and is invoked under the directory
+name, so the finding describes a portability and cross-reference problem in a
+skill that works. When a name both breaks the grammar and mismatches the
+directory, only the mismatch is reported — one fact, not two.
+
+### `AGF102` missing-skill-metadata · warning · active
 A skill omits `name` or `description`, the two fields the specification requires.
-A missing description is not a weak skill but an unusable one: the description is
-the only thing an agent sees before deciding whether to load it.
+The skill still loads and can be invoked by name — measured on Claude Code, a
+`SKILL.md` with no frontmatter at all is listed with its first heading standing
+in for the description — but the description is what an agent weighs when
+deciding to load a skill unprompted, so without one the skill is rarely chosen.
 
 ### `AGF103` skill-routing-quality · warning · active
 The description is valid but an agent cannot route on it reliably — it is too

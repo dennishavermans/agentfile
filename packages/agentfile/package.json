@@ -1,6 +1,6 @@
 {
   "name": "@agentfile/agentfile",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "description": "Find what is wrong with the AI agent configuration your repository already has",
   "type": "module",
   "bin": {
@@ -42,7 +42,7 @@
     "access": "public"
   },
   "dependencies": {
-    "@agentfile/cli": "^2.1.0"
+    "@agentfile/cli": "^2.1.1"
   },
   "devDependencies": {
     "@types/node": "^22.19.0",
