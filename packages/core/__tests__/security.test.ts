@@ -902,6 +902,36 @@ describe("auditPermissions", () => {
     });
   });
 
+  // ─── the two equivalent spellings of a trailing wildcard ───────────────
+
+  describe("the `:*` suffix", () => {
+    it("gives the same verdict as the space form it is equivalent to", () => {
+      // Documented: "`Bash(ls:*)` matches the same commands as `Bash(ls *)`".
+      // A real repository writes all 45 of its rules in the `:*` form, and got
+      // silence where the space form is reported.
+      for (const [spaced, suffixed] of [
+        ["Bash(find *)", "Bash(find:*)"],
+        ["Bash(watch *)", "Bash(watch:*)"],
+        ["Bash(npx *)", "Bash(npx:*)"],
+        ["Bash(docker exec *)", "Bash(docker exec:*)"],
+        ["Bash(devbox run *)", "Bash(devbox run:*)"],
+      ]) {
+        expect(problems(audit([rule("allow", suffixed)])), suffixed).toEqual(problems(audit([rule("allow", spaced)])));
+        expect(problems(audit([rule("allow", suffixed)])), suffixed).not.toHaveLength(0);
+      }
+    });
+
+    it("only rewrites a trailing `:*`, since elsewhere the colon is literal", () => {
+      expect(problems(audit([rule("allow", "Bash(git:* push)")]))).toEqual(["misplaced-colon-wildcard"]);
+    });
+
+    it("stays silent on the ordinary rules a real repository writes this way", () => {
+      for (const expression of ["Bash(make test:*)", "Bash(go build:*)", "Bash(git status:*)", "Bash(rg:*)"]) {
+        expect(audit([rule("allow", expression)]), expression).toHaveLength(0);
+      }
+    });
+  });
+
   // ─── compound-command separators ───────────────────────────────────────
 
   describe("rules that span a command separator", () => {

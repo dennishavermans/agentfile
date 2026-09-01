@@ -123,6 +123,23 @@ interface ParsedRule {
   specifier?: string;
 }
 
+/**
+ * A specifier with its `:*` suffix written as the space form it means.
+ *
+ * Documented: "The `:*` suffix is an equivalent way to write a trailing
+ * wildcard, so `Bash(ls:*)` matches the same commands as `Bash(ls *)`." Every
+ * check that reads the command word has to see the same command either way, or
+ * the same rule gets two different verdicts depending on which spelling its
+ * author preferred. `Bash(find *)` was reported and `Bash(find:*)` was not, and
+ * a repository writing all 45 of its rules in the second form got silence.
+ *
+ * Only a trailing `:*` is the suffix. In `Bash(git:* push)` the colon is
+ * literal, which is a different finding and is left for it.
+ */
+function commandForm(specifier: string): string {
+  return specifier.endsWith(":*") ? `${specifier.slice(0, -2)} *` : specifier;
+}
+
 /** Splits `Tool(specifier)` into its parts. */
 export function parsePermissionRule(rule: string): ParsedRule {
   const match = rule.trim().match(/^([^(]+)\((.*)\)$/);
@@ -257,9 +274,10 @@ function unapprovableWrapper(rule: PermissionRule): Diagnostic[] {
   const { tool, specifier } = parsePermissionRule(rule.rule);
   if (tool !== "Bash" || !specifier) return [];
 
-  const command = specifier.trim().split(/\s+/)[0].replace(/\*$/, "");
+  const written = commandForm(specifier);
+  const command = written.trim().split(/\s+/)[0].replace(/\*$/, "");
   if (!EXEC_WRAPPERS.includes(command) && command !== "find") return [];
-  if (!specifier.includes("*")) return [];
+  if (!written.includes("*")) return [];
 
   return [
     diagnostic({
@@ -411,7 +429,7 @@ function unstrippedRunner(rule: PermissionRule): Diagnostic[] {
   const { tool, specifier } = parsePermissionRule(rule.rule);
   if (tool !== "Bash" || !specifier) return [];
 
-  const command = specifier.trim();
+  const command = commandForm(specifier).trim();
   const runner = ENVIRONMENT_RUNNERS.find((candidate) =>
     new RegExp(`^${candidate.replace(/ /g, "\\s+")}\\s+\\*`).test(command),
   );
@@ -507,7 +525,7 @@ function wildcardBeforeSubcommand(rule: PermissionRule): Diagnostic[] {
   const { tool, specifier } = parsePermissionRule(rule.rule);
   if (tool !== "Bash" || !specifier) return [];
 
-  const words = specifier.trim().split(/\s+/);
+  const words = commandForm(specifier).trim().split(/\s+/);
   if (words.length < 3 || words[1] !== "*" || words[0].includes("*")) return [];
 
   return [
@@ -597,9 +615,10 @@ function fragileArgumentPattern(rule: PermissionRule): Diagnostic[] {
 
   const { tool, specifier } = parsePermissionRule(rule.rule);
   if (tool !== "Bash" || !specifier) return [];
-  if (!/^\s*(?:curl|wget)[\s.]/.test(specifier) || !specifier.includes("*")) return [];
+  const written = commandForm(specifier);
+  if (!/^\s*(?:curl|wget)[\s.]/.test(written) || !written.includes("*")) return [];
 
-  const host = specifier.match(/https?:\/\/([^\s/*:"']+)/);
+  const host = written.match(/https?:\/\/([^\s/*:"']+)/);
   if (!host) return [];
   if (/^(?:localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\]|host\.docker\.internal)$/i.test(host[1])) return [];
 
