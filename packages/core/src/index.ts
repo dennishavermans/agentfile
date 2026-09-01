@@ -373,6 +373,7 @@ export {
   globListField,
   listField,
   mapField,
+  parseAgentFrontmatter,
   parseFrontmatter,
   stringField,
 } from "./parsers/index.js";

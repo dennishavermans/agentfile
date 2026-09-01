@@ -56,18 +56,26 @@ const SKILL = (body: string, description = "Deploys the service to production wh
 
 const CASES: Case[] = [
   {
-    // A subagent file, not a `.mdc`: Anthropic documents this frontmatter as
-    // YAML, so a plain scalar containing `: ` genuinely fails to parse. Cursor
-    // `.mdc` is not YAML and belongs to AGF306 below instead.
-    defect: "a rule file whose YAML frontmatter does not parse",
+    // An unclosed fence, which breaks the file under any reading: there is no
+    // frontmatter block, so the whole file becomes body text and the agent has
+    // no name or description at all.
+    //
+    // This case used to be a `description` containing `: `, on the reasoning
+    // that Anthropic documents the block as YAML and a plain scalar with a
+    // colon does not parse. Both halves are true and the conclusion was wrong.
+    // Claude Code 2.1.238 loads such a file and reads the description
+    // correctly, verified by listing its subagents; it also loads
+    // `description: [unclosed`, which no strict parser accepts. Documented as
+    // YAML is not the same as parsed strictly, which is the same mistake as
+    // reading `.mdc` as YAML, made again on the next surface along.
+    defect: "a subagent file whose frontmatter fence is never closed",
     code: "AGF003",
     broken: {
-      [`${ROOT}/.claude/agents/reviewer.md`]:
-        "---\nname: reviewer\ndescription: Use this agent when: you want a review\n---\n\nReview the code.\n",
+      [`${ROOT}/.claude/agents/reviewer.md`]: "---\nname: reviewer\ndescription: Reviews code\n\nReview the code.\n",
     },
     fixed: {
       [`${ROOT}/.claude/agents/reviewer.md`]:
-        "---\nname: reviewer\ndescription: |-\n  Use this agent when: you want a review\n---\n\nReview the code.\n",
+        "---\nname: reviewer\ndescription: Reviews code\n---\n\nReview the code.\n",
     },
   },
   {

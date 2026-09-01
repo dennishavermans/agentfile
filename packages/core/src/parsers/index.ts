@@ -5,6 +5,7 @@ export {
   globListField,
   listField,
   mapField,
+  parseAgentFrontmatter,
   parseCursorFrontmatter,
   parseFrontmatter,
   stringField,

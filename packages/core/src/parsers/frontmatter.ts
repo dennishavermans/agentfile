@@ -207,6 +207,41 @@ export function parseCursorFrontmatter(file: string, text: string): ParsedFrontm
   };
 }
 
+/**
+ * Claude Code subagent frontmatter, read the way Claude Code reads it.
+ *
+ * Anthropic documents this block as YAML and documents that "YAML that doesn't
+ * parse" means Claude Code "reads no fields from the file, skips it, and writes
+ * the parse error to the debug log". Both are true, and together they are
+ * misleading: the parser Claude Code actually uses is not a strict one, and
+ * almost nothing a person writes by hand fails it.
+ *
+ * Tested against Claude Code 2.1.238 rather than inferred. A file whose
+ * frontmatter reads `description: [unclosed` — rejected by `yaml`, `js-yaml`
+ * and Ruby's Psych alike — loads as a working subagent, and its description
+ * comes through as the literal string `[unclosed`. So does PostHog's, whose
+ * five agent files carry an unquoted `description` containing `Context: ` and
+ * are rejected by all three parsers. agentfile reported those five at error
+ * severity, and they work.
+ *
+ * The fix is the same shape as the Cursor one: try YAML first, because the
+ * structured fields (`hooks`, `mcpServers`, `experimental`) are real mappings
+ * and a strict parse reads them properly. When that fails, fall back to the
+ * flat `key: value` reading rather than declaring the file broken, because
+ * that is what the program reading it does.
+ */
+export function parseAgentFrontmatter(file: string, text: string): ParsedFrontmatter {
+  const strict = parseFrontmatter(file, text);
+
+  // An unclosed fence is a real defect in either reading: there is no
+  // frontmatter block at all, and the whole file becomes body text.
+  const unclosed = strict.diagnostics.some((item) => item.message === "Frontmatter block is never closed");
+  if (!strict.diagnostics.length || unclosed) return strict;
+
+  const lenient = parseCursorFrontmatter(file, text);
+  return { ...lenient, diagnostics: [] };
+}
+
 export function stringField(data: Record<string, unknown> | undefined, key: string): string | undefined {
   const value = data?.[key];
   return typeof value === "string" ? value : undefined;

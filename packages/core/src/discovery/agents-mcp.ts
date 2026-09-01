@@ -9,7 +9,7 @@ import { join } from "node:path";
 import { type Diagnostic, diagnostic } from "../diagnostics/index.js";
 import type { FileSystem } from "../fs/index.js";
 import type { McpServerEntry, McpTransport, SourceFile, SubagentEntry } from "../ir/index.js";
-import { extraFields, listField, parseFrontmatter, stringField } from "../parsers/frontmatter.js";
+import { extraFields, listField, parseAgentFrontmatter, stringField } from "../parsers/frontmatter.js";
 import { dirnameOf } from "../paths/index.js";
 import { filesNamed, filesUnder, type RepositoryScan } from "./scan.js";
 import { basenameOf, provenanceOf } from "./shared.js";
@@ -43,7 +43,7 @@ export function discoverSubagents(root: string, scan: RepositoryScan, fs: FileSy
       continue;
     }
 
-    const parsed = parseFrontmatter(file, text);
+    const parsed = parseAgentFrontmatter(file, text);
     result.diagnostics.push(...parsed.diagnostics);
 
     const provenance = provenanceOf(file, "claude");
