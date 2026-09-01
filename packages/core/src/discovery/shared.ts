@@ -139,12 +139,18 @@ const NPM_SCOPED_PACKAGE = /^[a-z0-9~-][a-z0-9._~-]*\/[a-z0-9._~-]+$/;
  * Matches the documented form: an `@` at a word boundary followed by a path.
  * Email addresses and decorators are excluded by requiring the `@` to start a
  * token, and by requiring the target to look like a path or a filename.
+ *
+ * `]` ends a capture because a markdown link is not an import: in
+ * `[Victorien Elvinger @Conaclos](https://github.com/Conaclos)` the capture
+ * would otherwise run through the link syntax into the URL, pick up a `/`,
+ * and pass the looks-like-a-path gate. Biome's CLAUDE.md credits twenty-two
+ * maintainers exactly that way, and no real import target contains a `]`.
  */
 export function findImports(markdown: string): string[] {
   const cleaned = stripCode(markdown);
   const found = new Set<string>();
 
-  for (const match of cleaned.matchAll(/(^|[\s(])@([^\s)*,;'"]+)/g)) {
+  for (const match of cleaned.matchAll(/(^|[\s(])@([^\s)\]*,;'"]+)/g)) {
     const target = match[2].replace(/[.,:;]+$/, "");
 
     // A bare word is a mention, not an import. Require a path separator or an
