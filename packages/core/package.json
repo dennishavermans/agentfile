@@ -1,6 +1,6 @@
 {
   "name": "@agentfile/core",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "description": "Read, analyse and compile AI agent configuration — discovery, a normalized IR, a resolver, diagnostics, and static security analysis",
   "type": "module",
   "main": "./dist/index.js",
@@ -49,7 +49,7 @@
   },
   "dependencies": {
     "yaml": "^2.9.0",
-    "zod": "^4.4.3"
+    "zod": "^4.5.2"
   },
   "devDependencies": {
     "@types/node": "^22.19.0",

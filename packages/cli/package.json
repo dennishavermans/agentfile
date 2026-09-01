@@ -1,6 +1,6 @@
 {
   "name": "@agentfile/cli",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "description": "Find what is wrong with the AI agent configuration your repository already has — doctor, check, lint, audit, adopt, compile, eval",
   "type": "module",
   "main": "./dist/bin.js",
@@ -45,7 +45,7 @@
     "access": "public"
   },
   "dependencies": {
-    "@agentfile/core": "^2.1.0",
+    "@agentfile/core": "^2.1.1",
     "chalk": "^6.0.0",
     "commander": "^14.0.3",
     "enquirer": "^2.4.1"

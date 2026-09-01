@@ -114,12 +114,16 @@ describe("skillDirectoryName", () => {
 // ─── Structural validation ─────────────────────────────────────────────────
 
 describe("validateSkills", () => {
-  it("reports a missing description as an unusable skill, not a weak one", () => {
+  // This test used to call a description-less skill unusable, at error
+  // severity. Measured on Claude Code 2.1.238: a SKILL.md with no frontmatter
+  // at all still loads, is listed with its first heading standing in for the
+  // description, and resolves when invoked by name.
+  it("reports a missing description as a discovery problem, not a broken skill", () => {
     const [found] = validateSkills(configurationOf(skill({ description: "" })));
 
     expect(found.code).toBe("AGF102");
-    expect(found.severity).toBe("error");
-    expect(found.explanation).toContain("only thing an agent sees");
+    expect(found.severity).toBe("warning");
+    expect(found.explanation).toContain("still loads");
   });
 
   it("reports a missing name", () => {
@@ -135,6 +139,37 @@ describe("validateSkills", () => {
     expect(found?.code).toBe("AGF101");
     expect(found?.explanation).toContain('will load as "deploy"');
     expect(found?.suggestion).toContain("Rename the directory");
+  });
+
+  // Measured on Claude Code 2.1.238: a skill named `n8n:create-pr` in a
+  // `create-pr/` directory loads and is invoked as `create-pr`, and a skill in
+  // a directory named `My_Weird.Skill` loads and is invoked as exactly that.
+  // A name problem is a portability warning, never a load failure — n8n's 22
+  // namespaced skills were reported as 44 errors on the old severity.
+  it("reports name problems as warnings, because the skill still loads", () => {
+    const findings = validateSkills(
+      configurationOf(skill({ name: "n8n:create-pr", directory: ".agents/skills/create-pr" })),
+    );
+
+    expect(findings).toHaveLength(1);
+    expect(findings[0].severity).toBe("warning");
+    expect(findings[0].data?.problem).toBe("directory-mismatch");
+  });
+
+  it("reports one fact, not two, when a bad name also mismatches its directory", () => {
+    const problems = validateSkills(
+      configurationOf(skill({ name: "Deploy_It", directory: ".claude/skills/deploy" })),
+    ).map((item) => item.data?.problem);
+
+    expect(problems).toEqual(["directory-mismatch"]);
+  });
+
+  it("warns on an invalid name that matches its equally invalid directory", () => {
+    const [found] = validateSkills(configurationOf(skill({ name: "My_Weird.Skill" })));
+
+    expect(found.data?.problem).toBe("invalid-characters");
+    expect(found.severity).toBe("warning");
+    expect(found.explanation).toContain("still loads");
   });
 
   it("reports a description over the specification limit", () => {

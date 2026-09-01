@@ -16,7 +16,7 @@ import { join } from "node:path";
 import { type Diagnostic, diagnostic } from "../diagnostics/index.js";
 import type { FileSystem } from "../fs/index.js";
 import { type CommandEntry, nodeId, type SourceFile } from "../ir/index.js";
-import { booleanField, extraFields, listField, parseFrontmatter, stringField } from "../parsers/frontmatter.js";
+import { booleanField, extraFields, listField, parseAgentFrontmatter, stringField } from "../parsers/frontmatter.js";
 import { basenameOf, dirnameOf, normalizePath } from "../paths/index.js";
 import { filesUnder, type RepositoryScan } from "./scan.js";
 import { findImports, provenanceOf } from "./shared.js";
@@ -114,7 +114,7 @@ export function discoverCommands(root: string, scan: RepositoryScan, fs: FileSys
 
     let command: CommandEntry;
     if (platform === "claude") {
-      const parsed = parseFrontmatter(file, text);
+      const parsed = parseAgentFrontmatter(file, text);
       result.diagnostics.push(...parsed.diagnostics);
 
       const body = parsed.body;

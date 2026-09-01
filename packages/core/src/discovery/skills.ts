@@ -27,7 +27,7 @@ import {
   globListField,
   listField,
   mapField,
-  parseFrontmatter,
+  parseAgentFrontmatter,
   stringField,
 } from "../parsers/frontmatter.js";
 import { dirnameOf, ROOT_PATH } from "../paths/index.js";
@@ -112,7 +112,7 @@ export function discoverSkills(root: string, scan: RepositoryScan, fs: FileSyste
       continue;
     }
 
-    const parsed = parseFrontmatter(file, text);
+    const parsed = parseAgentFrontmatter(file, text);
     result.diagnostics.push(...parsed.diagnostics);
 
     const platform = platformFor(file);
@@ -150,6 +150,7 @@ export function discoverSkills(root: string, scan: RepositoryScan, fs: FileSyste
       metadata: mapField(parsed.data, "metadata"),
       allowedTools: listField(parsed.data, "allowed-tools"),
       body: parsed.body,
+      bodyLine: parsed.bodyLine,
       extensions: extraFields(parsed.data, SKILL_SPEC_FIELDS),
       resources: resourcesFor(scan, skillDirectory),
       applies,

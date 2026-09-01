@@ -53,6 +53,18 @@ const INVISIBLE_PATTERN = new RegExp(
 );
 
 /**
+ * A well-formed emoji ZWJ sequence: pictographs joined by U+200D, with
+ * variation selectors and skin-tone modifiers where they belong.
+ *
+ * The joiner is what makes 🧑\u200D💻 one glyph instead of two, so inside a
+ * sequence it is not hidden — it is rendered. PostHog's qa-team skill writes
+ * its reviewer table with exactly that emoji, and flagging it teaches people
+ * the check cries wolf. A ZWJ anywhere else stays a finding.
+ */
+const EMOJI_ZWJ_SEQUENCE =
+  /\p{Extended_Pictographic}[\u{FE0F}\u{1F3FB}-\u{1F3FF}]*(?:\u200D\p{Extended_Pictographic}[\u{FE0F}\u{1F3FB}-\u{1F3FF}]*)+/gu;
+
+/**
  * Wording that addresses the agent's own instructions rather than the codebase.
  *
  * Deliberately narrow. "Do not use npm" is an instruction about the project;
@@ -111,7 +123,7 @@ function textSources(configuration: AgentConfiguration): TextSource[] {
   for (const skill of configuration.skills) {
     sources.push({
       file: skill.provenance.file,
-      startLine: 1,
+      startLine: skill.bodyLine ?? 1,
       text: skill.body,
       provenance: skill.provenance,
       kind: "skill",
@@ -122,7 +134,7 @@ function textSources(configuration: AgentConfiguration): TextSource[] {
   for (const subagent of configuration.subagents) {
     sources.push({
       file: subagent.provenance.file,
-      startLine: 1,
+      startLine: subagent.bodyLine ?? 1,
       text: subagent.body,
       provenance: subagent.provenance,
       kind: "subagent",
@@ -145,9 +157,11 @@ function invisibleCharacters(source: TextSource): Diagnostic[] {
   const found: Array<{ line: number; names: string[] }> = [];
 
   for (let offset = 0; offset < lines.length; offset++) {
-    if (!INVISIBLE_PATTERN.test(lines[offset])) continue;
+    // An emoji sequence renders its joiners; only what remains is invisible.
+    const line = lines[offset].replace(EMOJI_ZWJ_SEQUENCE, "");
+    if (!INVISIBLE_PATTERN.test(line)) continue;
 
-    const names = INVISIBLE_CHARACTERS.filter((entry) => lines[offset].includes(String.fromCodePoint(entry.code))).map(
+    const names = INVISIBLE_CHARACTERS.filter((entry) => line.includes(String.fromCodePoint(entry.code))).map(
       (entry) => entry.name,
     );
 

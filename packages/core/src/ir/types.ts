@@ -151,6 +151,8 @@ export interface SkillEntry {
   allowedTools?: string[];
   /** Markdown body after the frontmatter. */
   body: string;
+  /** 1-based line in the source file where `body` starts. Defaults to 1. */
+  bodyLine?: number;
   /** Non-spec frontmatter keys, preserved verbatim for portability analysis. */
   extensions?: Record<string, unknown>;
   resources: SkillResource[];
@@ -169,6 +171,8 @@ export interface SubagentEntry {
   disallowedTools?: string[];
   model?: string;
   body: string;
+  /** 1-based line in the source file where `body` starts. Defaults to 1. */
+  bodyLine?: number;
   extensions?: Record<string, unknown>;
   provenance: Provenance;
 }

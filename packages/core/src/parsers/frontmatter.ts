@@ -208,23 +208,33 @@ export function parseCursorFrontmatter(file: string, text: string): ParsedFrontm
 }
 
 /**
- * Claude Code subagent frontmatter, read the way Claude Code reads it.
+ * Agent-config frontmatter, read the way the programs read it.
  *
- * Anthropic documents this block as YAML and documents that "YAML that doesn't
- * parse" means Claude Code "reads no fields from the file, skips it, and writes
- * the parse error to the debug log". Both are true, and together they are
- * misleading: the parser Claude Code actually uses is not a strict one, and
- * almost nothing a person writes by hand fails it.
+ * Anthropic documents these blocks as YAML and documents that "YAML that
+ * doesn't parse" means Claude Code "reads no fields from the file, skips it,
+ * and writes the parse error to the debug log". Both are true, and together
+ * they are misleading: the parser Claude Code actually uses is not a strict
+ * one, and almost nothing a person writes by hand fails it.
  *
- * Tested against Claude Code 2.1.238 rather than inferred. A file whose
- * frontmatter reads `description: [unclosed` — rejected by `yaml`, `js-yaml`
- * and Ruby's Psych alike — loads as a working subagent, and its description
- * comes through as the literal string `[unclosed`. So does PostHog's, whose
- * five agent files carry an unquoted `description` containing `Context: ` and
- * are rejected by all three parsers. agentfile reported those five at error
- * severity, and they work.
+ * Measured against Claude Code 2.1.238 rather than inferred, once per surface:
  *
- * The fix is the same shape as the Cursor one: try YAML first, because the
+ * - Subagents: `description: [unclosed` — rejected by `yaml`, `js-yaml` and
+ *   Ruby's Psych alike — loads as a working subagent, its description the
+ *   literal string `[unclosed`. So did PostHog's five agent files, which
+ *   agentfile 2.0.0 reported at error severity.
+ * - Skills: trigger.dev's drizzle skill carries an unquoted description
+ *   containing `conventions: `. It loads, and the agent echoes the full
+ *   description back verbatim. agentfile 2.1.0 reported it as having none.
+ * - Commands: a command whose frontmatter reads
+ *   `description: uses: colons, badly: everywhere` is listed with exactly
+ *   that description.
+ * - `.claude/rules`: a rule with the same un-YAML shape still loads its body.
+ *
+ * Copilot's `.instructions.md` gets the same reading untested — no Copilot to
+ * measure against here — because the failure mode of leniency is a missed
+ * finding, and the failure mode of strictness is the PostHog report.
+ *
+ * The mechanics are the same shape as the Cursor fix: try YAML first, because
  * structured fields (`hooks`, `mcpServers`, `experimental`) are real mappings
  * and a strict parse reads them properly. When that fails, fall back to the
  * flat `key: value` reading rather than declaring the file broken, because

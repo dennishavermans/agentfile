@@ -1149,6 +1149,35 @@ describe("auditInstructionText", () => {
     expect(findings[0].location?.line).toBe(11);
   });
 
+  // PostHog's qa-team skill writes its reviewer table with 🧑‍💻. The joiner
+  // in an emoji sequence is rendered, not hidden — it is what makes two
+  // pictographs one glyph — so it is not a finding.
+  it("does not flag the ZWJ inside an emoji sequence", () => {
+    const findings = audit({
+      skills: [skill({ body: "| \u{1F9D1}‍\u{1F4BB} generalist-a | risk | summary |" })],
+    });
+    expect(findings).toHaveLength(0);
+  });
+
+  it("still flags a ZWJ that joins nothing", () => {
+    const findings = audit({
+      skills: [skill({ body: "review the config‍file carefully" })],
+    });
+    expect(findings).toHaveLength(1);
+    expect(findings[0].explanation).toContain("ZERO WIDTH JOINER");
+  });
+
+  // The qa-team finding pointed at lines 306 and 311; the characters were on
+  // 317 and 322, eleven lines of frontmatter away. Skill text starts where the
+  // body starts, not at line 1.
+  it("anchors a skill finding to the line in the file, not the line in the body", () => {
+    const findings = audit({
+      skills: [skill({ body: "clean\nhidden⁠ here", bodyLine: 12 })],
+    });
+    expect(findings).toHaveLength(1);
+    expect(findings[0].location?.line).toBe(13);
+  });
+
   it("flags an override instruction hidden in an HTML comment as the finding that matters", () => {
     const findings = audit({
       instructions: [

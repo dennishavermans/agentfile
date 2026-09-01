@@ -56,6 +56,7 @@ export function discoverSubagents(root: string, scan: RepositoryScan, fs: FileSy
       disallowedTools: listField(parsed.data, "disallowedTools", /\s*,\s*/),
       model: stringField(parsed.data, "model"),
       body: parsed.body,
+      bodyLine: parsed.bodyLine,
       extensions: extraFields(parsed.data, SUBAGENT_FIELDS),
       provenance,
     });

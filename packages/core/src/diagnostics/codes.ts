@@ -109,7 +109,11 @@ export const DIAGNOSTIC_CODES = {
     name: "missing-skill-metadata",
     title: "Missing skill metadata",
     band: "skills",
-    defaultSeverity: "error",
+    // Measured on Claude Code 2.1.238: a SKILL.md with no frontmatter at all
+    // still loads, is listed with its first heading standing in for the
+    // missing description, and resolves when invoked by name. Missing metadata
+    // degrades discovery; it does not break the skill.
+    defaultSeverity: "warning",
     status: "active",
   },
   AGF103: {
