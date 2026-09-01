@@ -21,7 +21,7 @@ jobs:
     name: Reports and counts known defects
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       # Two defects a human reads straight past. The import names a file that
       # does not exist, so the instructions it promises are silently absent —
@@ -84,7 +84,7 @@ jobs:
     name: Gates the build when findings are present
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - run: |
           mkdir -p subject/.cursor/rules
@@ -113,7 +113,7 @@ jobs:
       contents: read
       security-events: write
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - uses: ./
         id: agentfile
