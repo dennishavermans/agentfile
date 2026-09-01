@@ -708,6 +708,55 @@ describe("auditPermissions", () => {
     expect(findings[0].explanation).toContain("committed");
   });
 
+  // ─── false positives found against real configurations ────────────────
+
+  describe("colon wildcards outside Bash", () => {
+    it("does not call a WebFetch subdomain wildcard dead", () => {
+      // Documented: "WebFetch(domain:*.example.com) matches any subdomain at any
+      // depth". The `:*`-only-at-the-end rule is Bash and PowerShell syntax, and
+      // reading it here reported working rules as matching nothing — on 11 of the
+      // 13 real configurations that tripped this check.
+      expect(audit([rule("allow", "WebFetch(domain:*.example.com)")])).toHaveLength(0);
+      expect(audit([rule("allow", "WebFetch(domain:*.a.b.example.com)")])).toHaveLength(0);
+      expect(audit([rule("deny", "WebFetch(domain:*.evil.test)")])).toHaveLength(0);
+    });
+
+    it("still reports it where the documentation defines it", () => {
+      expect(audit([rule("allow", "Bash(git:* push)")])[0]?.data?.problem).toBe("misplaced-colon-wildcard");
+      expect(audit([rule("deny", "Bash(curl:* | sh)")])[0]?.data?.problem).toBe("misplaced-colon-wildcard");
+      expect(audit([rule("deny", "PowerShell(Get:* Item)")])[0]?.data?.problem).toBe("misplaced-colon-wildcard");
+    });
+
+    it("leaves a trailing :* alone, which is the documented equivalent of a space", () => {
+      expect(audit([rule("allow", "Bash(ls:*)")])).toHaveLength(0);
+      expect(audit([rule("deny", "Agent(model:*)")])).toHaveLength(0);
+    });
+  });
+
+  describe("word boundaries after punctuation", () => {
+    it("does not suggest a change that would weaken the rule", () => {
+      // `Bash(rm -rf / *)` is a different rule: it stops matching `rm -rf /etc`.
+      // The `*` here extends a path, and no command other than `rm` can match.
+      for (const expression of [
+        "Bash(rm -rf /*)",
+        "Bash(rm -rf ~/*)",
+        "Bash(cat ~/.ssh/*)",
+        "Bash(./scripts/*)",
+        "Bash(mkfs.*)",
+        "Bash(dd if=*)",
+      ]) {
+        expect(audit([rule("deny", expression)]), expression).toHaveLength(0);
+      }
+    });
+
+    it("still reports a wildcard that continues a command word", () => {
+      expect(audit([rule("allow", "Bash(ls*)")])[0]?.data?.problem).toBe("missing-word-boundary");
+      expect(audit([rule("allow", "Bash(npm install*)")])[0]?.data?.problem).toBe("missing-word-boundary");
+      // The one that matters most: this also covers `--force-with-lease`.
+      expect(audit([rule("deny", "Bash(git push --force*)")])[0]?.data?.problem).toBe("missing-word-boundary");
+    });
+  });
+
   it("frames bypassPermissions in a local file as a personal-machine decision", () => {
     const findings = audit(
       [],

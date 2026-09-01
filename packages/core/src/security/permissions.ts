@@ -52,11 +52,20 @@ export function parsePermissionRule(rule: string): ParsedRule {
  *
  * `Bash(ls*)` matching `lsof` is the single most surprising documented behaviour
  * in the permission syntax, and the difference from `Bash(ls *)` is one space.
+ *
+ * The mechanism is a `*` continuing a word, so it only applies when the
+ * character before it is part of one. After punctuation the boundary is already
+ * there: `Bash(rm -rf /*)` cannot match a command other than `rm`, the `*` only
+ * extends a path, and the fix this check would otherwise suggest —
+ * `Bash(rm -rf / *)` — is a different rule that stops matching `rm -rf /etc`.
+ * Handing someone a change that quietly weakens their deny rule is worse than
+ * saying nothing.
  */
 function missingWordBoundary(rule: PermissionRule): Diagnostic[] {
   const { tool, specifier } = parsePermissionRule(rule.rule);
   if (tool !== "Bash" || !specifier) return [];
   if (!specifier.endsWith("*") || specifier.endsWith(" *")) return [];
+  if (!/[A-Za-z0-9_]\*$/.test(specifier)) return [];
 
   const prefix = specifier.slice(0, -1);
   if (!prefix || prefix.endsWith(":")) return [];
@@ -83,9 +92,23 @@ function missingWordBoundary(rule: PermissionRule): Diagnostic[] {
   ];
 }
 
-/** AGF506 for `:*` used anywhere but the end, where the colon is literal. */
+/**
+ * AGF506 for `:*` used anywhere but the end, where the colon is literal.
+ *
+ * Documented for Bash, and for PowerShell which "use the same shape as Bash
+ * rules": "The `:*` suffix is an equivalent way to write a trailing wildcard...
+ * The `:*` form is only recognized at the end of a pattern."
+ *
+ * It is not a rule about colons in general. Other tools give the colon their own
+ * meaning — `WebFetch(domain:*.example.com)` is a documented form that matches
+ * any subdomain at any depth — and reading `:*` there as a broken Bash prefix
+ * calls a working rule dead.
+ */
+const COLON_WILDCARD_TOOLS = ["Bash", "PowerShell"];
+
 function misplacedColonWildcard(rule: PermissionRule): Diagnostic[] {
-  const { specifier } = parsePermissionRule(rule.rule);
+  const { tool, specifier } = parsePermissionRule(rule.rule);
+  if (!COLON_WILDCARD_TOOLS.includes(tool)) return [];
   if (!specifier?.includes(":*")) return [];
   if (specifier.endsWith(":*")) return [];
 
