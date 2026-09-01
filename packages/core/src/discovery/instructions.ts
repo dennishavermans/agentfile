@@ -23,16 +23,15 @@ import {
 import {
   booleanField,
   globListField,
+  parseAgentFrontmatter,
   parseCursorFrontmatter,
-  parseFrontmatter,
   stringField,
 } from "../parsers/frontmatter.js";
-import { normalizePath } from "../paths/index.js";
+import { dirnameOf, normalizePath, ROOT_PATH } from "../paths/index.js";
 import { filesNamed, filesUnder, type RepositoryScan } from "./scan.js";
 import {
   basenameOf,
   findImports,
-  governedDirectory,
   hierarchicalApplicability,
   originFor,
   provenanceOf,
@@ -146,7 +145,7 @@ export function discoverClaudeRules(root: string, scan: RepositoryScan, fs: File
     const text = readFile(fs, root, file);
     if (text === undefined) continue;
 
-    const parsed = parseFrontmatter(file, text);
+    const parsed = parseAgentFrontmatter(file, text);
     result.diagnostics.push(...parsed.diagnostics);
 
     const paths = globListField(parsed.data, "paths");
@@ -327,7 +326,7 @@ export function discoverCopilotInstructions(
     const text = readFile(fs, root, file);
     if (text === undefined) continue;
 
-    const parsed = parseFrontmatter(file, text);
+    const parsed = parseAgentFrontmatter(file, text);
     result.diagnostics.push(...parsed.diagnostics);
 
     // Copilot documents applyTo as comma-separated glob patterns.
@@ -369,13 +368,21 @@ export function checkInstructionImports(
     for (const target of instruction.imports ?? []) {
       if (target.startsWith("~") || target.startsWith("/")) continue;
 
-      const importingDirectory = governedDirectory(instruction.provenance.file);
-      const candidates = [
-        normalizePath(target),
-        normalizePath(importingDirectory ? `${importingDirectory}/${target}` : target),
-      ];
+      // Claude Code resolves a relative import against the directory of the
+      // file that declares it — not the repository root, and not the working
+      // directory. Measured: a chain of `@` imports loads `sub/leaf.md` from
+      // `sub/mid.md` while an identically named file at the root stays
+      // unloaded. `governedDirectory` is the wrong base here: `.github/CLAUDE.md`
+      // governs the whole repository, but its `@../AGENTS.md` still resolves
+      // from `.github/`.
+      const importingDirectory = dirnameOf(instruction.provenance.file);
+      const resolved = normalizePath(importingDirectory === ROOT_PATH ? target : `${importingDirectory}/${target}`);
 
-      if (candidates.some((candidate) => fs.exists(join(root, candidate)))) continue;
+      // A target that escapes the repository cannot be proven absent by a scan
+      // bounded to the repository, so it is never reported.
+      if (resolved.startsWith("..")) continue;
+
+      if (fs.exists(join(root, resolved))) continue;
 
       diagnostics.push({
         code: "AGF004",
