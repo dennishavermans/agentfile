@@ -32,7 +32,7 @@
     "@agentfile/core": "^2.1.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "diff": "^8.0.4",
+    "diff": "^9.0.0",
     "express": "^5.2.1",
     "lucide-react": "^1.7.0",
     "open": "^11.0.0",
