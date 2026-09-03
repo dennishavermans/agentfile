@@ -480,6 +480,13 @@ not:
   wherever it stands — and gh switches GET to POST the moment a parameter is
   added. Measured: `Bash(gh api repos*)` auto-approves `-X DELETE`,
   `-f description=x`, and deleting a branch through `git/refs`.
+* **A `*` before the subcommand leaves one word limiting the rule.** In
+  `Bash(git * main)` only `git` limits it, and the wildcard spans options as
+  well as the subcommand. Measured with that rule alone: `git branch -D main`
+  deleted the branch, and `git -c core.fsmonitor=<script> diff main` ran the
+  named script. Claude Code warns about this shape at startup, and its
+  documentation notes the wildcard covers `-c`, "which makes git run a program
+  you name".
 * **A rule that opens with `*` names no program at all.** Claude Code matches
   everything before the first wildcard as written, so a leading `*` leaves
   nothing to limit the rule: it approves a shape, and any program can wear it.
