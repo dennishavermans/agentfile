@@ -1115,12 +1115,15 @@ describe("auditPermissions", () => {
       expect(problems).toEqual(["api-method-ride-along", "exec-admitting-wildcard"]);
     });
 
-    // rodekruis's rule. Measured: git push --force origin main and
-    // git push --delete origin main were both auto-approved under it.
+    // rodekruis's rule. Measured on Claude Code 2.1.238 with this rule alone, in
+    // a throwaway repository: `git branch -D main` deleted the branch, and
+    // `git -c core.fsmonitor=<script> diff main` ran the named script. With no
+    // rule present neither ran, and `git branch -D dev` did not run either.
     it("names the measured consequence when the wildcard is the verb", () => {
       const [found] = audit([rule("allow", "Bash(git * main)")]);
       expect(found.data?.problem).toBe("wildcard-before-subcommand");
-      expect(found.explanation).toContain("git push --force origin main");
+      expect(found.explanation).toContain("git branch -D main");
+      expect(found.explanation).toContain("core.fsmonitor");
     });
 
     // The fused text must share the prefix, so `git logfoo` is nobody's

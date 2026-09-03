@@ -687,8 +687,20 @@ function execAdmittingWildcard(rule: PermissionRule): Diagnostic[] {
  *
  * The text after the wildcard still narrows what matches, so this is not an
  * unbounded grant — it is a rule whose limit is one word long when it reads as
- * though it were three. In `Bash(git * main)` only `git` limits it, so
- * `git push --force main` is approved.
+ * though it were three.
+ *
+ * Measured on Claude Code 2.1.238 with `Bash(git * main)` as the only rule, in
+ * a throwaway repository: `git branch -D main` deleted the branch, and
+ * `git -c core.fsmonitor=<script> diff main` ran the named script. Neither was
+ * approved with no rule present, and `git branch -D dev` was not approved, so
+ * the grant is this rule and the tail is what selects it.
+ *
+ * An earlier spelling of this note claimed a measured `git push --force origin
+ * main`. That measurement could not be reproduced cleanly, because the machine
+ * it ran on carried `Bash(git push *)` in its own user settings, which approves
+ * every push on its own. The documented behaviour is unchanged — the table
+ * lists `git push origin main` as matching — but the sentence said "measured"
+ * about something the harness could not separate, so it is gone.
  */
 function wildcardBeforeSubcommand(rule: PermissionRule): Diagnostic[] {
   if (rule.effect !== "allow") return [];
@@ -710,9 +722,12 @@ function wildcardBeforeSubcommand(rule: PermissionRule): Diagnostic[] {
         "command still matches.",
         "",
         `\`${rule.rule}\` approves \`${words[0]} ${words.slice(2).join(" ")}\` whatever runs in place of the`,
-        "wildcard, and the wildcard spans spaces. Measured on Claude Code 2.1.238:",
-        "`Bash(git * main)` auto-approves `git push --force origin main` and",
-        "`git push --delete origin main`. Claude Code warns about this shape at startup.",
+        "wildcard, and the wildcard spans spaces. Measured on Claude Code 2.1.238 with",
+        "`Bash(git * main)` as the only rule: `git branch -D main` deleted the branch, and",
+        "`git -c core.fsmonitor=<script> diff main` ran the named script. Claude Code's",
+        'documentation describes the same reach — the wildcard covers "every git',
+        'subcommand and every option before it", including `-c`, "which makes git run a',
+        'program you name" — and warns about this shape at startup.',
         `\nPermission syntax:\n  ${PERMISSIONS_DOC}#wildcard-patterns`,
       ].join("\n"),
       suggestion: `Name the subcommand and put the wildcard after it, one rule per subcommand you want approved.`,
@@ -731,10 +746,15 @@ function wildcardBeforeSubcommand(rule: PermissionRule): Diagnostic[] {
 /**
  * AGF506 for an allow rule whose wildcard stands where the program goes.
  *
- * Documented: "Claude Code matches everything before the first `*` as written,
- * so those words are what limit the rule." A rule that opens with `*` has no
- * such words. Nothing names the program, so the rule approves a *shape* rather
+ * Documented, and about this exact shape: "In `Bash(* --version)`, the `*`
+ * stands in for the program, so any program matches." The vendor's own table
+ * lists `bash -c 'echo hi' --version` as a match for that rule, and
+ * `npm --help x` for `Bash(* --help *)`. So the rule approves a *shape* rather
  * than a command, and any program at all can wear that shape.
+ *
+ * The same table settles what the tail does: `Bash(* --help *)` "matches
+ * `npm --help x` but not `npm --help`", because a trailing `*` only matches the
+ * bare command when it is the rule's only wildcard.
  *
  * This is the sharpest version of the wildcard family and the quietest-looking:
  * `Bash(* --version)` reads as a harmless courtesy for version banners.

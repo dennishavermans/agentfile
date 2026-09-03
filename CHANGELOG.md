@@ -9,6 +9,39 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.3.1] — 2026-09-03
+
+A correction release. 2.2.0 shipped a sentence that said "measured" about
+something the harness could not separate.
+
+### Fixed
+
+- The `Bash(git * main)` finding claimed a measured `git push --force origin
+  main`. The machine that measurement ran on carries `Bash(git push *)` in its
+  own user settings, which approves every push by itself, so the run proved
+  nothing about the rule under test. The documented behaviour is unchanged, and
+  the vendor's table still lists `git push origin main` as a match, but the word
+  "measured" now covers only what a clean harness showed.
+
+  Re-measured on Claude Code 2.1.238 with `Bash(git * main)` as the only rule,
+  in a throwaway repository, using effects on disk as the evidence rather than
+  transcript text: `git branch -D main` deleted the branch, and
+  `git -c core.fsmonitor=<script> diff main` ran the named script. With no rule
+  present neither ran, and `git branch -D dev` did not run, so the rule is the
+  grant and the tail is what selects it. The second case is arbitrary program
+  execution from a rule that reads as a git allowance, which is sharper than the
+  claim it replaces.
+
+### Changed
+
+- Both wildcard findings now quote the permission documentation that describes
+  them. For a leading star that is "In `Bash(* --version)`, the `*` stands in
+  for the program, so any program matches", with `bash -c 'echo hi' --version`
+  listed as a match in the vendor's own table; for a star before the subcommand
+  it is the note that the wildcard covers `-c`, "which makes git run a program
+  you name".
+
+
 ## [2.3.0] — 2026-09-03
 
 The wildcard family had a member nobody had measured: a rule that begins with
