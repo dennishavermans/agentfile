@@ -9,6 +9,51 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.2.0] — 2026-09-03
+
+A ranking release. 2.1.1 made every finding true; this one makes the volume
+track the consequence. Running the permission audit over the Linux Foundation's
+crowd.dev produced 22 identical word-boundary warnings, and exactly one of the
+22 rules — `Bash(gh api repos*)` — grants remote writes. The one that can
+delete a branch read no louder than `git logfoo`. That is the wall of noise the
+pattern set's own comment warns about, so this release ranks the wildcard
+findings by what was measured to ride in the wildcard.
+
+### Added
+
+- **`AGF506`: a wildcarded `gh api` allow rule is reported as a write grant.**
+  A `*` matches any characters including spaces, so method and parameter flags
+  ride wherever it stands, and gh's own help documents that adding a parameter
+  switches the request from GET to POST. Measured on Claude Code 2.1.238:
+  `Bash(gh api repos*)` auto-approved `-X DELETE`, `-f description=x`, and a
+  branch deletion through `git/refs`. Deliberately scoped to `gh api`, which
+  sends the user's token on every call — the same flags ride a wildcarded curl
+  rule, but unlock writes nothing in the command is authorised to make.
+- **`AGF506`: a mid-rule wildcard that stands where the runner's subcommand
+  goes.** Measured: `pnpm --filter web exec rm -rf ./x build` is auto-approved
+  by `Bash(pnpm --filter * build)`, because a mid-rule `*` spans multiple
+  space-separated words. The check stays quiet once the subcommand is pinned
+  before the first star, so `Bash(npx rhachet run --skill x --glob '*.ts')`
+  reports nothing.
+
+### Changed
+
+- **Word-boundary findings are ranked by what the fusion can reach.** A
+  one-word prefix fuses the program name itself — `Bash(python*)` silently
+  covers `python3 -c` with anything after it — and stays a warning. After the
+  first word the fused text must still share the prefix, so `Bash(git log*)`
+  drops to info: `git logfoo` is nobody's command. Across the 344-file
+  permission corpus this moves roughly two thirds of all permission findings
+  from warning to info while 34 wildcarded `gh api` rules surface as the write
+  grants they are.
+- **One fact per rule.** A rule whose wildcard admits writes or chooses the
+  subcommand is no longer additionally nagged about its word boundary; the
+  wildcard-before-subcommand finding now carries its measured consequence
+  (`Bash(git * main)` auto-approves `git push --force origin main`).
+  Severity defaults remain documented as not stable in
+  [docs/stability.md](docs/stability.md); pin them in `agentfile.yaml` if CI
+  depends on them.
+
 ## [2.1.1] — 2026-09-01
 
 2.1.0 shipped with a claim it had only partly earned. The lesson of that

@@ -1,6 +1,6 @@
 {
   "name": "@agentfile/core",
-  "version": "2.1.1",
+  "version": "2.2.0",
   "description": "Read, analyse and compile AI agent configuration — discovery, a normalized IR, a resolver, diagnostics, and static security analysis",
   "type": "module",
   "main": "./dist/index.js",
