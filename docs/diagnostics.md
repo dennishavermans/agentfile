@@ -471,7 +471,24 @@ not:
 
 * **`Bash(ls*)` also matches `lsof`.** A `*` with no space before it enforces no
   word boundary. `Bash(ls *)` — one space different — matches only `ls` with
-  arguments. As an allow rule this grants more than it appears to.
+  arguments. Ranked by what the fusion can reach: a one-word prefix fuses the
+  program name itself (`Bash(python*)` covers `python3` with any arguments) and
+  is a warning; after the first word the fused text must still share the prefix,
+  so `Bash(git log*)` is informational.
+* **A wildcarded `gh api` allow rule grants writes, not just reads.** A `*`
+  matches any characters including spaces, so method and parameter flags ride
+  wherever it stands — and gh switches GET to POST the moment a parameter is
+  added. Measured: `Bash(gh api repos*)` auto-approves `-X DELETE`,
+  `-f description=x`, and deleting a branch through `git/refs`.
+* **A mid-rule `*` can choose what a runner executes.** It spans multiple
+  space-separated words, so a wildcard standing before the subcommand is pinned
+  admits an exec form and everything after it. Measured:
+  `pnpm --filter web exec rm -rf ./x build` was auto-approved by
+  `Bash(pnpm --filter * build)`. Quiet once the subcommand is pinned before the
+  first star.
+
+  When one rule triggers several of these, only the sharpest is reported — a
+  rule whose wildcard admits writes is not also nagged about word boundaries.
 * **`:*` is recognised only at the end of a pattern.** In `Bash(git:* push)` the
   colon is literal and the rule matches nothing. Reported as an error: the rule
   has no effect and nothing says so at load time.

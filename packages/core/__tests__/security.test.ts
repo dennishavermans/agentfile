@@ -1075,6 +1075,74 @@ describe("auditPermissions", () => {
     });
   });
 
+  // ─── ranking: the sharpest statement about a wildcard wins ─────────────
+
+  describe("wildcard consequence ranking", () => {
+    // crowd.dev's settings: 22 rules with trailing stars, of which exactly one
+    // grants remote writes. Measured on Claude Code 2.1.238: under
+    // Bash(gh api repos*), `-X DELETE`, `-f description=x` (gh switches GET to
+    // POST when parameters are added), and a git/refs branch deletion were all
+    // auto-approved.
+    it("raises gh api ride-along above the word-boundary noise", () => {
+      const findings = audit([rule("allow", "Bash(gh api repos*)")]);
+      expect(findings).toHaveLength(1);
+      expect(findings[0].severity).toBe("warning");
+      expect(findings[0].data?.problem).toBe("api-method-ride-along");
+      expect(findings[0].message).toContain("writes, not just reads");
+    });
+
+    it("stays quiet on an exact gh api endpoint, which no flag can ride", () => {
+      expect(audit([rule("allow", "Bash(gh api repos/o/r/pulls/42/comments --paginate)")])).toHaveLength(0);
+    });
+
+    // prisma's shape. Measured: `pnpm --filter web exec rm -rf ./x build` was
+    // auto-approved by Bash(pnpm --filter * build) and the trailing-star form.
+    it("reports a wildcard standing where the runner's subcommand goes", () => {
+      const findings = audit([rule("allow", "Bash(pnpm --filter * test*)")]);
+      expect(findings).toHaveLength(1);
+      expect(findings[0].severity).toBe("warning");
+      expect(findings[0].data?.problem).toBe("exec-admitting-wildcard");
+    });
+
+    it("stays quiet once the subcommand is pinned before the star", () => {
+      expect(audit([rule("allow", "Bash(npx rhachet run --skill sedreplace --glob src/*.ts)")])).toHaveLength(0);
+    });
+
+    it("does not double-report fusion on a rule already carrying a sharper fact", () => {
+      const problems = audit([rule("allow", "Bash(gh api repos*)"), rule("allow", "Bash(pnpm --filter * build*)")]).map(
+        (item) => item.data?.problem,
+      );
+      expect(problems).toEqual(["api-method-ride-along", "exec-admitting-wildcard"]);
+    });
+
+    // rodekruis's rule. Measured: git push --force origin main and
+    // git push --delete origin main were both auto-approved under it.
+    it("names the measured consequence when the wildcard is the verb", () => {
+      const [found] = audit([rule("allow", "Bash(git * main)")]);
+      expect(found.data?.problem).toBe("wildcard-before-subcommand");
+      expect(found.explanation).toContain("git push --force origin main");
+    });
+
+    // The fused text must share the prefix, so `git logfoo` is nobody's
+    // command — but a one-word prefix fuses the program name itself, and
+    // `python*` covers `python3 -c` with anything after it.
+    it("ranks fusion by what it can reach", () => {
+      const single = audit([rule("allow", "Bash(python*)")]);
+      expect(single[0].severity).toBe("warning");
+      expect(single[0].data?.consequence).toBe("program-substitution");
+
+      const multi = audit([rule("allow", "Bash(git log*)")]);
+      expect(multi[0].severity).toBe("info");
+      expect(multi[0].data?.consequence).toBe("prefix-fusion");
+    });
+
+    it("leaves a trailing star on a runner to the fusion check, where it belongs", () => {
+      const [found] = audit([rule("allow", "Bash(pnpm test*)")]);
+      expect(found.data?.problem).toBe("missing-word-boundary");
+      expect(found.severity).toBe("info");
+    });
+  });
+
   // ─── fragile argument patterns ─────────────────────────────────────────
 
   describe("fragile argument patterns", () => {
