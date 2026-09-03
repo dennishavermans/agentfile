@@ -1,6 +1,6 @@
 {
   "name": "@agentfile/cli",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "description": "Find what is wrong with the AI agent configuration your repository already has — doctor, check, lint, audit, adopt, compile, eval",
   "type": "module",
   "main": "./dist/bin.js",
@@ -45,20 +45,20 @@
     "access": "public"
   },
   "dependencies": {
-    "@agentfile/core": "^2.2.0",
+    "@agentfile/core": "^2.3.0",
     "chalk": "^6.0.0",
     "commander": "^14.0.3",
     "enquirer": "^2.4.1"
   },
   "devDependencies": {
-    "@agentfile/ui": "^0.1.0-beta.0",
+    "@agentfile/ui": "^2.3.0",
     "@types/node": "^22.19.0",
     "tsx": "^4.23.12",
     "typescript": "^6.0.2",
     "vitest": "^4.1.11"
   },
   "peerDependencies": {
-    "@agentfile/ui": "^0.1.0-beta.0"
+    "@agentfile/ui": "^2.3.0"
   },
   "peerDependenciesMeta": {
     "@agentfile/ui": {
