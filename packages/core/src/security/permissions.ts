@@ -170,14 +170,29 @@ function missingWordBoundary(rule: PermissionRule): Diagnostic[] {
   const prefix = specifier.slice(0, -1);
   if (!prefix || prefix.endsWith(":")) return [];
 
+  // What the fusion can reach decides the volume. On a one-word prefix the
+  // star continues the program name itself, so `Bash(python*)` quietly grants
+  // `python3` with any arguments — a different interpreter, not a longer
+  // spelling. After that first word the fused text must still share the
+  // prefix, so the reach is bounded by what commands happen to extend it:
+  // `git logfoo` is nobody's command. Measured on Claude Code 2.1.238 for the
+  // prisma shape: `Bash(pnpm build*)` approves `pnpm buildx`.
+  const singleWord = !prefix.trim().includes(" ");
+  const severity = rule.effect === "allow" ? (singleWord ? "warning" : "info") : "info";
+
   return [
     diagnostic({
       code: "AGF506",
-      severity: rule.effect === "allow" ? "warning" : "info",
-      message: `Permission rule ${rule.rule} has no word boundary, so it matches more than "${prefix}"`,
+      severity,
+      message: singleWord
+        ? `Permission rule ${rule.rule} also matches every program whose name starts with "${prefix}"`
+        : `Permission rule ${rule.rule} has no word boundary, so it matches more than "${prefix}"`,
       explanation: [
         `A \`*\` with no space before it does not enforce a word boundary, so this rule`,
         `also matches any command starting with "${prefix}" — \`${prefix}x\`, \`${prefix}foo\`, and so on.`,
+        singleWord
+          ? `\nThe prefix is a bare program name, so the fusion swaps the program itself:\n\`${prefix}3\`, \`${prefix}w\`, or any sibling binary, each with any arguments the\nwildcard then spans.`
+          : "",
         "",
         `\`Bash(${prefix} *)\` — with the space — matches only \`${prefix}\` followed by arguments.`,
         rule.effect === "allow"
@@ -187,7 +202,12 @@ function missingWordBoundary(rule: PermissionRule): Diagnostic[] {
       ].join("\n"),
       suggestion: `Write \`Bash(${prefix} *)\` if you meant the command "${prefix}" with any arguments.`,
       location: locationOf(rule),
-      data: { rule: rule.rule, effect: rule.effect, problem: "missing-word-boundary" },
+      data: {
+        rule: rule.rule,
+        effect: rule.effect,
+        problem: "missing-word-boundary",
+        consequence: singleWord ? "program-substitution" : "prefix-fusion",
+      },
     }),
   ];
 }
@@ -529,6 +549,141 @@ function separatorSpanningRule(rule: PermissionRule): Diagnostic[] {
  * though it were three. In `Bash(git * main)` only `git` limits it, so
  * `git push --force main` is approved.
  */
+/**
+ * Tools whose requests change state the moment a method or data flag appears.
+ *
+ * `gh api` is the measured case: its own help documents that "adding request
+ * parameters will automatically switch the request method to POST", and on
+ * Claude Code 2.1.238 an allow rule of `Bash(gh api repos*)` auto-approved
+ * `-X DELETE`, `-f description=x`, and a `git/refs/heads/<branch> -X DELETE`.
+ *
+ * Deliberately not curl or wget: the same flags ride their wildcards, but a
+ * curl request carries only the credentials the command spells out, so the
+ * write the flag unlocks is a write nothing is authorised to make. `gh api`
+ * sends the user's token on every call. Warning on every wildcarded curl rule
+ * would be the wall of noise this band exists to avoid.
+ */
+const API_TOOLS: ReadonlyArray<{ prefix: RegExp; label: string; flags: string }> = [
+  { prefix: /^gh\s+api\b/, label: "gh api", flags: "`-X`/`--method`, or `-f`/`-F`, which switch the request to POST" },
+];
+
+/**
+ * AGF506 for an API-tool rule whose wildcard admits method-changing flags.
+ *
+ * A prefix rule cannot see the HTTP method, and a `*` matches any characters
+ * including spaces, so the flags ride wherever a wildcard stands — appended
+ * after a trailing star, or tucked inside a mid-rule one: with a pinned
+ * `/comments` tail after the star, `gh api -X DELETE repos/o/r/pulls/1/comments`
+ * still matches, the flags riding inside the wildcard's span. A rule that
+ * reads as a read grant is a write grant, bounded only by the token's scopes.
+ */
+function apiMethodRideAlong(rule: PermissionRule): Diagnostic[] {
+  if (rule.effect !== "allow") return [];
+
+  const { tool, specifier } = parsePermissionRule(rule.rule);
+  if (tool !== "Bash" || !specifier) return [];
+
+  const form = commandForm(specifier);
+  if (!form.includes("*")) return [];
+
+  const api = API_TOOLS.find((candidate) => candidate.prefix.test(form.trim()));
+  if (!api) return [];
+
+  return [
+    diagnostic({
+      code: "AGF506",
+      severity: "warning",
+      message: `Allow rule ${rule.rule} approves ${api.label} writes, not just reads`,
+      explanation: [
+        `A \`*\` matches any characters including spaces, so this rule's wildcard also`,
+        `admits ${api.flags}.`,
+        "",
+        "Measured on Claude Code 2.1.238 with `Bash(gh api repos*)`: `-X DELETE`,",
+        "`-f description=x`, and deleting a branch through `git/refs` were all",
+        "auto-approved. What that reaches is bounded only by the token's scopes —",
+        "a default `gh auth` token cannot delete a repository, but can delete",
+        "branches, edit repository settings, and delete comments and releases.",
+        `\nPermission syntax:\n  ${PERMISSIONS_DOC}`,
+      ].join("\n"),
+      suggestion:
+        "Pin the exact endpoints without wildcards where possible, or add a PreToolUse hook that blocks method and data flags so the rule grants only reads.",
+      location: locationOf(rule),
+      data: { rule: rule.rule, effect: rule.effect, problem: "api-method-ride-along", consequence: "remote-write" },
+    }),
+  ];
+}
+
+/**
+ * Runners that will execute an arbitrary program if asked in the right place.
+ */
+const EXEC_CAPABLE_RUNNERS: ReadonlyArray<{ program: string; via: string }> = [
+  { program: "pnpm", via: "`pnpm exec` / `pnpm dlx`" },
+  { program: "npm", via: "`npm exec` / `npx`" },
+  { program: "yarn", via: "`yarn exec` / `yarn dlx`" },
+  { program: "bun", via: "`bun x`" },
+  { program: "npx", via: "npx itself" },
+  { program: "docker", via: "`docker exec` / `docker run`" },
+  { program: "kubectl", via: "`kubectl exec`" },
+];
+
+/**
+ * AGF506 for a wildcard standing where a runner's subcommand can go.
+ *
+ * A mid-rule `*` spans multiple space-separated words — measured:
+ * `pnpm --filter a b c test` satisfies `Bash(pnpm --filter * test*)` — so a
+ * wildcard that appears before the runner's subcommand is pinned can hold an
+ * exec form and everything after it. Measured on Claude Code 2.1.238:
+ * `pnpm --filter web exec rm -rf ./x build` was auto-approved by both
+ * `Bash(pnpm --filter * build*)` and `Bash(pnpm --filter * build)`.
+ *
+ * The check stays quiet once the subcommand is pinned before the first star:
+ * in `Bash(npx rhachet run --skill sedreplace --glob '*.ts')` the wildcard can
+ * only vary an argument to rhachet, and calling that arbitrary execution would
+ * be the wall of noise this band exists to avoid.
+ */
+function execAdmittingWildcard(rule: PermissionRule): Diagnostic[] {
+  if (rule.effect !== "allow") return [];
+
+  const { tool, specifier } = parsePermissionRule(rule.rule);
+  if (tool !== "Bash" || !specifier) return [];
+
+  const words = commandForm(specifier).trim().split(/\s+/);
+  const starAt = words.findIndex((word) => word.includes("*"));
+  if (starAt < 2 || starAt === words.length - 1) return []; // leading-verb stars belong to wildcardBeforeSubcommand; trailing stars cannot swallow the subcommand
+
+  const runner = EXEC_CAPABLE_RUNNERS.find((candidate) => candidate.program === words[0]);
+  if (!runner) return [];
+
+  // Pinned subcommand before the star means the wildcard can no longer choose
+  // what runs — only flag-shaped words may precede it.
+  if (!words.slice(1, starAt).every((word) => word.startsWith("-"))) return [];
+
+  return [
+    diagnostic({
+      code: "AGF506",
+      severity: "warning",
+      message: `Allow rule ${rule.rule} lets the wildcard choose what ${words[0]} runs`,
+      explanation: [
+        `A mid-rule \`*\` spans multiple space-separated words, and here it stands where`,
+        `the ${words[0]} subcommand goes — so an exec form (${runner.via}) and everything`,
+        "after it fit inside the wildcard as long as the rest of the rule still matches.",
+        "",
+        "Measured on Claude Code 2.1.238: `pnpm --filter web exec rm -rf ./x build` was",
+        "auto-approved by `Bash(pnpm --filter * build)`.",
+        `\nPermission syntax:\n  ${PERMISSIONS_DOC}#wildcard-patterns`,
+      ].join("\n"),
+      suggestion: `Pin the subcommand before the wildcard — one rule per subcommand — or guard ${words[0]} exec forms with a PreToolUse hook.`,
+      location: locationOf(rule),
+      data: {
+        rule: rule.rule,
+        effect: rule.effect,
+        problem: "exec-admitting-wildcard",
+        consequence: "arbitrary-command",
+      },
+    }),
+  ];
+}
+
 function wildcardBeforeSubcommand(rule: PermissionRule): Diagnostic[] {
   if (rule.effect !== "allow") return [];
 
@@ -549,12 +704,20 @@ function wildcardBeforeSubcommand(rule: PermissionRule): Diagnostic[] {
         "command still matches.",
         "",
         `\`${rule.rule}\` approves \`${words[0]} ${words.slice(2).join(" ")}\` whatever runs in place of the`,
-        "wildcard. Claude Code warns about this shape at startup.",
+        "wildcard, and the wildcard spans spaces. Measured on Claude Code 2.1.238:",
+        "`Bash(git * main)` auto-approves `git push --force origin main` and",
+        "`git push --delete origin main`. Claude Code warns about this shape at startup.",
         `\nPermission syntax:\n  ${PERMISSIONS_DOC}#wildcard-patterns`,
       ].join("\n"),
       suggestion: `Name the subcommand and put the wildcard after it, one rule per subcommand you want approved.`,
       location: locationOf(rule),
-      data: { rule: rule.rule, effect: rule.effect, program: words[0], problem: "wildcard-before-subcommand" },
+      data: {
+        rule: rule.rule,
+        effect: rule.effect,
+        program: words[0],
+        problem: "wildcard-before-subcommand",
+        consequence: "unconstrained-verb",
+      },
     }),
   ];
 }
@@ -771,15 +934,25 @@ function findingsFor(rule: PermissionRule): Diagnostic[] {
   const dead = separatorSpanningRule(rule);
   if (dead.length) return dead;
 
+  // The sharpest statement about a wildcard subsumes the duller ones: a rule
+  // whose star admits writes or picks the subcommand should not also nag about
+  // word boundaries. One fact per rule.
+  const rideAlong = apiMethodRideAlong(rule);
+  const execWildcard = execAdmittingWildcard(rule);
+  const verbWildcard = wildcardBeforeSubcommand(rule);
+  const fusion = rideAlong.length || execWildcard.length || verbWildcard.length ? [] : missingWordBoundary(rule);
+
   return [
-    ...missingWordBoundary(rule),
+    ...rideAlong,
+    ...execWildcard,
+    ...verbWildcard,
+    ...fusion,
     ...misplacedColonWildcard(rule),
     ...unanchoredAllowGlob(rule),
     ...unapprovableWrapper(rule),
     ...mcpRuleWithSpecifier(rule),
     ...primaryContentFieldRule(rule),
     ...unstrippedRunner(rule),
-    ...wildcardBeforeSubcommand(rule),
     ...fragileArgumentPattern(rule),
   ];
 }
