@@ -9,6 +9,49 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.3.0] — 2026-09-03
+
+The wildcard family had a member nobody had measured: a rule that begins with
+`*`. Claude Code matches everything before the first wildcard as written, so a
+leading star leaves nothing at all to limit the rule — it approves a shape,
+and any program can wear it. The Netherlands Red Cross carries
+`Bash(* --version)` and `Bash(* --help *)` in a public repository, and both read
+as courtesies for version banners.
+
+Measured on Claude Code 2.1.238 with a file-creating probe, chosen so the
+read-only classifier could not approve it on its own: under `Bash(* --version)`,
+`bash -c 'touch <marker>' --version` ran and the marker appeared. With no rules
+present it did not run, so the grant is the rule's. Without the flag it did not
+run, and neither did the same command with a word after it: the tail still has
+to match, which is exactly what makes the rule read narrower than it is.
+
+### Added
+
+- `AGF506` now reports an allow rule whose wildcard stands where the program
+  goes. Tail-constrained rules such as `Bash(* --version)` are reported as
+  arbitrary-command grants; `Bash(*)` is reported plainly as approving every
+  Bash command. Where the tail names a program, as in `Bash(*vitest*)`, the
+  suggestion is the rule the author meant: `Bash(vitest *)`.
+
+### Fixed
+
+- The word-boundary check no longer prints a false sentence about rules that
+  open with a wildcard. `Bash(*xmrig*)` drew "also matches every program whose
+  name starts with `*xmrig`", and no program is named `*xmrig`. Across a
+  344-file sample that removes 29 such sentences, all of them on deny rules
+  that were written correctly.
+- A doc comment orphaned from `wildcardBeforeSubcommand` in 2.2.0 sits with its
+  function again.
+
+### Scope
+
+Deny rules keep their leading stars without comment: in the same 344-file
+sample, most leading-star rules were denies such as `Bash(*xmrig*)` and
+`Bash(* | sh)`, and breadth in a deny runs in the safe direction. Across 12,556
+rules the new check fires 33 times — 4 tail-constrained rules in 2 repositories,
+and 29 spellings of `Bash(*)`.
+
+
 ## [2.2.0] — 2026-09-03
 
 A ranking release. 2.1.1 made every finding true; this one makes the volume

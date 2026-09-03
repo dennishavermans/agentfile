@@ -1143,6 +1143,75 @@ describe("auditPermissions", () => {
     });
   });
 
+  // ─── the wildcard where the program goes ───────────────────────────────
+
+  // rodekruis/qualitative-feedback-analysis carries both of these beside the
+  // `git * main` rule. Measured on Claude Code 2.1.238 with a file-creating
+  // probe, so the read-only classifier could not approve it by itself:
+  // `bash -c 'touch <marker>' --version` ran under Bash(* --version) and the
+  // marker appeared; with no rules present it did not run; without the flag,
+  // and with a word after it, it did not run.
+  describe("a wildcard standing where the program goes", () => {
+    it("reports a tail-constrained leading star as an arbitrary-command grant", () => {
+      const findings = audit([rule("allow", "Bash(* --version)")]);
+      expect(findings).toHaveLength(1);
+      expect(findings[0].severity).toBe("warning");
+      expect(findings[0].data?.problem).toBe("program-wildcard");
+      expect(findings[0].data?.consequence).toBe("arbitrary-command");
+      expect(findings[0].data?.tail).toBe("--version");
+      expect(findings[0].message).toContain("names no program");
+    });
+
+    it("reads the tail through to the suggestion, whatever the tail is", () => {
+      const [found] = audit([rule("allow", "Bash(* --help *)")]);
+      expect(found.data?.problem).toBe("program-wildcard");
+      expect(found.data?.tail).toBe("--help *");
+      expect(found.suggestion).toContain("Bash(node --help *)");
+    });
+
+    // vitorfdl/narratrix carries both of these. Here the tail names the program
+    // the author meant, so the suggestion can be the exact rule they wanted.
+    it("suggests the rule the author meant when the tail names a program", () => {
+      const [found] = audit([rule("allow", "Bash(*vitest*)")]);
+      expect(found.data?.problem).toBe("program-wildcard");
+      expect(found.suggestion).toContain("Bash(vitest *)");
+    });
+
+    it("says the plain thing about Bash(*), which is honest but total", () => {
+      const [found] = audit([rule("allow", "Bash(*)")]);
+      expect(found.severity).toBe("warning");
+      expect(found.data?.problem).toBe("unrestricted-bash");
+      expect(found.message).toContain("approves every Bash command");
+    });
+
+    // In a 364-file sample most leading-star rules were denies. Breadth in a
+    // deny is breadth in the safe direction, and reporting it would bury the
+    // allow-rule finding under a list of careful deny lines.
+    it("stays quiet on deny rules, where the shape is common and safe", () => {
+      expect(audit([rule("deny", "Bash(*xmrig*)")])).toHaveLength(0);
+      expect(audit([rule("deny", "Bash(*)")])).toHaveLength(0);
+    });
+
+    it("does not also nag about word boundaries on the same rule", () => {
+      const findings = audit([rule("allow", "Bash(*npm*)")]);
+      expect(findings).toHaveLength(1);
+      expect(findings[0].data?.problem).toBe("program-wildcard");
+    });
+
+    it("leaves a star that arrives after the program to the checks that own it", () => {
+      expect(audit([rule("allow", "Bash(git * main)")])[0].data?.problem).toBe("wildcard-before-subcommand");
+      expect(audit([rule("allow", "Bash(python*)")])[0].data?.problem).toBe("missing-word-boundary");
+    });
+
+    // A rule that matches nothing is reported alone: the pipe is the fact
+    // worth acting on, and the fix for it removes the leading star too.
+    it("yields to the dead-rule finding when a separator is present", () => {
+      const findings = audit([rule("allow", "Bash(* | jq)")]);
+      expect(findings).toHaveLength(1);
+      expect(findings[0].data?.problem).toBe("separator-spanning-rule");
+    });
+  });
+
   // ─── fragile argument patterns ─────────────────────────────────────────
 
   describe("fragile argument patterns", () => {

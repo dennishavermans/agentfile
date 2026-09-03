@@ -170,6 +170,12 @@ function missingWordBoundary(rule: PermissionRule): Diagnostic[] {
   const prefix = specifier.slice(0, -1);
   if (!prefix || prefix.endsWith(":")) return [];
 
+  // A rule that opens with `*` matches any text before the prefix as well, so
+  // the word boundary this check is about decides nothing — and the sentence it
+  // would print is false, because no program is named `*xmrig`. `programWildcard`
+  // says the true thing for allow rules; for deny rules there is nothing to say.
+  if (prefix.trimStart().startsWith("*")) return [];
+
   // What the fusion can reach decides the volume. On a one-word prefix the
   // star continues the program name itself, so `Bash(python*)` quietly grants
   // `python3` with any arguments — a different interpreter, not a longer
@@ -538,18 +544,6 @@ function separatorSpanningRule(rule: PermissionRule): Diagnostic[] {
 }
 
 /**
- * AGF506 for an allow rule whose wildcard stands where the subcommand goes.
- *
- * Documented: "Claude Code matches everything before the first `*` as written,
- * so those words are what limit the rule", with a startup warning "about an
- * allow rule with a `*` before the subcommand, such as `Bash(git * main)`".
- *
- * The text after the wildcard still narrows what matches, so this is not an
- * unbounded grant — it is a rule whose limit is one word long when it reads as
- * though it were three. In `Bash(git * main)` only `git` limits it, so
- * `git push --force main` is approved.
- */
-/**
  * Tools whose requests change state the moment a method or data flag appears.
  *
  * `gh api` is the measured case: its own help documents that "adding request
@@ -684,6 +678,18 @@ function execAdmittingWildcard(rule: PermissionRule): Diagnostic[] {
   ];
 }
 
+/**
+ * AGF506 for an allow rule whose wildcard stands where the subcommand goes.
+ *
+ * Documented: "Claude Code matches everything before the first `*` as written,
+ * so those words are what limit the rule", with a startup warning "about an
+ * allow rule with a `*` before the subcommand, such as `Bash(git * main)`".
+ *
+ * The text after the wildcard still narrows what matches, so this is not an
+ * unbounded grant — it is a rule whose limit is one word long when it reads as
+ * though it were three. In `Bash(git * main)` only `git` limits it, so
+ * `git push --force main` is approved.
+ */
 function wildcardBeforeSubcommand(rule: PermissionRule): Diagnostic[] {
   if (rule.effect !== "allow") return [];
 
@@ -717,6 +723,122 @@ function wildcardBeforeSubcommand(rule: PermissionRule): Diagnostic[] {
         program: words[0],
         problem: "wildcard-before-subcommand",
         consequence: "unconstrained-verb",
+      },
+    }),
+  ];
+}
+
+/**
+ * AGF506 for an allow rule whose wildcard stands where the program goes.
+ *
+ * Documented: "Claude Code matches everything before the first `*` as written,
+ * so those words are what limit the rule." A rule that opens with `*` has no
+ * such words. Nothing names the program, so the rule approves a *shape* rather
+ * than a command, and any program at all can wear that shape.
+ *
+ * This is the sharpest version of the wildcard family and the quietest-looking:
+ * `Bash(* --version)` reads as a harmless courtesy for version banners.
+ *
+ * Measured on Claude Code 2.1.238, with a file-creating command as the probe so
+ * that the read-only classifier cannot approve it on its own:
+ *
+ * - `bash -c 'touch <marker>' --version` under `Bash(* --version)` ran, and the
+ *   marker appeared.
+ * - The same command with no rules at all did not run, so the grant is the
+ *   rule's doing and not the environment's.
+ * - The same command without the trailing flag did not run, and neither did
+ *   `... --version extra`: the tail still has to match, which is precisely what
+ *   makes the rule read narrower than it is.
+ * - `Bash(* --help *)` approved `bash -c 'touch <marker>' --help extra`.
+ *
+ * Allow rules only. A leading `*` in a deny rule is breadth in the safe
+ * direction, and denies are where the shape is most common: in a 364-file
+ * sample, of 39 files carrying leading-star Bash rules most were denies such as
+ * `Bash(*xmrig*)` and `Bash(* | sh)`. Reporting those would bury the finding
+ * that matters under a list of careful deny lines.
+ */
+function programWildcard(rule: PermissionRule): Diagnostic[] {
+  if (rule.effect !== "allow") return [];
+
+  const { tool, specifier } = parsePermissionRule(rule.rule);
+  if (tool !== "Bash" || !specifier) return [];
+
+  const form = commandForm(specifier).trim();
+  if (!form.startsWith("*")) return [];
+
+  const tail = form.slice(1).trim();
+
+  // `Bash(*)` is the honest spelling of the same reach: it reads as "every
+  // command" and is every command. It is still worth a line in an audit,
+  // because the reader's remaining guards are deny rules, hooks and the
+  // sandbox, and those are worth knowing about deliberately.
+  if (!tail) {
+    return [
+      diagnostic({
+        code: "AGF506",
+        severity: "warning",
+        message: `Allow rule ${rule.rule} approves every Bash command`,
+        explanation: [
+          "The wildcard stands where the program goes and nothing follows it, so this rule",
+          "matches any command at all. Measured on Claude Code 2.1.238: a file-creating",
+          "command was auto-approved under this rule, and was not approved with no rules",
+          "present.",
+          "",
+          "Deny rules, `PreToolUse` hooks and the sandbox are what remain in front of a",
+          "command once this rule is in the allow list. Deny still wins: the same command",
+          "was blocked when a matching deny rule was added beside this one.",
+          `\nPermission syntax:\n  ${PERMISSIONS_DOC}`,
+        ].join("\n"),
+        suggestion:
+          "Keep it only if every Bash command in this project is meant to run unattended. Otherwise name the programs you approve, one rule each.",
+        location: locationOf(rule),
+        data: {
+          rule: rule.rule,
+          effect: rule.effect,
+          problem: "unrestricted-bash",
+          consequence: "arbitrary-command",
+        },
+      }),
+    ];
+  }
+
+  // `Bash(*vitest*)` and `Bash(*biome*)` are the other shape in the wild, and
+  // there the tail names the program the author had in mind. Saying so makes
+  // the fix one edit rather than a research task.
+  const leading = tail.replace(/^\*+/, "").split(/\s+/)[0]?.replace(/\*+$/, "") ?? "";
+  const namedInTail = /^[A-Za-z0-9_][A-Za-z0-9_.-]*$/.test(leading) ? leading : "";
+
+  return [
+    diagnostic({
+      code: "AGF506",
+      severity: "warning",
+      message: `Allow rule ${rule.rule} names no program: the wildcard chooses it`,
+      explanation: [
+        "Claude Code matches everything before the first `*` as written, and those words",
+        "are what limit the rule. This rule opens with the wildcard, so there is nothing",
+        `limiting it: any program at all is approved as long as the command still ${
+          tail.endsWith("*") ? `matches "${tail}"` : `ends with "${tail}"`
+        }.`,
+        "",
+        "Measured on Claude Code 2.1.238, with a file-creating command as the probe so",
+        "the read-only classifier could not approve it alone. Under `Bash(* --version)`,",
+        "`bash -c 'touch <marker>' --version` ran and the marker appeared; under",
+        "`Bash(* --help *)`, the same command with `--help extra` ran. Neither ran with",
+        "no rules present, without the flag, or with a word after `--version` — the tail",
+        "still has to match, which is what makes a rule of this shape read narrower than",
+        "it is.",
+        `\nPermission syntax:\n  ${PERMISSIONS_DOC}#wildcard-patterns`,
+      ].join("\n"),
+      suggestion: namedInTail
+        ? `Write \`Bash(${namedInTail} *)\` if you meant ${namedInTail} with any arguments — that is what this rule reads as, and it is not what it matches.`
+        : `Name the program before the wildcard, one rule per program you approve — \`Bash(node ${tail})\` rather than \`${rule.rule}\`.`,
+      location: locationOf(rule),
+      data: {
+        rule: rule.rule,
+        effect: rule.effect,
+        tail,
+        problem: "program-wildcard",
+        consequence: "arbitrary-command",
       },
     }),
   ];
@@ -940,12 +1062,15 @@ function findingsFor(rule: PermissionRule): Diagnostic[] {
   const rideAlong = apiMethodRideAlong(rule);
   const execWildcard = execAdmittingWildcard(rule);
   const verbWildcard = wildcardBeforeSubcommand(rule);
-  const fusion = rideAlong.length || execWildcard.length || verbWildcard.length ? [] : missingWordBoundary(rule);
+  const programStar = programWildcard(rule);
+  const louder = rideAlong.length || execWildcard.length || verbWildcard.length || programStar.length;
+  const fusion = louder ? [] : missingWordBoundary(rule);
 
   return [
     ...rideAlong,
     ...execWildcard,
     ...verbWildcard,
+    ...programStar,
     ...fusion,
     ...misplacedColonWildcard(rule),
     ...unanchoredAllowGlob(rule),

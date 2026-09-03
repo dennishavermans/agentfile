@@ -480,6 +480,15 @@ not:
   wherever it stands — and gh switches GET to POST the moment a parameter is
   added. Measured: `Bash(gh api repos*)` auto-approves `-X DELETE`,
   `-f description=x`, and deleting a branch through `git/refs`.
+* **A rule that opens with `*` names no program at all.** Claude Code matches
+  everything before the first wildcard as written, so a leading `*` leaves
+  nothing to limit the rule: it approves a shape, and any program can wear it.
+  Measured with a file-creating probe, so the read-only classifier could not
+  approve it alone: `bash -c 'touch <marker>' --version` ran under
+  `Bash(* --version)`, and did not run with no rules present, without the flag,
+  or with a word after it. `Bash(*)` is the honest spelling of the same reach
+  and is reported plainly; deny rules with a leading `*` are left alone, since
+  breadth there runs in the safe direction.
 * **A mid-rule `*` can choose what a runner executes.** It spans multiple
   space-separated words, so a wildcard standing before the subcommand is pinned
   admits an exec form and everything after it. Measured:
