@@ -464,6 +464,68 @@ describe("checkSkillReferences", () => {
     ).toEqual([]);
   });
 
+  // Real strings from n8n and ruff. A link inside a code span is being shown,
+  // not followed: n8n documents image syntax as `![description](url)` and ruff
+  // documents a permalink as `[project file.py:123](permalink)`. Both were
+  // reported as missing files.
+  it("ignores links inside inline code, which are documentation of a syntax", () => {
+    expect(
+      checkSkillReferences(
+        configurationOf(skill({ body: "- **URLs** embed with markdown image syntax (`![description](url)`)" })),
+        [".claude/skills/deploy/SKILL.md"],
+      ),
+    ).toEqual([]);
+
+    expect(
+      checkSkillReferences(
+        configurationOf(skill({ body: "Link sources such as `[project file.py:123](permalink)`; never raw URLs." })),
+        [".claude/skills/deploy/SKILL.md"],
+      ),
+    ).toEqual([]);
+  });
+
+  it("ignores links inside a fenced block, and still counts lines after it", () => {
+    const body = ["```md", "[a](missing-one.md)", "```", "", "See [b](missing-two.md)."].join("\n");
+    const found = checkSkillReferences(configurationOf(skill({ body })), [".claude/skills/deploy/SKILL.md"]);
+
+    expect(found).toHaveLength(1);
+    expect(found[0].data?.target).toBe("missing-two.md");
+    expect(found[0].location?.line).toBe(5);
+  });
+
+  // n8n's human-like-code-review names a file it will create at run time.
+  it("ignores a placeholder target, which is a shape rather than a file", () => {
+    expect(
+      checkSkillReferences(
+        configurationOf(
+          skill({ body: "Write the review to [tmp/review-<repo>-<number>.md](tmp/review-<repo>-<number>.md)." }),
+        ),
+        [".claude/skills/deploy/SKILL.md"],
+      ),
+    ).toEqual([]);
+  });
+
+  // n8n posts canned replies containing these. On a pull request page
+  // `../blob/master/CONTRIBUTING.md` resolves to the file's GitHub page, so the
+  // link works where it is used and is not a path in the repository.
+  it("ignores a GitHub web URL written without its origin", () => {
+    expect(
+      checkSkillReferences(
+        configurationOf(
+          skill({ body: "Per our [contributing guide](../blob/master/CONTRIBUTING.md#rules) we decline." }),
+        ),
+        [".claude/skills/deploy/SKILL.md"],
+      ),
+    ).toEqual([]);
+  });
+
+  it("still reports a directory genuinely named blob when no ref follows it", () => {
+    const found = checkSkillReferences(configurationOf(skill({ body: "See [x](blob/notes.md)." })), [
+      ".claude/skills/deploy/SKILL.md",
+    ]);
+    expect(found).toHaveLength(1);
+  });
+
   it("names both readings when a bare path exists under neither", () => {
     const [found] = checkSkillReferences(configurationOf(skill({ body: "See [notes](services/api.md)." })), [
       ".claude/skills/deploy/SKILL.md",

@@ -17,13 +17,73 @@ import type { FileSystem } from "../fs/index.js";
 import type { AgentConfiguration, SkillEntry } from "../ir/index.js";
 import { basenameOf, normalizePath } from "../paths/index.js";
 
+/**
+ * A GitHub web URL written without its origin.
+ *
+ * `../blob/master/CONTRIBUTING.md` is not a path in the repository, it is a
+ * link that resolves correctly once GitHub renders it: from a pull request at
+ * `/owner/repo/pull/123`, `../` reaches `/owner/repo/` and the rest lands on
+ * the file's web page. n8n writes five of these inside canned review replies
+ * that the agent posts as comments, and reading them as repository paths
+ * reported five broken links in a skill whose links all work.
+ *
+ * Scoped tightly to the three segment names GitHub uses for this, each of
+ * which must be followed by a ref, so an ordinary directory called `blob` is
+ * unaffected.
+ */
+const WEB_URL_SHAPE = /(^|\/)(blob|tree|raw)\/[^/]+\//;
+
 /** A link that is a path inside the repository, rather than a URL or an anchor. */
 function isLocalPath(target: string): boolean {
   if (!target) return false;
   if (/^[a-z][a-z0-9+.-]*:/i.test(target)) return false; // http:, mailto:, file:
   if (target.startsWith("#")) return false;
   if (target.startsWith("/")) return false; // absolute: not ours to resolve
+  // A placeholder is a shape to fill in, not a file: `tmp/review-<repo>-<number>.md`
+  // names a file the skill will create at run time. Angle brackets cannot appear
+  // in a real link target unencoded, so this costs nothing.
+  if (target.includes("<") || target.includes(">")) return false;
+  if (WEB_URL_SHAPE.test(target)) return false;
   return true;
+}
+
+/**
+ * The body with code removed, and every line still in its original position.
+ *
+ * A link inside a code span is being shown, not followed: n8n documents image
+ * syntax as `` `![description](url)` `` and ruff documents a permalink as
+ * `` `[project file.py:123](permalink)` ``. Reading those as links reported
+ * `url` and `permalink` as missing files. Import detection already ignores
+ * code for the same reason; this is the same rule applied to links.
+ *
+ * Lines are blanked rather than deleted so the reported line number still
+ * points at the link.
+ */
+function withoutCode(body: string): string[] {
+  const lines = body.split("\n");
+  const output: string[] = [];
+  let fence: string | undefined;
+
+  for (const line of lines) {
+    const delimiter = line.match(/^ {0,3}(`{3,}|~{3,})/);
+
+    if (fence) {
+      // Inside a fenced block: the closing fence must be at least as long.
+      if (delimiter && delimiter[1][0] === fence[0] && delimiter[1].length >= fence.length) fence = undefined;
+      output.push("");
+      continue;
+    }
+
+    if (delimiter) {
+      fence = delimiter[1];
+      output.push("");
+      continue;
+    }
+
+    output.push(line.replace(/`[^`\n]*`/g, ""));
+  }
+
+  return output;
 }
 
 /** Resolves a relative link against a directory, collapsing `.` and `..`. */
@@ -71,7 +131,7 @@ interface BodyLink {
 
 /** Markdown links in a body, with the line each sits on. */
 function bodyLinks(skill: SkillEntry): BodyLink[] {
-  const lines = skill.body.split("\n");
+  const lines = withoutCode(skill.body);
   const startLine = 1;
   const links: BodyLink[] = [];
 

@@ -392,6 +392,42 @@ describe("auditHooks", () => {
     expect(findings).toHaveLength(0);
   });
 
+  // Both spellings are documented and both are used in the wild. Stripping only
+  // the braced one reported a missing script for five hooks across cline,
+  // streamlit, prefect and twenty whose files were all present.
+  it("resolves the unbraced $CLAUDE_PROJECT_DIR too", () => {
+    const present = audit(
+      [hook({ command: "$CLAUDE_PROJECT_DIR/.claude/hooks/setup.sh" })],
+      [".claude/hooks/setup.sh"],
+    );
+    expect(present).toHaveLength(0);
+
+    const missing = audit(
+      [hook({ command: "$CLAUDE_PROJECT_DIR/.claude/hooks/setup.sh" })],
+      [".claude/hooks/other.sh"],
+    );
+    expect(missing).toHaveLength(1);
+    expect(missing[0].data?.script).toBe(".claude/hooks/setup.sh");
+  });
+
+  // bun writes its hooks this way. Taking only the quoted chunk as the first
+  // token threw the path away, leaving a bare variable with no slash in it,
+  // and the check silently skipped a script it could have verified.
+  it("reads a quoted variable joined to an unquoted path as one word", () => {
+    const present = audit(
+      [hook({ command: '"$CLAUDE_PROJECT_DIR"/.claude/hooks/post-edit-format.js' })],
+      [".claude/hooks/post-edit-format.js"],
+    );
+    expect(present).toHaveLength(0);
+
+    const missing = audit(
+      [hook({ command: '"$CLAUDE_PROJECT_DIR"/.claude/hooks/post-edit-format.js' })],
+      [".claude/hooks/something-else.js"],
+    );
+    expect(missing).toHaveLength(1);
+    expect(missing[0].data?.script).toBe(".claude/hooks/post-edit-format.js");
+  });
+
   it("does not guess about PATH binaries or absolute paths", () => {
     expect(audit([hook({ command: "prettier --check ." })])).toHaveLength(0);
     expect(audit([hook({ command: "/usr/local/bin/formatter" })])).toHaveLength(0);
