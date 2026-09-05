@@ -20,3 +20,6 @@ ai.override.yaml
 packages/*/dist/
 packages/extension/*.vsix
 docs/demo/
+
+# Brand working files: options, renders, house style. Local only.
+/media/

@@ -1,4 +1,6 @@
-# agentfile
+<p align="center">
+  <img src="assets/header.png" alt="agentfile" width="900">
+</p>
 
 > Find what is wrong with the AI agent configuration your repository already has.
 

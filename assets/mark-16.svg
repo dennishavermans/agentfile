@@ -1,0 +1,10 @@
+<!-- 16px and below: stroke thickened 7 -> 8 so the arms hold at small sizes. -->
+<svg width="16" height="16" viewBox="0 0 72 72" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <title>agentfile</title>
+  <rect width="72" height="72" rx="16" fill="#0F172A"/>
+  <g stroke="#22D3EE" stroke-width="8" stroke-linecap="round">
+    <line x1="36" y1="18" x2="36" y2="54"/>
+    <line x1="20.4" y1="27" x2="51.6" y2="45"/>
+    <line x1="20.4" y1="45" x2="51.6" y2="27"/>
+  </g>
+</svg>
