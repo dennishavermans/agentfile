@@ -190,6 +190,53 @@ describe("nearDuplicateDiagnostics", () => {
     expect(found.data?.similarity).toBeGreaterThan(0.6);
   });
 
+  // twenty's configuration produces 11,317 pairs from 13 real groups, one of
+  // them holding 205 lines. Reported pair by pair that is 11,317 warnings for
+  // 13 facts, on exactly the repositories big enough for configuration to drift.
+  it("reports one finding per group rather than one per pair", () => {
+    const { pairs } = findNearDuplicateInstructions([
+      instruction("AGENTS.md", "agents-md", "Use pnpm as the package manager, never npm or yarn"),
+      instruction("CLAUDE.md", "claude", "Use pnpm as the package manager, never npm"),
+      instruction(".cursor/rules/style.mdc", "cursor", "Use pnpm as the package manager, never yarn"),
+      instruction(".github/copilot-instructions.md", "copilot", "Use pnpm as the package manager, not npm"),
+    ]);
+
+    expect(pairs.length).toBeGreaterThan(3);
+
+    const findings = nearDuplicateDiagnostics(pairs);
+    expect(findings).toHaveLength(1);
+    expect(findings[0].data?.copies).toBe(4);
+    expect(findings[0].message).toContain("in 4 places");
+    expect(findings[0].explanation).toContain("near-duplicates of one another");
+    // Every platform in the group is named, so the reader knows the spread.
+    expect(findings[0].data?.platforms).toBe("agents-md,claude,copilot,cursor");
+    // The other three are reachable from the finding.
+    expect(findings[0].related).toHaveLength(3);
+  });
+
+  it("keeps two unrelated groups apart", () => {
+    const { pairs } = findNearDuplicateInstructions([
+      instruction("AGENTS.md", "agents-md", "Use pnpm as the package manager, never npm or yarn"),
+      instruction("CLAUDE.md", "claude", "Use pnpm as the package manager, never npm"),
+      instruction("docs/a.md", "agents-md", "Run the database migrations before starting the server"),
+      instruction("docs/b.md", "claude", "Run the database migrations before you start the server"),
+    ]);
+
+    const findings = nearDuplicateDiagnostics(pairs);
+    expect(findings).toHaveLength(2);
+    expect(findings.every((found) => found.data?.copies === 2)).toBe(true);
+  });
+
+  it("counts the rest instead of listing every location", () => {
+    const many = Array.from({ length: 9 }, (_, index) =>
+      instruction(`docs/rule-${index}.md`, "agents-md", `Always run the linter before pushing changes ${index}`),
+    );
+
+    const [found] = nearDuplicateDiagnostics(findNearDuplicateInstructions(many).pairs);
+    expect(found.data?.copies).toBe(9);
+    expect(found.explanation).toContain("and 3 more in the same group.");
+  });
+
   it("strips the list marker from the quoted text", () => {
     const { pairs } = findNearDuplicateInstructions([
       instruction("AGENTS.md", "agents-md", "- Use pnpm as the package manager, never npm or yarn"),

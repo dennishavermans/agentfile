@@ -249,42 +249,139 @@ export function findNearDuplicateInstructions(
   return { pairs, truncated, comparisons };
 }
 
-/** Turns near-duplicate pairs into AGF305 diagnostics. */
+/** A set of lines that are all near-duplicates of one another. */
+export interface NearDuplicateCluster {
+  /** Members, strongest pair first, then in the order they were reached. */
+  lines: InstructionLine[];
+  /** The pairs that connected them, strongest first. */
+  pairs: NearDuplicatePair[];
+  /** The strongest similarity inside the group. */
+  similarity: number;
+}
+
+/** Locations listed in the explanation before it starts counting instead. */
+const LISTED_MEMBERS = 6;
+
+/** Members carried as `related`, which editors render one by one. */
+const RELATED_MEMBERS = 10;
+
+/**
+ * Groups pairs into sets of mutually near-duplicate lines.
+ *
+ * Duplication is not pairwise in practice. One rule copied into four platform
+ * files produces six pairs, and a line repeated across a documentation index
+ * produces thousands: twenty's configuration yields 11,317 pairs from 13 real
+ * groups, one of which holds 205 lines. Reported pair by pair that is 11,317
+ * warnings for 13 facts, and the tool becomes unusable on exactly the
+ * repositories whose configuration is big enough to drift.
+ *
+ * Membership is transitive on purpose. If A is a near-duplicate of B and B of
+ * C, the three belong to one conversation about one rule, even when A and C
+ * fall below the threshold against each other.
+ */
+export function clusterNearDuplicates(pairs: readonly NearDuplicatePair[]): NearDuplicateCluster[] {
+  const keyOf = (line: InstructionLine) => `${line.file}:${line.line}`;
+  const parent = new Map<string, string>();
+
+  const find = (key: string): string => {
+    let root = key;
+    while (parent.get(root) !== root) root = parent.get(root) as string;
+    while (parent.get(key) !== root) {
+      const next = parent.get(key) as string;
+      parent.set(key, root);
+      key = next;
+    }
+    return root;
+  };
+
+  for (const pair of pairs) {
+    for (const key of [keyOf(pair.a), keyOf(pair.b)]) if (!parent.has(key)) parent.set(key, key);
+    const left = find(keyOf(pair.a));
+    const right = find(keyOf(pair.b));
+    if (left !== right) parent.set(left, right);
+  }
+
+  // Pairs arrive strongest first, so walking them in order puts the strongest
+  // pair's two lines at the head of their cluster and keeps the whole result
+  // deterministic.
+  const clusters = new Map<string, NearDuplicateCluster>();
+  const seen = new Set<string>();
+
+  for (const pair of pairs) {
+    const root = find(keyOf(pair.a));
+    let cluster = clusters.get(root);
+    if (!cluster) {
+      cluster = { lines: [], pairs: [], similarity: pair.similarity };
+      clusters.set(root, cluster);
+    }
+
+    cluster.pairs.push(pair);
+    cluster.similarity = Math.max(cluster.similarity, pair.similarity);
+    for (const line of [pair.a, pair.b]) {
+      const key = keyOf(line);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      cluster.lines.push(line);
+    }
+  }
+
+  return [...clusters.values()];
+}
+
+/**
+ * Turns near-duplicate pairs into AGF305 diagnostics, one per group.
+ *
+ * A group of two reads exactly as it always did, which is the common case: of
+ * bun's 15 groups, twelve are plain pairs. Larger groups say how many copies
+ * there are and where, because "this rule exists in nine places" is the fact
+ * worth acting on, and nine is not obvious from thirty-six separate warnings.
+ */
 export function nearDuplicateDiagnostics(pairs: readonly NearDuplicatePair[]): Diagnostic[] {
-  return pairs.map((pair) => {
-    const percentage = Math.round(pair.similarity * 100);
-    const crossPlatform = pair.a.platform !== pair.b.platform;
+  return clusterNearDuplicates(pairs).map((cluster) => {
+    const [first, ...rest] = cluster.lines;
+    const percentage = Math.round(cluster.similarity * 100);
+    const platforms = [...new Set(cluster.lines.map((line) => line.platform))].sort();
+    const crossPlatform = platforms.length > 1;
+    const listed = cluster.lines.slice(0, LISTED_MEMBERS);
+    const unlisted = cluster.lines.length - listed.length;
+
+    const heading =
+      cluster.lines.length === 2
+        ? crossPlatform
+          ? `These two lines are ${percentage}% similar and are maintained separately for ${first.platform} and ${rest[0].platform}.`
+          : `These two lines are ${percentage}% similar.`
+        : crossPlatform
+          ? `These ${cluster.lines.length} lines are near-duplicates of one another, up to ${percentage}% similar, and are maintained separately across ${platforms.join(", ")}.`
+          : `These ${cluster.lines.length} lines are near-duplicates of one another, up to ${percentage}% similar.`;
 
     return diagnostic({
       code: "AGF305",
-      message: `Near-duplicate instruction (${percentage}% similar): "${pair.a.text}"`,
+      message:
+        cluster.lines.length === 2
+          ? `Near-duplicate instruction (${percentage}% similar): "${first.text}"`
+          : `Near-duplicate instruction in ${cluster.lines.length} places (up to ${percentage}% similar): "${first.text}"`,
       explanation: [
-        crossPlatform
-          ? `These two lines are ${percentage}% similar and are maintained separately for ${pair.a.platform} and ${pair.b.platform}.`
-          : `These two lines are ${percentage}% similar.`,
+        heading,
         "",
-        `  ${pair.a.file}:${pair.a.line}`,
-        `    ${pair.a.text}`,
-        `  ${pair.b.file}:${pair.b.line}`,
-        `    ${pair.b.text}`,
+        ...listed.flatMap((line) => [`  ${line.file}:${line.line}`, `    ${line.text}`]),
+        ...(unlisted ? ["", `  and ${unlisted} more in the same group.`] : []),
         "",
-        "If they are the same rule, one copy has been edited and the other has not.",
+        "If they are the same rule, one copy has been edited and the others have not.",
         "If they are genuinely different rules that happen to share wording, this is",
         "not a problem — similarity is measured on words, not meaning.",
       ].join("\n"),
       suggestion:
         "Decide which wording is correct, then keep it in one place and generate the rest, so the copies cannot drift again.",
-      location: { file: pair.a.file, line: pair.a.line },
-      related: [
-        {
-          location: { file: pair.b.file, line: pair.b.line },
-          message: `${percentage}% similar wording in ${pair.b.platform} configuration`,
-        },
-      ],
+      location: { file: first.file, line: first.line },
+      related: rest.slice(0, RELATED_MEMBERS).map((line) => ({
+        location: { file: line.file, line: line.line },
+        message: `similar wording in ${line.platform} configuration`,
+      })),
       data: {
-        similarity: pair.similarity,
-        sharedTokens: pair.sharedTokens.join(","),
-        platforms: [pair.a.platform, pair.b.platform].sort().join(","),
+        similarity: cluster.similarity,
+        copies: cluster.lines.length,
+        sharedTokens: cluster.pairs[0].sharedTokens.join(","),
+        platforms: platforms.join(","),
       },
     });
   });

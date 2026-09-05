@@ -9,6 +9,32 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.4.0] — 2026-09-05
+
+Near-duplicate findings are grouped. The check was correct and unusable at the
+same time: it reported one warning per similar pair, and duplication is not
+pairwise. One rule copied into four files is six pairs; a line repeated down a
+documentation index is thousands.
+
+Measured on twenty's configuration: 11,317 pairs from 13 real groups, the
+largest holding 205 lines. That is 11,317 warnings for 13 facts, on exactly the
+repositories whose configuration is large enough to drift in the first place.
+
+### Changed
+
+- `AGF305` reports one finding per group of mutually near-duplicate lines
+  rather than one per pair. Membership is transitive: A similar to B and B to C
+  is one conversation about one rule, even where A and C fall below the
+  threshold against each other. A group of two reads exactly as it did before,
+  which is the common case. Larger groups name the number of copies, list the
+  first six with their locations, and count the rest. `data.copies` carries the
+  group size for machine consumers.
+
+Warning counts on the repositories used to check this: twenty 11,346 to 42,
+streamlit 723 to 79, bun 42 to 21, prefect 42 to 29. Repositories with no
+duplication are unchanged.
+
+
 ## [2.3.2] — 2026-09-05
 
 A false-positive release, found by running the tool on eight repositories that
