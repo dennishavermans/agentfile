@@ -294,7 +294,7 @@ signature, since everything is inside the root. Without that, every root
 `AGENTS.md`/`CLAUDE.md` pair would report a mismatch that does not exist.
 
 ### `AGF305` near-duplicate-instruction · warning · active
-Two instruction lines that are similar but not identical — copies of one rule
+Instruction lines that are similar but not identical — copies of one rule
 that have drifted apart. Exact comparison goes quiet at precisely the moment one
 copy is edited, which is when the configuration starts disagreeing with itself.
 
@@ -303,6 +303,14 @@ than approximated with MinHash: MinHash exists to avoid pairwise comparison on
 large corpora, and an instruction corpus is hundreds of lines, so approximating
 would add error for no saving. Candidate pairs come from an inverted token index,
 so lines with nothing in common are never compared.
+
+Reported one finding per group, not per pair. Duplication is rarely pairwise:
+one rule copied into four files is six pairs, and a line repeated down a
+documentation index is thousands. twenty's configuration produces 11,317 pairs
+from 13 groups, the largest holding 205 lines, so pair-by-pair reporting meant
+11,317 warnings for 13 facts. Membership is transitive, because A like B and B
+like C is one conversation about one rule. A group of two reads exactly as it
+always did; larger groups say how many copies exist and list the first six.
 
 Three deliberate limits, all stated in the finding rather than hidden:
 
