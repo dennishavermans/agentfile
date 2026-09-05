@@ -46,6 +46,52 @@ export interface RiskPattern {
   title: string;
   /** Why it is worth a human looking. Never a claim about intent. */
   why: string;
+  /**
+   * Lines the pattern matches that are not the thing it is looking for.
+   *
+   * Kept beside the pattern rather than in the scanner so that a pattern and
+   * the shape it must not report stay readable together.
+   */
+  exempt?: (line: string) => boolean;
+}
+
+/**
+ * Removes shell expansions from a value, innermost first.
+ *
+ * `${LINEAR_API_KEY:-${LINEAR_TOKEN:-}}` collapses to nothing, and so does
+ * `$HUGGINGFACE_HUB_TOKEN`. What is left is the literal text the line would
+ * still contain with every variable empty.
+ */
+function withoutExpansions(value: string): string {
+  let previous: string;
+  let text = value;
+
+  // Innermost `${...}` first, so nesting unwinds without a recursive pattern.
+  do {
+    previous = text;
+    text = text.replace(/\$\{[^{}]*\}/g, "");
+  } while (text !== previous);
+
+  return text.replace(/\$\([^()]*\)/g, "").replace(/\$[A-Za-z_][A-Za-z0-9_]*/g, "");
+}
+
+/**
+ * A credential assignment whose value is only variable expansion.
+ *
+ * `HF_TOKEN="$HUGGINGFACE_HUB_TOKEN"` in sglang and
+ * `TOKEN="${LINEAR_API_KEY:-${LINEAR_TOKEN:-}}"` in langfuse were both reported
+ * as literal credentials. Reading a secret from the environment is what this
+ * project tells people to do everywhere else, so reporting it is worse than
+ * saying nothing: the advice and the finding contradict each other.
+ *
+ * The quoted value still has to be short once expansions are removed, so
+ * `token="prefix-$SUFFIX-0123456789"` keeps its finding.
+ */
+function assignsOnlyAnExpansion(line: string): boolean {
+  const match = line.match(/(?:secret|token|password|passwd|api[_-]?key)\s*[:=]\s*(["'])([^"'\n]{12,})\1/i);
+  if (!match) return false;
+
+  return withoutExpansions(match[2]).replace(/[^A-Za-z0-9]/g, "").length < 12;
 }
 
 /**
@@ -95,6 +141,7 @@ export const RISK_PATTERNS: readonly RiskPattern[] = [
     severity: "error",
     title: "contains what looks like a credential",
     why: "A literal credential in a committed file is disclosed to everyone with repository access. This pattern also matches placeholders, so confirm before rotating anything.",
+    exempt: assignsOnlyAnExpansion,
   },
   {
     id: "recursive-force-delete",
@@ -171,9 +218,9 @@ export function scanText(text: string): RiskMatch[] {
     if (/^\s*#(?!!)/.test(line) || /^\s*\/\//.test(line)) continue;
 
     for (const pattern of RISK_PATTERNS) {
-      if (pattern.pattern.test(line)) {
-        matches.push({ pattern, line: offset + 1, text: line.trim() });
-      }
+      if (!pattern.pattern.test(line)) continue;
+      if (pattern.exempt?.(line)) continue;
+      matches.push({ pattern, line: offset + 1, text: line.trim() });
     }
   }
 
@@ -182,7 +229,7 @@ export function scanText(text: string): RiskMatch[] {
 
 /** Matches in a single expression that a shell will interpret, such as a hook command. */
 export function scanExpression(expression: string): RiskPattern[] {
-  return RISK_PATTERNS.filter((pattern) => pattern.pattern.test(expression));
+  return RISK_PATTERNS.filter((pattern) => pattern.pattern.test(expression) && !pattern.exempt?.(expression));
 }
 
 /**

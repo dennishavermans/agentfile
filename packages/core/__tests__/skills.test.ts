@@ -114,6 +114,42 @@ describe("skillDirectoryName", () => {
 // ─── Structural validation ─────────────────────────────────────────────────
 
 describe("validateSkills", () => {
+  // novu ships byte-identical copies of better-auth-best-practices to
+  // .claude/skills and .cursor/skills. Claude Code reads one directory and
+  // Cursor the other, so there is no precedence question and nothing to decide.
+  // Drift between the copies is real, and AGF305 is the check that reports it.
+  it("does not call the same skill shipped to two platforms a name collision", () => {
+    const claudeCopy = skill({ name: "better-auth-best-practices" });
+    const cursorCopy: typeof claudeCopy = {
+      ...claudeCopy,
+      provenance: {
+        ...claudeCopy.provenance,
+        file: ".cursor/skills/better-auth-best-practices/SKILL.md",
+        platform: "cursor",
+      },
+      directory: ".cursor/skills/better-auth-best-practices",
+    };
+
+    const collisions = validateSkills(configurationOf(claudeCopy, cursorCopy)).filter((found) =>
+      found.message.includes("skills are named"),
+    );
+    expect(collisions).toEqual([]);
+  });
+
+  it("still reports two skills sharing a name on the same platform", () => {
+    const first = skill({ name: "deploy", directory: ".claude/skills/deploy" });
+    const second: typeof first = {
+      ...first,
+      provenance: { ...first.provenance, file: ".claude/skills/nested/deploy/SKILL.md" },
+      directory: ".claude/skills/nested/deploy",
+    };
+
+    const [found] = validateSkills(configurationOf(first, second)).filter((item) =>
+      item.message.includes("skills are named"),
+    );
+    expect(found.message).toContain('2 skills are named "deploy"');
+  });
+
   // This test used to call a description-less skill unusable, at error
   // severity. Measured on Claude Code 2.1.238: a SKILL.md with no frontmatter
   // at all still loads, is listed with its first heading standing in for the

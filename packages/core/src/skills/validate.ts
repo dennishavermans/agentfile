@@ -150,10 +150,18 @@ function checkConstraints(skill: SkillEntry): Diagnostic[] {
 }
 
 /**
- * Two skills sharing a name.
+ * Two skills sharing a name on the same platform.
  *
  * Which one an agent loads depends on directory precedence the platforms
  * document differently, so a duplicate name means the answer differs per tool.
+ *
+ * Only within a platform. Shipping one skill to two tools means writing it to
+ * both `.claude/skills/<name>` and `.cursor/skills/<name>`, and novu does
+ * exactly that with byte-identical copies of `better-auth-best-practices`.
+ * Claude Code reads one directory and Cursor reads the other, so no precedence
+ * question arises and there is nothing for a reader to decide. If those copies
+ * later drift apart, that is a real problem and AGF305 is the check that
+ * reports it.
  */
 function checkDuplicateNames(skills: readonly SkillEntry[]): Diagnostic[] {
   const byName = new Map<string, SkillEntry[]>();
@@ -161,15 +169,17 @@ function checkDuplicateNames(skills: readonly SkillEntry[]): Diagnostic[] {
   for (const skill of skills) {
     const name = skill.name.trim();
     if (!name) continue;
-    const group = byName.get(name);
+    const key = `${skill.provenance.platform} ${name}`;
+    const group = byName.get(key);
     if (group) group.push(skill);
-    else byName.set(name, [skill]);
+    else byName.set(key, [skill]);
   }
 
   const diagnostics: Diagnostic[] = [];
 
-  for (const [name, group] of byName) {
+  for (const [key, group] of byName) {
     if (group.length < 2) continue;
+    const name = key.slice(key.indexOf(" ") + 1);
 
     const [first, ...rest] = group;
     diagnostics.push(

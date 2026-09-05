@@ -9,6 +9,42 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.4.1] — 2026-09-05
+
+Three false positives, found by running the tool across fourteen more
+repositories it had never seen.
+
+### Fixed
+
+- A credential assignment whose value is only shell expansion is no longer
+  reported as a hardcoded credential. sglang writes
+  `HF_TOKEN="$HUGGINGFACE_HUB_TOKEN"` and langfuse
+  `TOKEN="${LINEAR_API_KEY:-${LINEAR_TOKEN:-}}"`, and reading a secret from the
+  environment is what this project recommends everywhere else, so the finding
+  contradicted the advice. Expansions are removed innermost first and the
+  remainder still has to look like a literal, so
+  `token="prefix-$SUFFIX-0123456789"` keeps its finding.
+- Two skills sharing a name are only a collision on the same platform. novu
+  ships byte-identical copies of `better-auth-best-practices` to
+  `.claude/skills` and `.cursor/skills`; Claude Code reads one directory and
+  Cursor the other, so no precedence question arises. Drift between such copies
+  is a real problem and AGF305 is the check that reports it.
+- An import the file itself marks as conditional is no longer reported missing.
+  vllm's `rust/CLAUDE.md` opens "First, check @AGENTS.override.md if exists",
+  describing a per-developer override the repository deliberately does not
+  carry. Only the line carrying the import is considered, so a conditional
+  sentence elsewhere cannot excuse a genuinely missing one.
+
+### Not changed
+
+An earlier note in this session claimed airflow's eight broken skill links were
+gitignored build artefacts. Checked with `git check-ignore`: they are not. The
+links resolve to nothing in that checkout and the findings stand. Likewise
+next.js's `eval "VER_$arm=$V"` interpolates command output, so
+"what runs depends on the variable's value at that moment" is true of it and
+the severity is left alone.
+
+
 ## [2.4.0] — 2026-09-05
 
 Near-duplicate findings are grouped. The check was correct and unusable at the
