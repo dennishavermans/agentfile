@@ -350,6 +350,26 @@ export function discoverCopilotInstructions(
 // ─── Import resolution ─────────────────────────────────────────────────────
 
 /**
+ * An import the file itself says may not be there.
+ *
+ * vllm's `rust/CLAUDE.md` opens with "First, check @AGENTS.override.md if
+ * exists." The file is a per-developer override that the repository
+ * deliberately does not carry, and the sentence says so. Reporting it as a
+ * broken import contradicts the text it is reading.
+ *
+ * Only the line carrying the import is considered, so a conditional sentence
+ * elsewhere in the file cannot excuse an import that is genuinely missing.
+ */
+function importedConditionally(body: string, target: string): boolean {
+  const escaped = target.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const reference = new RegExp(`@${escaped}(?![\\w./-])`);
+  const optional =
+    /\bif\s+(?:it\s+|they\s+|these\s+|any\s+)?(?:exists?|present|available)\b|\bif\s+any\b|\boptional\b/i;
+
+  return body.split("\n").some((line) => reference.test(line) && optional.test(line));
+}
+
+/**
  * Reports imports that point at a file which is not in the repository.
  *
  * Only repository-relative imports are checked. An import that resolves outside
@@ -367,6 +387,7 @@ export function checkInstructionImports(
   for (const instruction of instructions) {
     for (const target of instruction.imports ?? []) {
       if (target.startsWith("~") || target.startsWith("/")) continue;
+      if (importedConditionally(instruction.body, target)) continue;
 
       // Claude Code resolves a relative import against the directory of the
       // file that declares it — not the repository root, and not the working

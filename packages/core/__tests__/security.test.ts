@@ -205,6 +205,23 @@ describe("scanArgv", () => {
     );
   });
 
+  // sglang writes `HF_TOKEN="$HUGGINGFACE_HUB_TOKEN"` and langfuse
+  // `TOKEN="${LINEAR_API_KEY:-${LINEAR_TOKEN:-}}"`. Reading a secret from the
+  // environment is what this project recommends everywhere else, so reporting
+  // it made the advice and the finding contradict each other.
+  it("does not call an environment variable reference a hardcoded credential", () => {
+    const flagged = (line: string) => scanText(line).some((match) => match.pattern.id === "hardcoded-credential");
+
+    expect(flagged('HF_TOKEN="$HUGGINGFACE_HUB_TOKEN"')).toBe(false);
+    expect(flagged('TOKEN="${LINEAR_API_KEY:-${LINEAR_TOKEN:-${LINEAR_API_TOKEN:-}}}"')).toBe(false);
+    expect(flagged('api_key="$(pass show deploy/key)"')).toBe(false);
+
+    // A literal is still a literal, and a variable does not launder one.
+    expect(flagged('api_key = "sk-live-0123456789abcdef"')).toBe(true);
+    expect(flagged('token="prefix-$SUFFIX-0123456789abc"')).toBe(true);
+    expect(flagged(`AWS_KEY=AKIA${"A".repeat(16)}`)).toBe(true);
+  });
+
   it("stays silent on legitimate argv that resembles a defect", () => {
     // Negative fixtures: each of these would fire if exec form were scanned as
     // shell text, and each is a normal thing to write.

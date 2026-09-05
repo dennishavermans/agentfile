@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { alwaysLoadedContext, findInstructionOverlap } from "../src/analysis/index.ts";
 import {
+  checkInstructionImports,
   DEFAULT_IGNORED_DIRECTORIES,
   discover,
   discoverAgentsMd,
@@ -214,6 +215,41 @@ describe("discoverAgentsMd", () => {
 });
 
 // ─── CLAUDE.md ─────────────────────────────────────────────────────────────
+
+describe("checkInstructionImports", () => {
+  it("reports an import whose target is not in the repository", () => {
+    const { fs, scan } = scanOf({ "/repo/CLAUDE.md": "Follow instructions in @AGENTS.md." });
+    const { instructions } = discoverClaudeMd(ROOT, scan, fs);
+
+    const [found] = checkInstructionImports(ROOT, instructions, fs);
+    expect(found.code).toBe("AGF004");
+    expect(found.message).toContain("AGENTS.md");
+  });
+
+  // vllm's rust/CLAUDE.md opens with exactly this sentence. The override file
+  // is per-developer and the repository deliberately does not carry it, which
+  // the text says out loud.
+  it("does not report an import the file itself marks as conditional", () => {
+    const { fs, scan } = scanOf({
+      "/repo/CLAUDE.md": "First, check @AGENTS.override.md if exists.\nThen, follow @AGENTS.md.",
+      "/repo/AGENTS.md": "Rules.",
+    });
+    const { instructions } = discoverClaudeMd(ROOT, scan, fs);
+
+    expect(checkInstructionImports(ROOT, instructions, fs)).toEqual([]);
+  });
+
+  it("does not let a conditional elsewhere excuse a different import", () => {
+    const { fs, scan } = scanOf({
+      "/repo/CLAUDE.md": "Check @local.override.md if present.\nAlways read @docs/rules.md.",
+    });
+    const { instructions } = discoverClaudeMd(ROOT, scan, fs);
+
+    const found = checkInstructionImports(ROOT, instructions, fs);
+    expect(found).toHaveLength(1);
+    expect(found[0].message).toContain("docs/rules.md");
+  });
+});
 
 describe("discoverClaudeMd", () => {
   it("reads CLAUDE.md and .claude/CLAUDE.md as project-scoped", () => {
