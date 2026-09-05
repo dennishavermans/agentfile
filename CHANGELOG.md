@@ -9,6 +9,41 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.3.2] — 2026-09-05
+
+A false-positive release, found by running the tool on eight repositories that
+had never seen it: n8n, supabase, bun, cline, streamlit, twenty, prefect and
+ruff. Between them they drew 15 error-severity AGF004 findings, and every one
+of the 15 was wrong.
+
+### Fixed
+
+- Hook scripts written with the unbraced `$CLAUDE_PROJECT_DIR` were reported as
+  missing. Only `${CLAUDE_PROJECT_DIR}` was stripped, so the literal variable
+  name stayed in the path and no file could match it. Five hooks across cline,
+  streamlit, prefect and twenty were reported missing while their scripts sat
+  in the repository. Both spellings are documented and both are used.
+- A hook command like `"$CLAUDE_PROJECT_DIR"/.claude/hooks/format.js`, which is
+  how bun writes them, lost its path: the first shell word was read as the
+  quoted chunk alone, leaving a bare variable with no slash, and the check
+  skipped a script it could have verified. A word is now assembled from its
+  quoted and unquoted parts, the way a shell reads it.
+- Links inside code are no longer followed. n8n documents image syntax as
+  `` `![description](url)` `` and ruff documents a permalink as
+  `` `[project file.py:123](permalink)` ``; both were reported as missing
+  files. Fenced blocks are excluded too, which is what turned n8n's remaining
+  four link errors into zero: the links sat inside a fenced example of a skill,
+  not in the skill's own prose. Import detection has always ignored code for
+  this reason; links now do the same, and line numbers still point at the link.
+- A placeholder target such as `tmp/review-<repo>-<number>.md` names a file the
+  skill creates at run time, not one that should already exist.
+- A GitHub web URL written without its origin, such as
+  `../blob/master/CONTRIBUTING.md`, is no longer read as a repository path. From
+  a pull request page that link resolves to the file's GitHub page, which is
+  where n8n's canned review replies use it. Scoped to `blob`, `tree` and `raw`
+  followed by a ref, so an ordinary directory named `blob` still resolves.
+
+
 ## [2.3.1] — 2026-09-03
 
 A correction release. 2.2.0 shipped a sentence that said "measured" about

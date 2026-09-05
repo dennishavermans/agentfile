@@ -227,6 +227,35 @@ function unknownType(hook: HookEntry): Diagnostic[] {
  * on the event that is either noise in every session or a check the team believes
  * is running and is not.
  */
+/**
+ * The first shell word of a command, with quotes removed.
+ *
+ * A word is not a whitespace-delimited token: `"$CLAUDE_PROJECT_DIR"/.claude/x.sh`
+ * is one word made of a quoted chunk and an unquoted one, and taking only the
+ * quoted chunk threw the path away, leaving nothing to check. bun writes its
+ * hooks exactly that way.
+ */
+function firstWord(command: string): string {
+  let word = "";
+  let quote: '"' | "'" | undefined;
+
+  for (const character of command) {
+    if (quote) {
+      if (character === quote) quote = undefined;
+      else word += character;
+      continue;
+    }
+    if (character === '"' || character === "'") {
+      quote = character;
+      continue;
+    }
+    if (/\s/.test(character)) break;
+    word += character;
+  }
+
+  return word;
+}
+
 function missingScripts(
   hook: HookEntry,
   files: readonly string[],
@@ -246,11 +275,15 @@ function missingScripts(
   if (isExecForm(hook)) {
     script = command;
   } else {
-    const match = command.match(/^(?:"([^"]+)"|'([^']+)'|(\S+))/);
-    if (!match) return [];
-    script = match[1] ?? match[2] ?? match[3];
+    script = firstWord(command);
+    if (!script) return [];
   }
-  script = script.replace(/^\$\{CLAUDE_PROJECT_DIR\}\/?/, "").replace(/^\.\//, "");
+  // Both spellings of the variable, and both are documented. Stripping only the
+  // braced one left `$CLAUDE_PROJECT_DIR/.claude/hooks/x.sh` looking like a
+  // relative path with a directory named `$CLAUDE_PROJECT_DIR`, which reported
+  // a missing script for five hooks across cline, streamlit, prefect and
+  // twenty whose files were all present.
+  script = script.replace(/^\$(?:\{CLAUDE_PROJECT_DIR\}|CLAUDE_PROJECT_DIR)\/?/, "").replace(/^\.\//, "");
 
   // Not a relative path inside the repository: nothing to check.
   if (script.startsWith("/") || script.startsWith("~") || !script.includes("/")) return [];
