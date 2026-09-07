@@ -100,8 +100,31 @@ function stringMap(value: unknown): Record<string, string> | undefined {
   return Object.keys(result).length ? result : undefined;
 }
 
+/** True for a value that can be read as a mapping of server name to definition. */
+function isServerMap(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === "object" && !Array.isArray(value);
+}
+
+/**
+ * True when this `.mcp.json` belongs to a plugin rather than a project.
+ *
+ * A plugin is marked by the `.claude-plugin/plugin.json` manifest beside it,
+ * which is what `claude plugin validate` reads.
+ */
+function insidePlugin(root: string, file: string, fs: FileSystem): boolean {
+  return fs.exists(join(root, dirnameOf(file), ".claude-plugin", "plugin.json"));
+}
+
 /**
  * `.mcp.json` at a repository root: `{ "mcpServers": { "<name>": { ... } } }`.
+ *
+ * A plugin's `.mcp.json` is the exception: it may also declare servers bare, at
+ * the top level, with no `mcpServers` wrapper. Measured on Claude Code 2.1.238
+ * with a probe server whose command touches a marker file: loaded through
+ * `--plugin-dir`, both the wrapped and the bare shape spawned the server, while
+ * at project scope only the wrapped shape did. Anthropic's own plugin
+ * marketplace ships both, ten bare and six wrapped, so requiring the wrapper
+ * everywhere reports valid configuration as broken.
  *
  * Only project-scoped configuration is discoverable. Local and user scopes live
  * in the developer's home directory by design, and are neither committed nor
@@ -134,8 +157,13 @@ export function discoverMcpServers(root: string, scan: RepositoryScan, fs: FileS
       continue;
     }
 
-    const servers = (parsed as { mcpServers?: unknown } | null)?.mcpServers;
-    if (!servers || typeof servers !== "object" || Array.isArray(servers)) {
+    const declared = (parsed as { mcpServers?: unknown } | null)?.mcpServers;
+    const servers = isServerMap(declared)
+      ? declared
+      : insidePlugin(root, file, fs) && isServerMap(parsed)
+        ? parsed
+        : undefined;
+    if (!servers) {
       result.diagnostics.push(
         diagnostic({
           code: "AGF001",

@@ -903,6 +903,62 @@ describe("discoverMcpServers", () => {
     const { fs, scan } = scanOf({ "/repo/.mcp.json": JSON.stringify({ servers: {} }) });
     expect(discoverMcpServers(ROOT, scan, fs).diagnostics[0].message).toContain('no "mcpServers" object');
   });
+
+  // A plugin may declare its servers bare, with no `mcpServers` wrapper.
+  // Measured on Claude Code 2.1.238 through `--plugin-dir`: both shapes spawn
+  // the server. Anthropic's own marketplace ships ten of the bare shape, so
+  // demanding the wrapper here reports working configuration as broken.
+  it("reads a plugin's bare server map, with no mcpServers wrapper", () => {
+    const { fs, scan } = scanOf({
+      "/repo/.claude-plugin/plugin.json": JSON.stringify({ name: "demo", version: "1.0.0" }),
+      "/repo/.mcp.json": JSON.stringify({ github: { type: "http", url: "https://api.example/mcp/" } }),
+    });
+
+    const found = discoverMcpServers(ROOT, scan, fs);
+    expect(found.diagnostics).toEqual([]);
+    expect(found.mcpServers).toMatchObject([{ name: "github", transport: "http", url: "https://api.example/mcp/" }]);
+  });
+
+  it("still reads a plugin's wrapped server map", () => {
+    const { fs, scan } = scanOf({
+      "/repo/.claude-plugin/plugin.json": JSON.stringify({ name: "demo", version: "1.0.0" }),
+      "/repo/.mcp.json": JSON.stringify({ mcpServers: { ctx: { type: "http", url: "https://api.example/mcp/" } } }),
+    });
+
+    const found = discoverMcpServers(ROOT, scan, fs);
+    expect(found.diagnostics).toEqual([]);
+    expect(found.mcpServers).toMatchObject([{ name: "ctx" }]);
+  });
+
+  it("finds the plugin manifest beside the file, not at the repository root", () => {
+    const { fs, scan } = scanOf({
+      "/repo/plugins/demo/.claude-plugin/plugin.json": JSON.stringify({ name: "demo" }),
+      "/repo/plugins/demo/.mcp.json": JSON.stringify({ db: { command: "npx" } }),
+    });
+
+    expect(discoverMcpServers(ROOT, scan, fs).diagnostics).toEqual([]);
+  });
+
+  // The wrapper stays mandatory at project scope: measured with the same probe,
+  // a bare project-level `.mcp.json` spawned nothing.
+  it("still requires the wrapper when no plugin manifest sits beside the file", () => {
+    const { fs, scan } = scanOf({
+      "/repo/.mcp.json": JSON.stringify({ github: { type: "http", url: "https://api.example/mcp/" } }),
+    });
+
+    const found = discoverMcpServers(ROOT, scan, fs);
+    expect(found.mcpServers).toEqual([]);
+    expect(found.diagnostics[0].message).toContain('no "mcpServers" object');
+  });
+
+  it("does not treat a sibling directory's manifest as this file's", () => {
+    const { fs, scan } = scanOf({
+      "/repo/plugins/demo/.claude-plugin/plugin.json": JSON.stringify({ name: "demo" }),
+      "/repo/other/.mcp.json": JSON.stringify({ db: { command: "npx" } }),
+    });
+
+    expect(discoverMcpServers(ROOT, scan, fs).diagnostics[0].message).toContain('no "mcpServers" object');
+  });
 });
 
 // ─── Import checking ───────────────────────────────────────────────────────
