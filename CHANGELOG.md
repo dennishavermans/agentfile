@@ -9,6 +9,37 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.5.0] — 2026-09-07
+
+A false positive that fired on almost everyone, found by running the tool
+against a stock `~/.claude` rather than against a repository.
+
+A minor rather than a patch because the fix also widens what gets analysed:
+plugin MCP servers were being skipped and are now read, so the MCP security
+checks see servers they could not see before.
+
+### Fixed
+
+- A plugin's `.mcp.json` may declare its servers bare, at the top level, with no
+  `mcpServers` wrapper, and AGF001 reported every such file as invalid.
+  Anthropic's own plugin marketplace ships ten plugins in the bare shape and six
+  wrapped, so a stock install reported ten errors, at error severity, against
+  files the user never wrote. Measured on Claude Code 2.1.238 with a probe
+  server whose command touches a marker file, loaded through `--plugin-dir`:
+  both the wrapped and the bare shape spawned the server at plugin scope, while
+  at project scope only the wrapped shape did. The bare shape is therefore
+  accepted only when a `.claude-plugin/plugin.json` sits beside the file, which
+  is the same marker `claude plugin validate` reads, and the wrapper stays
+  mandatory for a project's own `.mcp.json`.
+
+### Changed
+
+- Servers declared in a plugin's `.mcp.json` are now discovered instead of
+  skipped, so they reach the MCP security checks. A repository that vendors
+  plugins may see findings that were previously invisible. Those servers do
+  load, so the findings are about configuration that is really in effect.
+
+
 ## [2.4.1] — 2026-09-05
 
 Three false positives, found by running the tool across fourteen more
