@@ -399,6 +399,43 @@ the first one's alerts.
 
 ---
 
+## pre-commit
+
+For the repositories that already run [pre-commit](https://pre-commit.com):
+
+```yaml
+repos:
+  - repo: https://github.com/dennishavermans/agentfile
+    rev: v2.5.0
+    hooks:
+      - id: agentfile
+      - id: agentfile-audit
+```
+
+Two hooks, because no single command covers both halves. `agentfile` runs the
+structural and resolution layers, the same ones `check` runs. `agentfile-audit`
+runs the security layer over permission rules, hooks and MCP servers.
+
+`audit` exits 0 on warnings and every permission finding is a warning, so
+`agentfile-audit` passes `--strict`. Without it the hook would report success
+on a rule that grants arbitrary command execution, which is worse than not
+running it at all. Override `args` to relax that:
+
+```yaml
+      - id: agentfile-audit
+        args: [--max-warnings, "5"]
+```
+
+Both hooks read the whole repository rather than the staged files, because
+editing one skill can break a reference in another file. The file patterns are
+only a trigger, and they match nested configuration too, so a monorepo with a
+CLAUDE.md per package is covered.
+
+The hooks run the CLI through `npx`, pinned to the version that matches `rev`,
+so the machine needs Node but nothing installed up front.
+
+---
+
 ## CI output
 
 `check`, `validate`, `lint` and `audit` emit **SARIF 2.1.0** with `--format

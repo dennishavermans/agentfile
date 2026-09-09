@@ -1,0 +1,55 @@
+# agentfile as a pre-commit hook.
+#
+# Two hooks rather than one, because no single command covers both halves.
+# `check` runs the structural and resolution layers; `audit` runs the security
+# layer. A repository that wants the permission analysis has to ask for it.
+#
+# Both read the repository rather than a list of files, so `pass_filenames` is
+# false and `files` is only a trigger: editing one skill can break a reference
+# in another file, and a per-file hook would miss that.
+#
+# The leading `(.*/)?` in `files` is deliberate. A monorepo carries a CLAUDE.md
+# or a .claude/ directory per package, and agentfile discovers all of them.
+#
+# The version is pinned to the tag that carries this file, so a consumer who
+# pins `rev: v2.5.0` gets 2.5.0 and not whatever `latest` becomes tomorrow.
+# Bumping it is part of cutting a release.
+
+- id: agentfile
+  name: agentfile
+  description: Structural and resolution checks on the agent configuration this repository already has.
+  entry: npx --yes @agentfile/cli@2.5.0 check
+  language: system
+  pass_filenames: false
+  files: >-
+    (?x)^(.*/)?(
+      AGENTS\.md|
+      CLAUDE\.md|
+      \.mcp\.json|
+      \.agentfile\.(json|ya?ml)|
+      \.claude/.*|
+      \.cursor/.*|
+      \.github/copilot-instructions\.md
+    )$
+
+# `audit` exits 0 on warnings, and every permission finding is a warning, so
+# without `--strict` this hook would pass on a rule that grants arbitrary
+# command execution. A hook that cannot fail is worse than no hook: it reports
+# assurance it has not earned. Override `args` to relax it.
+- id: agentfile-audit
+  name: agentfile audit
+  description: Security analysis of permission rules, hooks and MCP servers.
+  entry: npx --yes @agentfile/cli@2.5.0 audit
+  args: [--strict]
+  language: system
+  pass_filenames: false
+  files: >-
+    (?x)^(.*/)?(
+      AGENTS\.md|
+      CLAUDE\.md|
+      \.mcp\.json|
+      \.agentfile\.(json|ya?ml)|
+      \.claude/.*|
+      \.cursor/.*|
+      \.github/copilot-instructions\.md
+    )$
