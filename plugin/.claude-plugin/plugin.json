@@ -1,0 +1,10 @@
+{
+  "name": "agentfile",
+  "description": "Catches agent configuration that grants more than it appears to: permission rules whose wildcards reach further than they read, broken skill references, and MCP servers that will silently fail to load.",
+  "version": "2.7.0",
+  "author": {
+    "name": "Dennis Havermans"
+  },
+  "homepage": "https://github.com/dennishavermans/agentfile",
+  "license": "MIT"
+}
