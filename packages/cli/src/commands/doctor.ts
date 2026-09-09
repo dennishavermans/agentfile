@@ -14,18 +14,14 @@ import {
   alwaysLoadedContext,
   analyzeSkillRouting,
   configuredDirectories,
-  type Diagnostic,
   type DiscoveryResult,
-  discover,
-  findInstructionOverlap,
   formatHuman,
   formatJson,
   hasErrors,
-  overlapDiagnostics,
-  repositoryResolutionDiagnostics,
+  IMPLEMENTED_LAYERS,
   resolveForPath,
+  runValidation,
   summarize,
-  validateSkills,
 } from "@agentfile/core";
 import chalk from "chalk";
 import { logger } from "../logger.js";
@@ -48,23 +44,6 @@ function formatBytes(bytes: number): string {
 
 function formatCount(count: number, singular: string, plural = `${singular}s`): string {
   return `${count} ${count === 1 ? singular : plural}`;
-}
-
-/**
- * Duplicate detection across the whole repository.
- *
- * Both halves come from core, which is what keeps `doctor` and `check` from
- * disagreeing about what counts as duplication: declared rules that co-apply at
- * some path, and text repeated between instruction files.
- */
-function repositoryWideDiagnostics(result: DiscoveryResult): Diagnostic[] {
-  return [
-    ...repositoryResolutionDiagnostics(result.configuration),
-    ...overlapDiagnostics(findInstructionOverlap(result.configuration.instructions)),
-    // Specification breaches in a skill are errors that nothing else in the
-    // toolchain reports, so they belong in the first command anyone runs.
-    ...validateSkills(result.configuration),
-  ];
 }
 
 function reportInventory(result: DiscoveryResult, verbose: boolean): void {
@@ -199,8 +178,24 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<void> 
     return;
   }
 
-  const result = discover({ root });
-  const diagnostics = [...result.diagnostics, ...repositoryWideDiagnostics(result)];
+  // Every implemented layer, not a hand-picked subset.
+  //
+  // `doctor` is the command the README leads with and the one the empty-state
+  // message recommends, so it is the full analysis and the narrower verbs are
+  // the subsets: `check` for the fast structural pass, `lint` for quality,
+  // `audit` for security. That is the shape the comparable tools settled on.
+  // Biome, which this repository already uses, runs its security rules at
+  // error severity inside the default `biome check` and keeps `lint` and
+  // `format` beside it as focused commands.
+  //
+  // Selecting the layers by hand is how `doctor` came to print "No problems
+  // found" over a broken reference and two permission rules that grant
+  // arbitrary command execution, each of which a sibling command reported.
+  // Going through `runValidation` also means suppressions and configured
+  // severity apply here exactly as they do everywhere else.
+  const validation = runValidation({ root, layers: IMPLEMENTED_LAYERS });
+  const result = validation.discovery;
+  const diagnostics = validation.diagnostics;
 
   if (format === "json") {
     const always = alwaysLoadedContext(result.configuration);

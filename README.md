@@ -140,6 +140,9 @@ It reads `AGENTS.md`, `CLAUDE.md`, `.claude/rules/`, `.claude/skills/`, `.claude
 - rules duplicated across platforms — the drift the rest of agentfile prevents
 - skills whose description is too thin for an agent to route on
 - misconfigurations such as an MCP server that will silently fail to load, or an instruction file importing a path that does not exist
+- permission rules, hooks and MCP servers that grant more than they appear to, such as a wildcard that stands in for the program itself
+
+`doctor` runs every layer agentfile implements, so it is the whole picture in one command. The narrower verbs are subsets of it: `check` for the fast structural pass, `lint` for quality, `audit` for security on its own.
 
 `doctor` runs no model, makes no network calls, and never executes a hook, script, or MCP command it finds. It exits non-zero on errors, so it can gate CI.
 
