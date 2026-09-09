@@ -12,13 +12,13 @@
 # or a .claude/ directory per package, and agentfile discovers all of them.
 #
 # The version is pinned to the tag that carries this file, so a consumer who
-# pins `rev: v2.5.0` gets 2.5.0 and not whatever `latest` becomes tomorrow.
+# pins `rev: v2.6.0` gets 2.5.0 and not whatever `latest` becomes tomorrow.
 # Bumping it is part of cutting a release.
 
 - id: agentfile
   name: agentfile
   description: Structural and resolution checks on the agent configuration this repository already has.
-  entry: npx --yes @agentfile/cli@2.5.0 check
+  entry: npx --yes @agentfile/cli@2.6.0 check
   language: system
   pass_filenames: false
   files: >-
@@ -39,7 +39,7 @@
 - id: agentfile-audit
   name: agentfile audit
   description: Security analysis of permission rules, hooks and MCP servers.
-  entry: npx --yes @agentfile/cli@2.5.0 audit
+  entry: npx --yes @agentfile/cli@2.6.0 audit
   args: [--strict]
   language: system
   pass_filenames: false
