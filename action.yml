@@ -15,7 +15,7 @@ author: Dennis Havermans
 
 branding:
   icon: check-circle
-  color: purple
+  color: blue
 
 inputs:
   command:
