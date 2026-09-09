@@ -9,6 +9,35 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.6.0] — 2026-09-09
+
+agentfile ships as a pre-commit hook. The repository has advertised
+`pre-commit` as a topic since the beginning and never carried the file that
+makes it work.
+
+### Added
+
+- `.pre-commit-hooks.yaml`, with two hooks. No single command covers both
+  halves, so `agentfile` runs the structural and resolution layers and
+  `agentfile-audit` runs the security layer over permission rules, hooks and
+  MCP servers. A repository that wants the permission analysis asks for it.
+- `agentfile-audit` passes `--strict`. Measured: `audit` exits 0 on warnings
+  and every permission finding is a warning, so without the flag the hook
+  reports success on a rule that grants arbitrary command execution. A hook
+  that cannot fail is worse than no hook. The flag sits in `args` so a consumer
+  can override it.
+- A test tying the hook's pinned version and the README's `rev` to the CLI's
+  own version, so a release that forgets either fails the build.
+
+### Fixed
+
+- The pre-commit configuration documented in 2.5.0 could not work. The README
+  told consumers to pin `rev: v2.5.0`, and that tag predates
+  `.pre-commit-hooks.yaml`, so pre-commit failed with `InvalidManifestError`.
+  This release is the first tag that carries the file, and the new test is what
+  stops the same drift happening again.
+
+
 ## [2.5.0] — 2026-09-07
 
 A false positive that fired on almost everyone, found by running the tool
