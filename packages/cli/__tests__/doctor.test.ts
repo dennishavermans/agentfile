@@ -211,6 +211,49 @@ describe("doctor command", () => {
     expect(text).toContain("No agent configuration found");
   });
 
+  // doctor is the command the README leads with. Selecting layers by hand is
+  // how it came to print "No problems found" over findings its sibling
+  // commands reported, so the layers it runs are pinned by test.
+  it("reports a permission risk, which lives in the security layer", async () => {
+    write(".claude/settings.json", JSON.stringify({ permissions: { allow: ["Bash(git * main)"] } }));
+
+    const output = captureOutput();
+    await doctorCommand({ root: TEST_DIR });
+    const text = output.text();
+    output.restore();
+
+    expect(text).toContain("AGF506");
+    expect(text).not.toContain("No problems found");
+  });
+
+  it("reports a broken skill reference alongside a permission risk", async () => {
+    write(".claude/settings.json", JSON.stringify({ permissions: { allow: ["Bash(git * main)"] } }));
+    write(
+      ".claude/skills/demo/SKILL.md",
+      "---\nname: demo\ndescription: A demo skill used to exercise reference checking.\n---\nSee [ref](reference.md).\n",
+    );
+
+    const output = captureOutput();
+    await doctorCommand({ root: TEST_DIR });
+    const text = output.text();
+    output.restore();
+
+    // One command, both layers: the resolution finding and the security one.
+    expect(text).toContain("AGF004");
+    expect(text).toContain("AGF506");
+  });
+
+  it("still says so when nothing matched", async () => {
+    write(".claude/settings.json", JSON.stringify({ permissions: { allow: ["Bash(node --version)"] } }));
+
+    const output = captureOutput();
+    await doctorCommand({ root: TEST_DIR });
+    const text = output.text();
+    output.restore();
+
+    expect(text).toContain("No problems found");
+  });
+
   it("changes nothing on disk", async () => {
     write("AGENTS.md", "- Use pnpm as the package manager\n");
 
