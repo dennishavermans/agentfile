@@ -9,6 +9,46 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.7.0] — 2026-09-09
+
+`doctor` tells the truth about what it found.
+
+### Fixed
+
+- `doctor` ran a hand-picked subset of the analysis, so on a repository with a
+  broken skill reference and two wildcard permission rules it printed
+  "No problems found" while `check`, `lint` and `audit` reported four findings
+  between them. It is the command the README leads with and the one the
+  empty-state message recommends, and the affirmative all-clear also
+  contradicted this project's rule that a clean result says no pattern matched,
+  never that the configuration is safe. It now runs every implemented layer.
+- Suppressions and configured severity now apply to `doctor`. Going through
+  `runValidation` rather than calling analyses directly means an
+  `agentfile-disable` directive and a configured severity are honoured here as
+  they already were everywhere else. They were not before.
+
+### Changed
+
+- `doctor` is the full analysis and the narrower verbs are subsets of it:
+  `check` for the fast structural pass, `lint` for quality, `audit` for
+  security alone. This is the shape the comparable tools settled on. Biome,
+  which this repository already uses, gives its security rules a default
+  severity of error and runs them inside the default `biome check`, keeping
+  `lint` and `format` beside it. The `audit` verb elsewhere means dependency
+  CVE scanning, a different data source, and the `doctor` verb elsewhere means
+  environment health.
+- A stock `~/.claude` will now show findings that were previously hidden,
+  including unpinned MCP server packages in third-party plugins the user did
+  not write. Those servers do load and they are unpinned, so the findings are
+  accurate.
+
+### Note
+
+The layer split was justified by a pre-commit time budget. Measured on
+`~/.claude`, 2107 files, `check` and `audit` both run in 0.14s, because the
+filesystem walk dominates.
+
+
 ## [2.6.0] — 2026-09-09
 
 agentfile ships as a pre-commit hook. The repository has advertised

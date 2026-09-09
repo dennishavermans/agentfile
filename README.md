@@ -409,7 +409,7 @@ For the repositories that already run [pre-commit](https://pre-commit.com):
 ```yaml
 repos:
   - repo: https://github.com/dennishavermans/agentfile
-    rev: v2.6.0
+    rev: v2.7.0
     hooks:
       - id: agentfile
       - id: agentfile-audit
