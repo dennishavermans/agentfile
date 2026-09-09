@@ -1,0 +1,17 @@
+{
+  "description": "Runs agentfile after an edit to agent configuration, and reports what it finds.",
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/after_config_edit.py\"",
+            "timeout": 20
+          }
+        ]
+      }
+    ]
+  }
+}

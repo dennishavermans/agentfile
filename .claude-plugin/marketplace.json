@@ -1,0 +1,18 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "agentfile",
+  "description": "Static analysis for the AI agent configuration a repository already has.",
+  "owner": {
+    "name": "Dennis Havermans",
+    "url": "https://github.com/dennishavermans"
+  },
+  "plugins": [
+    {
+      "name": "agentfile",
+      "description": "Catches agent configuration that grants more than it appears to: permission rules whose wildcards reach further than they read, broken skill references, and MCP servers that will silently fail to load. Reports after an edit; never blocks one.",
+      "category": "productivity",
+      "source": "./plugin",
+      "homepage": "https://github.com/dennishavermans/agentfile"
+    }
+  ]
+}
