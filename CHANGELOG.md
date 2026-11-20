@@ -34,6 +34,17 @@ own reference.
 
 ### Fixed
 
+- AGF506 said a `defaultMode: "bypassPermissions"` in `.claude/settings.json`
+  "starts every session in bypassPermissions mode", at error severity. Claude
+  Code 2.1.257 changed that setting in project and local files "to be ignored,
+  like `auto`". Measured on 2.1.322 in a trusted workspace, twice: with the mode
+  in either file the session started in `default` mode and a command needing
+  approval was not run, while an allow rule in the same project file was
+  honoured. A first attempt in an untrusted workspace proved nothing, because
+  `claude -p` ignores every project permission setting there. The finding now
+  says the line is ignored by current Claude Code and live only on older
+  clients, at AGF506's own warning severity, and points at
+  `--permission-mode bypassPermissions`, which was measured to take effect.
 - `validate --format sarif` wrote the "agentfile validate" title, and with a
   contract present its success lines, to stdout ahead of the JSON, so the file
   the GitHub Action uploads did not parse. The action lists `validate` as one of

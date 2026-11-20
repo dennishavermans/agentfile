@@ -535,11 +535,14 @@ not:
 * **Exec wrappers are not auto-approved by a prefix rule.** `Bash(watch *)`,
   `Bash(setsid *)`, `Bash(ionice *)`, `Bash(flock *)`, and `Bash(find *)` with
   `-exec` or `-delete` still prompt.
-* **`permissions.defaultMode: "bypassPermissions"` in a committed file** (error).
-  Claude Code's own documentation says to use that mode only in isolated
-  environments like containers or VMs where it cannot cause damage. In a
-  committed file it applies to everyone on the project, including anyone who has
-  not read the line.
+* **`permissions.defaultMode: "bypassPermissions"` in a project or local
+  settings file.** Claude Code 2.1.257 and later ignore it there; its changelog
+  says to "set it in user or managed settings, or pass `--permission-mode`".
+  Measured on 2.1.322 in a trusted workspace: the session started in default
+  mode and a command needing approval did not run, while an allow rule in the
+  same file was honoured. On an older client the line still starts every session
+  in a mode Claude Code reserves for isolated environments, so it is either dead
+  or dangerous depending on who runs it, and never what it appears to be.
 
 ---
 
