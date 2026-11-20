@@ -62,6 +62,47 @@ describe("buildSarif", () => {
     expect(location[0].physicalLocation.region?.startLine).toBe(3);
   });
 
+  it("starts a finding about a whole file on its first line, since GitHub requires a startLine", () => {
+    const built = log([diagnostic({ code: "AGF302", message: "d", location: { file: "AGENTS.md" } })]);
+    const location = built.runs[0].results[0].locations as Array<{
+      physicalLocation: { region?: { startLine: number } };
+    }>;
+    expect(location[0].physicalLocation.region).toEqual({ startLine: 1 });
+  });
+
+  it("uses only GitHub's problem.severity vocabulary", () => {
+    const values = new Set(
+      log([]).runs[0].tool.driver.rules.map((rule) => (rule.properties as Record<string, unknown>)["problem.severity"]),
+    );
+    for (const value of values) expect(["error", "warning", "recommendation"]).toContain(value);
+    expect(values.has("recommendation")).toBe(true);
+  });
+
+  it("gives every rule the description and help text GitHub marks required", () => {
+    for (const rule of log([]).runs[0].tool.driver.rules) {
+      const fields = rule as { fullDescription?: { text: string }; help?: { text: string; markdown: string } };
+      expect(fields.fullDescription?.text.length).toBeGreaterThan(0);
+      expect(fields.fullDescription?.text.length).toBeLessThanOrEqual(1024);
+      expect(fields.help?.text).toContain(String(rule.helpUri));
+      expect(fields.help?.markdown).toContain(String(rule.helpUri));
+    }
+  });
+
+  it("rates the security band, and only it, so those results become security alerts", () => {
+    for (const rule of log([]).runs[0].tool.driver.rules) {
+      const properties = rule.properties as Record<string, unknown>;
+      const rating = properties["security-severity"];
+      if (properties.band === "security") {
+        expect(properties.tags).toContain("security");
+        // GitHub's buckets: 7.0-8.9 high, 4.0-6.9 medium, 0.1-3.9 low; nothing claims critical.
+        expect(Number(rating)).toBeGreaterThanOrEqual(0.1);
+        expect(Number(rating)).toBeLessThan(9);
+      } else {
+        expect(rating).toBeUndefined();
+      }
+    }
+  });
+
   it("still produces a location for a finding that has none", () => {
     const built = log([diagnostic({ code: "AGF002", message: "nothing found" })]);
     const location = built.runs[0].results[0].locations as Array<{
@@ -72,6 +113,7 @@ describe("buildSarif", () => {
     // configuration as a whole is attached to the repository root.
     expect(location).toHaveLength(1);
     expect(location[0].physicalLocation.artifactLocation.uri).toBe(".");
+    expect((location[0].physicalLocation as { region?: unknown }).region).toBeUndefined();
   });
 
   it("carries related locations", () => {
@@ -99,7 +141,7 @@ describe("buildSarif", () => {
     expect(text).toContain("Suggested fix: do this");
   });
 
-  it("fingerprints a finding without its line, so an edit above it does not reopen the alert", () => {
+  it("fingerprints a finding without its line, so moving it down the file keeps its identity", () => {
     const at = (line: number) =>
       log([diagnostic({ code: "AGF302", message: "d", location: { file: "AGENTS.md", line } })]).runs[0].results[0]
         .partialFingerprints as { agentfileDiagnostic: string };

@@ -125,3 +125,37 @@ jobs:
         with:
           sarif_file: ${{ steps.agentfile.outputs.sarif-file }}
           category: agentfile-check
+
+  branch:
+    name: SARIF from this branch's build
+    # `self` runs the published CLI, because that is what a user gets. This runs
+    # the code under review, so a change to the SARIF output is proven against
+    # GitHub's own ingestion before it ships rather than after.
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+
+      - name: Every SARIF command writes a log that parses
+        run: |
+          set -euo pipefail
+          for command in check validate lint audit; do
+            code=0
+            node packages/cli/dist/bin.js "$command" --format sarif > "$command.sarif" || code=$?
+            if [ "$code" -gt 1 ]; then echo "::error::$command could not run (exit $code)"; exit 1; fi
+            node -e 'JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf-8"))' "$command.sarif" \
+              || { echo "::error::$command --format sarif did not write valid JSON"; exit 1; }
+          done
+
+      - uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: validate.sarif
+          category: agentfile-branch

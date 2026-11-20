@@ -228,10 +228,13 @@ export function contextBudgetDiagnostics(
     const file = instruction.provenance.file;
     byFile.set(file, (byFile.get(file) ?? 0) + instruction.body.length);
   }
-  const largest = [...byFile]
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, LISTED_FILES)
-    .map(([file, characters]) => `  ${file} — roughly ${Math.round(characters / CHARACTERS_PER_TOKEN)} tokens`);
+  const ranked = [...byFile].sort((a, b) => b[1] - a[1]).slice(0, LISTED_FILES);
+  const largest = ranked.map(
+    ([file, characters]) => `  ${file} — roughly ${Math.round(characters / CHARACTERS_PER_TOKEN)} tokens`,
+  );
+  // Anchored on the largest contributor, the file most worth cutting, so the
+  // finding lands somewhere an editor and code scanning can show it.
+  const [first, ...rest] = ranked.map(([file]) => file);
 
   return [
     diagnostic({
@@ -249,6 +252,12 @@ export function contextBudgetDiagnostics(
       ].join("\n"),
       suggestion:
         "Move the parts that only matter for specific work into path-scoped rules or skills, so they load when they are relevant instead of always.",
+      ...(first
+        ? {
+            location: { file: first },
+            related: rest.map((file) => ({ location: { file }, message: "also loads in every session" })),
+          }
+        : {}),
       data: {
         estimatedTokens,
         budgetTokens: budget,

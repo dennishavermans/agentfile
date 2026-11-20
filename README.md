@@ -453,7 +453,7 @@ version of this; by hand it is:
     sarif_file: agentfile.sarif
 ```
 
-Findings then appear as annotations on the pull request that introduced them instead of in a job log. Every code is declared with a documentation link, and findings are fingerprinted without their line number, so editing a file above a finding does not close the alert and open an identical new one.
+Findings then appear as annotations on the pull request that introduced them instead of in a job log. Every code is declared with a documentation link. Security findings (`AGF5xx`) carry a `security-severity`, so code scanning lists them as security alerts and a ruleset's "Require code scanning results" protection can gate a merge on them. agentfile rates them high or medium from the code's default severity, never critical: it reads configuration and never runs it, so it cannot know a finding is exploitable.
 
 `--max-warnings <n>` is the ratchet for working a warning count down: it fails the run when warnings exceed the ceiling, without `--strict`'s claim that every warning is an error.
 
