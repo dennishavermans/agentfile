@@ -57,8 +57,13 @@ Consumers should ignore fields they do not recognise.
 
 `--format sarif` emits SARIF 2.1.0. The tool name is `agentfile`, rule ids are
 diagnostic codes, and results carry `partialFingerprints.agentfileDiagnostic`.
-The fingerprint deliberately excludes the line number, so a finding that moves
-because something was inserted above it stays the same alert.
+
+The fingerprint excludes the line number, so a finding that moves down a file
+keeps it. It includes the message, and message wording is not stable, so the
+fingerprint is stable within a release and may change between releases. GitHub
+code scanning does not use it: its SARIF reference says "Code scanning only uses
+the `primaryLocationLineHash`", which the upload-sarif action computes from the
+source line.
 
 ### The intermediate representation
 

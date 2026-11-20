@@ -463,6 +463,16 @@ describe("contextBudgetDiagnostics", () => {
     expect(contextBudgetDiagnostics(configurationOfSize(400), { budgetTokens: 10_000 })).toEqual([]);
   });
 
+  it("anchors on the largest contributor and relates the rest, so it lands on a file", () => {
+    const configuration = emptyConfiguration(ROOT);
+    configuration.instructions.push(instruction("small.md", "x".repeat(200)));
+    configuration.instructions.push(instruction("huge.md", "x".repeat(40_000)));
+    const [found] = contextBudgetDiagnostics(configuration, { budgetTokens: 10 });
+
+    expect(found.location).toEqual({ file: "huge.md" });
+    expect(found.related?.map((item) => item.location.file)).toEqual(["small.md"]);
+  });
+
   it("names the largest contributors, since a total alone is not actionable", () => {
     const configuration = emptyConfiguration(ROOT);
     configuration.instructions.push(instruction("small.md", "x".repeat(200)));

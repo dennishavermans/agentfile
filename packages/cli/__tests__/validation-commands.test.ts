@@ -276,6 +276,34 @@ describe("validation commands", () => {
       expect(exitCodes).toEqual([1]);
     });
 
+    it("writes nothing but SARIF under --format sarif, so the file the action uploads parses", async () => {
+      // A valid contract too: its success lines used to go to stdout as well.
+      write("ai/contract.yaml", CONTRACT);
+      write("AGENTS.md", "- Use pnpm as the package manager, never npm\n");
+      write("CLAUDE.md", "- Use pnpm as the package manager, never npm\n");
+
+      const output = captureOutput();
+      await validateCommand({ root: TEST_DIR, format: "sarif" });
+      const text = output.text();
+      output.restore();
+
+      const log = JSON.parse(text) as { runs: Array<{ results: Array<{ ruleId: string }> }> };
+      expect(log.runs[0].results.map((result) => result.ruleId)).toContain("AGF302");
+    });
+
+    it("reports an invalid contract as a SARIF finding rather than an empty file", async () => {
+      write("ai/contract.yaml", 'version: 1\nproject:\n  name: ""\n  stack: []\n');
+
+      const output = captureOutput();
+      await validateCommand({ root: TEST_DIR, format: "sarif" });
+      const text = output.text();
+      output.restore();
+
+      const log = JSON.parse(text) as { runs: Array<{ results: Array<{ ruleId: string }> }> };
+      expect(log.runs[0].results.map((result) => result.ruleId)).toEqual(["AGF001"]);
+      expect(exitCodes).toEqual([1]);
+    });
+
     it("validates a repository that has no contract at all", async () => {
       write("AGENTS.md", "- Use pnpm as the package manager, never npm\n");
       write("CLAUDE.md", "- Use pnpm as the package manager, never npm\n");

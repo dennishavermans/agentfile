@@ -1024,39 +1024,63 @@ function shadowedAllow(configuration: AgentConfiguration): Diagnostic[] {
   return diagnostics;
 }
 
+/** Claude Code's changelog entry that stopped project and local files setting this mode. */
+const BYPASS_IGNORED_SINCE = "2.1.257";
+
 /**
- * AGF506 for `bypassPermissions` set in a committed file.
+ * AGF506 for `bypassPermissions` set in a project or local settings file.
  *
- * The vendor's own documentation carries a warning on this mode, and quoting it
- * is more persuasive than anything agentfile could add.
+ * Claude Code 2.1.257 changed `defaultMode: "bypassPermissions"` in
+ * `.claude/settings.json` and `.claude/settings.local.json` "to be ignored, like
+ * `auto`" (its changelog). Measured on 2.1.322 in a trusted workspace, twice:
+ * with the mode in either file the session started in `default` mode and a
+ * command that needs approval was not run, while an allow rule in the same
+ * project file was honoured, so the file was read. Passing
+ * `--permission-mode bypassPermissions` on the command line did take effect.
+ *
+ * Until this was measured the finding said the file "starts every session in
+ * bypassPermissions mode", at error severity. That is now true only of clients
+ * older than 2.1.257; on a current one the line is dead. Neither is what the
+ * file appears to say, which is the AGF506 definition, so it stays AGF506 at
+ * the code's own severity.
  */
 function bypassMode(configuration: AgentConfiguration): Diagnostic[] {
   return configuration.settings
     .filter((setting) => setting.key === "permissions.defaultMode" && setting.value === "bypassPermissions")
-    .map((setting) =>
-      diagnostic({
+    .map((setting) => {
+      const local = setting.provenance.scope === "local";
+      return diagnostic({
         code: "AGF506",
-        severity: "error",
-        message: `${setting.provenance.file} starts every session in bypassPermissions mode`,
+        message: `${setting.provenance.file} sets bypassPermissions, which current Claude Code ignores in this file`,
         explanation: [
-          "In this mode Claude Code skips permission prompts, including for writes to",
-          "protected paths such as `.git` and `.claude`. Claude Code's own documentation",
-          "says to use it only in isolated environments like containers or VMs where it",
-          "cannot cause damage.",
+          `Claude Code ${BYPASS_IGNORED_SINCE} and later ignore \`defaultMode: "bypassPermissions"\` in`,
+          ".claude/settings.json and .claude/settings.local.json. Measured on 2.1.322 in a",
+          "trusted workspace: the session started in default mode and a command that needs",
+          "approval was not run, while an allow rule in the same file was honoured.",
           "",
-          setting.provenance.scope === "local"
+          `So the line does nothing on a current client. On a client older than ${BYPASS_IGNORED_SINCE},`,
+          "its changelog implies it still starts every session in bypassPermissions mode,",
+          "which skips permission prompts and which Claude Code's documentation reserves for",
+          "isolated environments such as containers or VMs. Either way it does not do what",
+          "it appears to.",
+          "",
+          local
             ? "This file is personal and usually untracked, so it affects one machine."
-            : "This file is committed, so it applies to everyone on the project — including anyone who has not read this line.",
+            : "This file is committed, so each teammate's Claude Code version decides which of the two it is.",
           `\nPermission modes:\n  ${PERMISSIONS_DOC}#permission-modes`,
         ].join("\n"),
-        suggestion:
-          setting.provenance.scope === "local"
-            ? "Keep it only if this machine is a disposable environment."
-            : "Remove it from the committed file. If a container needs it, set it there instead.",
+        suggestion: local
+          ? "Remove it. On a disposable machine, pass `--permission-mode bypassPermissions` when starting Claude Code, which takes effect."
+          : "Remove it from the committed file. Where bypass is wanted, such as a disposable container, pass `--permission-mode bypassPermissions` there, which takes effect.",
         location: { file: setting.provenance.file, line: setting.provenance.line },
-        data: { setting: setting.key, value: setting.value, scope: setting.provenance.scope },
-      }),
-    );
+        data: {
+          setting: setting.key,
+          value: setting.value,
+          scope: setting.provenance.scope,
+          ignoredSince: BYPASS_IGNORED_SINCE,
+        },
+      });
+    });
 }
 
 /**

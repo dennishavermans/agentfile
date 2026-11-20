@@ -750,7 +750,10 @@ describe("auditPermissions", () => {
     expect(audit([rule("deny", "Bash(rm *)"), rule("allow", "Bash(git status)")])).toHaveLength(0);
   });
 
-  it("errors on bypassPermissions committed for the whole project", () => {
+  it("reports bypassPermissions in a project file as ignored by current Claude Code", () => {
+    // Measured on 2.1.322 in a trusted workspace: the session started in default
+    // mode and an approval-needing command did not run, while an allow rule in
+    // the same file was honoured. The changelog dates the change to 2.1.257.
     const findings = audit(
       [],
       [
@@ -762,8 +765,16 @@ describe("auditPermissions", () => {
       ],
     );
     expect(findings).toHaveLength(1);
-    expect(findings[0].severity).toBe("error");
+    expect(findings[0].code).toBe("AGF506");
+    expect(findings[0].severity).toBe("warning");
+    expect(findings[0].message).toBe(
+      ".claude/settings.json sets bypassPermissions, which current Claude Code ignores in this file",
+    );
+    expect(findings[0].message).not.toContain("starts every session");
+    expect(findings[0].explanation).toContain("2.1.257");
     expect(findings[0].explanation).toContain("committed");
+    expect(findings[0].suggestion).toContain("--permission-mode bypassPermissions");
+    expect(findings[0].data?.ignoredSince).toBe("2.1.257");
   });
 
   // ─── false positives found against real configurations ────────────────
@@ -1306,6 +1317,7 @@ describe("auditPermissions", () => {
       ],
     );
     expect(findings).toHaveLength(1);
+    expect(findings[0].message).toContain("settings.local.json sets bypassPermissions");
     expect(findings[0].explanation).toContain("one machine");
   });
 

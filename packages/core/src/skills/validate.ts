@@ -169,7 +169,7 @@ function checkDuplicateNames(skills: readonly SkillEntry[]): Diagnostic[] {
   for (const skill of skills) {
     const name = skill.name.trim();
     if (!name) continue;
-    const key = `${skill.provenance.platform} ${name}`;
+    const key = `${skill.provenance.platform}\u0000${name}`;
     const group = byName.get(key);
     if (group) group.push(skill);
     else byName.set(key, [skill]);
@@ -179,7 +179,7 @@ function checkDuplicateNames(skills: readonly SkillEntry[]): Diagnostic[] {
 
   for (const [key, group] of byName) {
     if (group.length < 2) continue;
-    const name = key.slice(key.indexOf(" ") + 1);
+    const name = key.slice(key.indexOf("\u0000") + 1);
 
     const [first, ...rest] = group;
     diagnostics.push(

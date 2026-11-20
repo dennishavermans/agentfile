@@ -18,6 +18,7 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import {
+  diagnostic,
   IMPLEMENTED_LAYERS,
   KNOWN_TARGETS,
   RULES,
@@ -36,6 +37,7 @@ import {
   printHeader,
   printJson,
   printSarif,
+  printSarifDiagnostics,
   printSuppressed,
   rejectFormat,
   resolveMaxWarnings,
@@ -152,17 +154,18 @@ export async function validateCommand(options: ValidateOptions = {}): Promise<vo
 
   const root = options.root ?? process.cwd();
   const json = format === "json";
+  // SARIF is machine output as much as JSON is: anything else on stdout lands
+  // in the file the GitHub Action uploads and makes it unparseable.
+  const machine = format !== "human";
 
-  if (!json) logger.title("agentfile validate");
+  if (!machine) logger.title("agentfile validate");
 
-  if (!validateContractFirst(root, json)) {
+  if (!validateContractFirst(root, machine)) {
+    const message = "ai/contract.yaml does not satisfy its schema";
     if (json) {
-      printJson({
-        root,
-        command: "validate",
-        contractValid: false,
-        message: "ai/contract.yaml does not satisfy its schema",
-      });
+      printJson({ root, command: "validate", contractValid: false, message });
+    } else if (format === "sarif") {
+      printSarifDiagnostics([diagnostic({ code: "AGF001", message, location: { file: "ai/contract.yaml" } })]);
     }
     process.exit(1);
     return;

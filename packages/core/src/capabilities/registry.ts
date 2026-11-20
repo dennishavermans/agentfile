@@ -125,10 +125,10 @@ const CLAUDE_SUBAGENTS = "https://code.claude.com/docs/en/sub-agents";
 const CLAUDE_MCP = "https://code.claude.com/docs/en/mcp";
 const CLAUDE_HOOKS = "https://code.claude.com/docs/en/hooks";
 const COPILOT_INSTRUCTIONS =
-  "https://docs.github.com/en/copilot/how-tos/configure-custom-instructions/add-repository-instructions";
-const COPILOT_SKILLS = "https://docs.github.com/en/copilot/concepts/agents/about-agent-skills";
-const CURSOR_RULES = "https://cursor.com/docs/context/rules";
-const CURSOR_SKILLS = "https://cursor.com/docs/context/skills";
+  "https://docs.github.com/en/copilot/how-tos/copilot-on-github/customize-copilot/add-custom-instructions/add-repository-instructions";
+const COPILOT_SKILLS = "https://docs.github.com/en/copilot/concepts/customizations/agent-skills";
+const CURSOR_RULES = "https://cursor.com/docs/rules";
+const CURSOR_SKILLS = "https://cursor.com/docs/skills";
 const AGENTS_MD = "https://agents.md/";
 
 export const CAPABILITIES: readonly CapabilityRow[] = [
@@ -164,8 +164,8 @@ export const CAPABILITIES: readonly CapabilityRow[] = [
   {
     target: "claude",
     feature: "instructions.agents-md",
-    level: "emulated",
-    note: "Claude Code reads CLAUDE.md, not AGENTS.md. The documented bridge is a CLAUDE.md containing an @AGENTS.md import, or a symlink.",
+    level: "supported",
+    note: "Read natively since Claude Code 2.1.277, but only when no CLAUDE.md, .claude/CLAUDE.md or CLAUDE.local.md exists; with one present, AGENTS.md is read only through an @AGENTS.md import or a symlink. Measured on 2.1.322.",
     source: CLAUDE_MEMORY,
   },
   {
@@ -288,7 +288,7 @@ export const CAPABILITIES: readonly CapabilityRow[] = [
     target: "cursor",
     feature: "instructions.nested",
     level: "supported",
-    note: "Nested .cursor/rules directories and nested AGENTS.md; more specific instructions take precedence.",
+    note: "Nested AGENTS.md, combined with parent directories, the more specific taking precedence; nested .cursor/rules directories are discovered too, with no documented precedence between them.",
     source: CURSOR_RULES,
   },
   {

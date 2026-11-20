@@ -66,8 +66,11 @@ describe("capability lookup", () => {
     expect(capability("agents-md", "instructions.path-scoped").level).toBe("unsupported");
   });
 
-  it("records that Claude Code reads AGENTS.md only through a bridge", () => {
-    expect(capability("claude", "instructions.agents-md").level).toBe("emulated");
+  it("records that Claude Code reads AGENTS.md natively, and when it does not", () => {
+    // Measured on 2.1.322; the CLAUDE.md-shadowing case is its own finding.
+    const row = capability("claude", "instructions.agents-md");
+    expect(row.level).toBe("supported");
+    expect(row.note).toContain("only when no CLAUDE.md");
   });
 
   it("records that Copilot path-scoped instructions reach only some surfaces", () => {
@@ -76,7 +79,7 @@ describe("capability lookup", () => {
 
   it("treats only a verified native implementation as supported", () => {
     expect(supports("cursor", "instructions.path-scoped")).toBe(true);
-    expect(supports("claude", "instructions.agents-md")).toBe(false);
+    expect(supports("claude", "instructions.agents-md")).toBe(true);
     expect(supports("agents-md", "skills")).toBe(false);
   });
 
@@ -104,13 +107,6 @@ describe("diagnoseCapability", () => {
     expect(found?.severity).toBe("error");
     expect(found?.message).toContain("does not support");
     expect(found?.location).toEqual(context.location);
-  });
-
-  it("raises AGF202 for an emulated feature", () => {
-    const found = diagnoseCapability("claude", "instructions.agents-md", context);
-    expect(found?.code).toBe("AGF202");
-    expect(found?.severity).toBe("warning");
-    expect(found?.message).toContain("emulated rather than native");
   });
 
   it("raises AGF202 for a degraded feature", () => {

@@ -402,35 +402,6 @@ the first one's alerts.
 
 ---
 
-## Claude Code plugin
-
-The configuration agentfile reads is configuration someone is editing in Claude
-Code, so the tool can speak up at the moment of the edit rather than waiting to
-be remembered:
-
-```bash
-claude plugin marketplace add dennishavermans/agentfile
-claude plugin install agentfile@agentfile
-```
-
-It installs two things.
-
-A **skill** covering the permission-matching behaviour that makes a rule grant
-more than it reads, so an agent writing `Bash(git * main)` knows what it is
-approving before the rule exists.
-
-A **hook** on `PostToolUse` that runs the analysis after an edit to
-`CLAUDE.md`, `AGENTS.md`, `.mcp.json`, `.claude/` or `.cursor/`, and reports
-only the findings in the file that changed. It informs and never blocks: a hook
-that refuses a write on a warning gets uninstalled the same day, and a finding
-is advice rather than a verdict. Every failure path exits 0, so a missing
-binary cannot wedge an edit.
-
-The hook prefers an `agentfile` on `PATH` and falls back to `npx`, so it works
-offline once the CLI is installed.
-
----
-
 ## pre-commit
 
 For the repositories that already run [pre-commit](https://pre-commit.com):
@@ -482,7 +453,7 @@ version of this; by hand it is:
     sarif_file: agentfile.sarif
 ```
 
-Findings then appear as annotations on the pull request that introduced them instead of in a job log. Every code is declared with a documentation link, and findings are fingerprinted without their line number, so editing a file above a finding does not close the alert and open an identical new one.
+Findings then appear as annotations on the pull request that introduced them instead of in a job log. Every code is declared with a documentation link. Security findings (`AGF5xx`) carry a `security-severity`, so code scanning lists them as security alerts and a ruleset's "Require code scanning results" protection can gate a merge on them. agentfile rates them high or medium from the code's default severity, never critical: it reads configuration and never runs it, so it cannot know a finding is exploitable.
 
 `--max-warnings <n>` is the ratchet for working a warning count down: it fails the run when warnings exceed the ceiling, without `--strict`'s claim that every warning is an error.
 
