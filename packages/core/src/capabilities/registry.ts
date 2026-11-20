@@ -125,10 +125,10 @@ const CLAUDE_SUBAGENTS = "https://code.claude.com/docs/en/sub-agents";
 const CLAUDE_MCP = "https://code.claude.com/docs/en/mcp";
 const CLAUDE_HOOKS = "https://code.claude.com/docs/en/hooks";
 const COPILOT_INSTRUCTIONS =
-  "https://docs.github.com/en/copilot/how-tos/configure-custom-instructions/add-repository-instructions";
-const COPILOT_SKILLS = "https://docs.github.com/en/copilot/concepts/agents/about-agent-skills";
-const CURSOR_RULES = "https://cursor.com/docs/context/rules";
-const CURSOR_SKILLS = "https://cursor.com/docs/context/skills";
+  "https://docs.github.com/en/copilot/how-tos/copilot-on-github/customize-copilot/add-custom-instructions/add-repository-instructions";
+const COPILOT_SKILLS = "https://docs.github.com/en/copilot/concepts/customizations/agent-skills";
+const CURSOR_RULES = "https://cursor.com/docs/rules";
+const CURSOR_SKILLS = "https://cursor.com/docs/skills";
 const AGENTS_MD = "https://agents.md/";
 
 export const CAPABILITIES: readonly CapabilityRow[] = [
@@ -288,7 +288,7 @@ export const CAPABILITIES: readonly CapabilityRow[] = [
     target: "cursor",
     feature: "instructions.nested",
     level: "supported",
-    note: "Nested .cursor/rules directories and nested AGENTS.md; more specific instructions take precedence.",
+    note: "Nested AGENTS.md, combined with parent directories, the more specific taking precedence; nested .cursor/rules directories are discovered too, with no documented precedence between them.",
     source: CURSOR_RULES,
   },
   {

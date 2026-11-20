@@ -319,13 +319,13 @@ Claude Code truncates `description` + `when_to_use` at **1,536 characters** in t
 listing. Non-spec keys are rejected by claude.ai uploads / the Skills API — a real
 portability constraint agentfile should report.
 
-### 5.4 Cursor — <https://cursor.com/docs/context/rules>
+### 5.4 Cursor — <https://cursor.com/docs/rules>
 `.cursor/rules/*.mdc`, version-controlled. Frontmatter: `description`, `globs`,
 `alwaysApply`. Four application modes: always / apply-intelligently (by description) /
 auto-attach (by glob) / manual (`@`-mention). Nested `.cursor/rules` supported;
 `AGENTS.md` supported as a metadata-free alternative, root and nested.
 
-### 5.5 GitHub Copilot — <https://docs.github.com/en/copilot/how-tos/configure-custom-instructions/add-repository-instructions>
+### 5.5 GitHub Copilot — <https://docs.github.com/en/copilot/how-tos/copilot-on-github/customize-copilot/add-custom-instructions/add-repository-instructions>
 Three kinds: repo-wide `.github/copilot-instructions.md`; path-specific
 `.github/instructions/NAME.instructions.md` with **`applyTo`** frontmatter (comma-separated
 globs, optional `excludeAgent`); and `AGENTS.md` anywhere (nearest wins), with
@@ -1272,7 +1272,7 @@ typecheck clean. `docs/evals.md` documents the format.
 - <https://code.claude.com/docs/en/sub-agents>
 - <https://code.claude.com/docs/en/mcp>
 - <https://agentskills.io/> and <https://agentskills.io/specification>
-- <https://cursor.com/docs/context/rules>
-- <https://docs.github.com/en/copilot/how-tos/configure-custom-instructions/add-repository-instructions>
+- <https://cursor.com/docs/rules>
+- <https://docs.github.com/en/copilot/how-tos/copilot-on-github/customize-copilot/add-custom-instructions/add-repository-instructions>
 - <https://eslint.org/docs/latest/use/configure/configuration-files>
 - <https://eslint.org/docs/latest/extend/custom-rules>

@@ -9,6 +9,77 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+Claude Code moved under agentfile between 2.1.238 and 2.1.322. This release
+catches up with what was measured, and fixes the SARIF output against GitHub's
+own reference.
+
+### Changed
+
+- Claude Code reads AGENTS.md natively, so `instructions.agents-md` is now
+  `supported` for the `claude` target, and AGF202 no longer reports every
+  AGENTS.md as "emulated rather than native". It reports the case that is
+  still true instead: a root `AGENTS.md` or `.claude/AGENTS.md` that Claude Code
+  skips because a `CLAUDE.md`, `.claude/CLAUDE.md` or `CLAUDE.local.md` takes
+  its place. Measured on Claude Code 2.1.322 with a codeword in each file and
+  only the Write tool available, so a codeword could come from loaded context
+  and nowhere else, across nine arms, twice for the first six: AGENTS.md alone
+  is read; each of the three memory files suppresses it; `CLAUDE.md`
+  suppresses `.claude/AGENTS.md`; an `@AGENTS.md` import or a symlink brings it
+  back. A memory file that `agentfile compile` generated is not reported,
+  since it carries the same rules. Nested AGENTS.md files are not judged,
+  because their loading was not measured.
+- AGF401 now points at the largest always-loaded file and relates the next
+  largest, instead of carrying no location, so an editor and code scanning can
+  show it.
+
+### Fixed
+
+- `validate --format sarif` wrote the "agentfile validate" title, and with a
+  contract present its success lines, to stdout ahead of the JSON, so the file
+  the GitHub Action uploads did not parse. The action lists `validate` as one of
+  its four SARIF commands; `check`, `lint` and `audit` were not affected.
+  Measured against the published 2.7.0 before fixing. An invalid
+  `ai/contract.yaml` under `--format sarif` now produces an AGF001 result
+  instead of an empty file.
+- SARIF `problem.severity` used SARIF's `note` for info-level rules. GitHub's
+  vocabulary for that property is `error`, `warning` or `recommendation`, so
+  info-level rules now say `recommendation`. The result `level` is unchanged.
+- SARIF rules now carry `fullDescription` and `help` (text and markdown, linking
+  to the code's section of docs/diagnostics.md), which GitHub's SARIF reference
+  marks required.
+- Security rules (`AGF5xx`) now carry `security-severity` and a `security` tag,
+  so code scanning treats their results as security alerts and a ruleset can
+  gate a merge on them. Ratings come from the default severity: error is 7.5
+  (high), warning 5.0 (medium). Nothing is rated critical, because agentfile
+  never runs what it reads and cannot know a finding is exploitable. If you
+  already upload agentfile results, existing `AGF5xx` alerts are reclassified
+  as security alerts on the next upload.
+- A finding about a whole file now starts on line 1 in SARIF. GitHub marks
+  `region.startLine` required, and those results previously had no region.
+- The SARIF header, docs/stability.md and the README said the
+  `agentfileDiagnostic` fingerprint keeps a GitHub alert open when a finding
+  moves. GitHub's SARIF reference says "Code scanning only uses the
+  `primaryLocationLineHash`", which upload-sarif computes itself, so that
+  claim is withdrawn. The fingerprint is unchanged, and docs/stability.md now
+  says it is stable within a release, not across releases, because it includes
+  the message.
+- Three source files carried literal NUL bytes as hash separators, so git
+  treated them as binary and their diffs read "Binary files differ". They are
+  now `\u0000` escapes; the strings are identical and so are the fingerprints,
+  compared byte for byte against the previous build.
+- Four documentation links redirected: Cursor's rules and skills pages, and
+  GitHub's Copilot skills and repository-instructions pages. They now point at
+  the current addresses. Every other URL in the source returns 200.
+- The Cursor capability note claimed nested `.cursor/rules` directories take
+  precedence by specificity. Cursor documents that for nested AGENTS.md only;
+  the note now says so.
+
+### Removed
+
+- The Claude Code plugin and the repository-root marketplace manifest. It never
+  shipped in a release. If you added the marketplace from the default branch,
+  remove it with `claude plugin marketplace remove agentfile`.
+
 ## [2.7.0] — 2026-09-09
 
 `doctor` tells the truth about what it found.
