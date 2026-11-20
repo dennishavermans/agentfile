@@ -194,6 +194,15 @@ The target supports the feature, but not natively (`emulated`) or not on every
 surface (`degraded`). The behaviour is reachable; it is just narrower than
 elsewhere.
 
+With `claude` as a target it also reports a root `AGENTS.md` or
+`.claude/AGENTS.md` that Claude Code does not read because a `CLAUDE.md`,
+`.claude/CLAUDE.md` or `CLAUDE.local.md` takes its place. Claude Code reads
+AGENTS.md natively only when none of those exists. Measured on Claude Code
+2.1.322: each of the three suppressed a root `AGENTS.md`, and an `@AGENTS.md`
+import or a symlink brought it back. A memory file that imports or links to the
+AGENTS.md, or that `agentfile compile` generated, is not reported. Nested
+AGENTS.md files are not judged, because their loading was not measured.
+
 ### `AGF203` unknown-target-feature · info · active
 Nobody has verified this target's behaviour for this feature against the
 target's documentation. Agentfile reports the gap rather than assuming either

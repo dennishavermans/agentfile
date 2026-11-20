@@ -164,8 +164,8 @@ export const CAPABILITIES: readonly CapabilityRow[] = [
   {
     target: "claude",
     feature: "instructions.agents-md",
-    level: "emulated",
-    note: "Claude Code reads CLAUDE.md, not AGENTS.md. The documented bridge is a CLAUDE.md containing an @AGENTS.md import, or a symlink.",
+    level: "supported",
+    note: "Read natively since Claude Code 2.1.277, but only when no CLAUDE.md, .claude/CLAUDE.md or CLAUDE.local.md exists; with one present, AGENTS.md is read only through an @AGENTS.md import or a symlink. Measured on 2.1.322.",
     source: CLAUDE_MEMORY,
   },
   {

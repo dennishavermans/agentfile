@@ -150,7 +150,7 @@ Unverified combinations report as `unknown` rather than being guessed.
 import { capability, diagnoseCapability, supports } from '@agentfile/core'
 
 supports('cursor', 'instructions.path-scoped')      // true
-capability('claude', 'instructions.agents-md').level // 'emulated'
+capability('copilot', 'instructions.path-scoped').level // 'degraded'
 capability('agents-md', 'skills').level              // 'unsupported'
 
 // Report what a compilation would lose, instead of dropping it silently.

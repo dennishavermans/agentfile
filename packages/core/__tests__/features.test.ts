@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { compatibilityDiagnostics, featuresUsed, groupFeatureUsage } from "../src/capabilities/index.ts";
+import {
+  claudeShadowedAgentsMd,
+  compatibilityDiagnostics,
+  featuresUsed,
+  groupFeatureUsage,
+} from "../src/capabilities/index.ts";
 import {
   ALWAYS,
   appliesToDirectory,
@@ -158,14 +163,19 @@ describe("compatibilityDiagnostics", () => {
     expect(found.explanation).toContain("https://agents.md/");
   });
 
-  it("reports an emulated feature as a warning rather than an error", () => {
-    // Claude Code reads CLAUDE.md, not AGENTS.md; the bridge is documented.
-    const [found] = compatibilityDiagnostics(configuration(), ["claude"]).filter(
+  it("reports a root AGENTS.md that a CLAUDE.md shadows for Claude Code, as a warning", () => {
+    // Measured on Claude Code 2.1.322: with CLAUDE.md present, AGENTS.md is not read.
+    const found = compatibilityDiagnostics(configuration(), ["claude"]).filter(
       (item) => item.data?.feature === "instructions.agents-md",
     );
 
-    expect(found.code).toBe("AGF202");
-    expect(found.severity).toBe("warning");
+    expect(found).toHaveLength(1);
+    expect(found[0].code).toBe("AGF202");
+    expect(found[0].severity).toBe("warning");
+    expect(found[0].message).toBe("AGENTS.md is not read by Claude Code here: CLAUDE.md takes its place");
+    expect(found[0].location).toEqual({ file: "AGENTS.md" });
+    expect(found[0].related?.map((item) => item.location.file)).toEqual(["CLAUDE.md"]);
+    expect(found[0].suggestion).toContain("`@AGENTS.md`");
   });
 
   it("reports an unverified combination as info rather than guessing either answer", () => {
@@ -195,5 +205,88 @@ describe("compatibilityDiagnostics", () => {
       compatibilityDiagnostics(configuration(), ["agents-md", "cursor"]).map((item) => item.data?.target),
     );
     expect(targets).toEqual(new Set(["agents-md", "cursor"]));
+  });
+});
+
+describe("claudeShadowedAgentsMd", () => {
+  // Each case mirrors an arm measured on Claude Code 2.1.322: a codeword in
+  // each file, only the Write tool available, the codewords written to disk.
+  function memory(file: string, options: { imports?: string[]; realFile?: string; generated?: boolean } = {}) {
+    const source = {
+      ...provenance(file, "claude"),
+      ...(options.realFile ? { realFile: options.realFile } : {}),
+      ...(options.generated ? { origin: "generated" as const } : {}),
+    };
+    return {
+      id: nodeId("instruction", source),
+      title: file,
+      body: "Rules.",
+      applies: ALWAYS,
+      provenance: source,
+      ...(options.imports ? { imports: options.imports } : {}),
+    };
+  }
+
+  function agents(file = "AGENTS.md") {
+    const source = provenance(file, "agents-md");
+    return { id: nodeId("instruction", source), title: file, body: "Rules.", applies: ALWAYS, provenance: source };
+  }
+
+  function repo(...instructions: Array<ReturnType<typeof memory> | ReturnType<typeof agents>>) {
+    const config = emptyConfiguration("/repo");
+    config.instructions.push(...instructions);
+    return config;
+  }
+
+  it("reports nothing for AGENTS.md alone, which Claude Code reads natively", () => {
+    expect(claudeShadowedAgentsMd(repo(agents()))).toEqual([]);
+  });
+
+  it.each(["CLAUDE.md", ".claude/CLAUDE.md", "CLAUDE.local.md"])("reports AGENTS.md shadowed by %s", (file) => {
+    const [found] = claudeShadowedAgentsMd(repo(agents(), memory(file)));
+    expect(found.message).toBe(`AGENTS.md is not read by Claude Code here: ${file} takes its place`);
+  });
+
+  it("reports .claude/AGENTS.md shadowed by CLAUDE.md", () => {
+    const [found] = claudeShadowedAgentsMd(repo(agents(".claude/AGENTS.md"), memory("CLAUDE.md")));
+    expect(found.location).toEqual({ file: ".claude/AGENTS.md" });
+  });
+
+  it("names every shadowing file once", () => {
+    const [found] = claudeShadowedAgentsMd(repo(agents(), memory("CLAUDE.md"), memory("CLAUDE.local.md")));
+    expect(found.message).toBe(
+      "AGENTS.md is not read by Claude Code here: CLAUDE.md and CLAUDE.local.md take its place",
+    );
+  });
+
+  it("accepts an @AGENTS.md import as the bridge, resolved from the importing file", () => {
+    expect(claudeShadowedAgentsMd(repo(agents(), memory("CLAUDE.md", { imports: ["AGENTS.md"] })))).toEqual([]);
+    expect(claudeShadowedAgentsMd(repo(agents(), memory("CLAUDE.md", { imports: ["./AGENTS.md"] })))).toEqual([]);
+    expect(claudeShadowedAgentsMd(repo(agents(), memory(".claude/CLAUDE.md", { imports: ["../AGENTS.md"] })))).toEqual(
+      [],
+    );
+  });
+
+  it("does not accept an import that resolves somewhere else", () => {
+    // From .claude/CLAUDE.md, `@AGENTS.md` means .claude/AGENTS.md.
+    const found = claudeShadowedAgentsMd(repo(agents(), memory(".claude/CLAUDE.md", { imports: ["AGENTS.md"] })));
+    expect(found).toHaveLength(1);
+  });
+
+  it("accepts a CLAUDE.md symlinked to AGENTS.md as the bridge", () => {
+    expect(claudeShadowedAgentsMd(repo(agents(), memory("CLAUDE.md", { realFile: "AGENTS.md" })))).toEqual([]);
+  });
+
+  it("leaves a CLAUDE.md that agentfile generated alone, since it carries the same rules", () => {
+    expect(claudeShadowedAgentsMd(repo(agents(), memory("CLAUDE.md", { generated: true })))).toEqual([]);
+  });
+
+  it("does not judge nested AGENTS.md files, whose loading was not measured", () => {
+    expect(claudeShadowedAgentsMd(repo(agents("apps/web/AGENTS.md"), memory("CLAUDE.md")))).toEqual([]);
+  });
+
+  it("runs only for the claude target", () => {
+    const found = compatibilityDiagnostics(repo(agents(), memory("CLAUDE.md")), ["cursor", "codex"]);
+    expect(found.filter((item) => item.data?.level === "shadowed")).toEqual([]);
   });
 });
