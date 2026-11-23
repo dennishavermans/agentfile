@@ -7,7 +7,7 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
-## [Unreleased]
+## [2.8.0] — 2026-11-23
 
 Claude Code moved under agentfile between 2.1.238 and 2.1.322. This release
 catches up with what was measured, and fixes the SARIF output against GitHub's
