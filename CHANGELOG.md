@@ -7,6 +7,17 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [Unreleased]
+
+### Added
+
+- AGF303 reports a Cursor rule saved as `.md` in `.cursor/rules`, which Cursor
+  never loads, and names the `.mdc` file it should be. Measured on Cursor CLI
+  2026.11.22 with a codeword in an always-apply rule, twice per arm and with no
+  tool call in any run: the rule was followed both times as `.mdc`, and never
+  as `.md` with the same frontmatter or as plain Markdown. `README.md` and
+  `AGENTS.md` in that folder are not reported.
+
 ## [2.8.0] — 2026-11-23
 
 Claude Code moved under agentfile between 2.1.238 and 2.1.322. This release

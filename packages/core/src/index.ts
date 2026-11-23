@@ -422,6 +422,7 @@ export {
   explainInstruction,
   explainTarget,
   findExplainTargets,
+  ignoredRuleFileDiagnostics,
   normalizeDirectiveText,
   probePaths,
   repositoryResolutionDiagnostics,
