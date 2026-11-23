@@ -18,7 +18,11 @@ import {
   scopeMismatchDiagnostics,
 } from "../analysis/index.js";
 import { compatibilityDiagnostics, instructionSizeDiagnostics } from "../capabilities/index.js";
-import { repositoryResolutionDiagnostics, unreachableDiagnostics } from "../resolver/index.js";
+import {
+  ignoredRuleFileDiagnostics,
+  repositoryResolutionDiagnostics,
+  unreachableDiagnostics,
+} from "../resolver/index.js";
 import { auditHooks, auditInstructionText, auditMcpServers, auditPermissions } from "../security/index.js";
 import { analyzeSkillQuality, checkSkillReferences, inspectSkillResources, validateSkills } from "../skills/index.js";
 import type { Rule } from "./types.js";
@@ -55,19 +59,23 @@ const duplicateInstructions: Rule = {
 const unreachableConfiguration: Rule = {
   id: "unreachable-configuration",
   layer: "resolution",
-  description: "Glob-scoped configuration that no file in the repository matches",
+  description: "Configuration that never applies: globs no file matches, and rule files the platform does not load",
   emits: ["AGF303"],
   run: (context) => {
     if (!context.files.length) {
       return { diagnostics: [], skipped: "no file list was available to match patterns against" };
     }
     return {
-      diagnostics: unreachableDiagnostics(context.configuration, {
-        files: context.files,
-        root: context.root,
-        fs: context.fs,
-        truncated: context.scanTruncated,
-      }),
+      diagnostics: [
+        ...unreachableDiagnostics(context.configuration, {
+          files: context.files,
+          root: context.root,
+          fs: context.fs,
+          truncated: context.scanTruncated,
+        }),
+        // Not a glob, but the same outcome: a rule that is never loaded.
+        ...ignoredRuleFileDiagnostics(context.files),
+      ],
     };
   },
 };

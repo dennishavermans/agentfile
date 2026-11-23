@@ -291,6 +291,13 @@ uses. The scan skips generated and vendored directories, so a pattern aimed at
 `dist/` will appear here — the explanation says so rather than leaving the reader
 to guess.
 
+A Cursor rule saved as `.md` is reported here too, because the outcome is the
+same: Cursor's rules system loads `.mdc` files from `.cursor/rules` and skips a
+`.md` file there, frontmatter or not. Measured on Cursor CLI 2026.11.22 with a
+codeword in an always-apply rule and no tool call in any run: followed both times
+as `.mdc`, never as `.md`. `README.md` and `AGENTS.md` in that folder are not
+reported; one is documentation and the other was not measured.
+
 ### `AGF304` inconsistent-scope · warning · active
 The same instruction text is present in several files, but the configuration
 around it does not agree on when it applies — unconditional in `AGENTS.md`,

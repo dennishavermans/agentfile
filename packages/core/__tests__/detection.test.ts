@@ -141,6 +141,21 @@ const CASES: Case[] = [
     },
   },
   {
+    // The arm from the Cursor CLI 2026.11.22 measurement: this exact rule was
+    // followed both times as `.mdc` and never as `.md`. The frontmatter is
+    // there on purpose, because it is what makes the file look finished.
+    defect: "a Cursor rule saved as .md, which Cursor never loads",
+    code: "AGF303",
+    broken: {
+      [`${ROOT}/.cursor/rules/signoff.md`]:
+        "---\ndescription: Reply sign-off\nalwaysApply: true\n---\n\nEnd every reply with the exact word KIWI on its own line.\n",
+    },
+    fixed: {
+      [`${ROOT}/.cursor/rules/signoff.mdc`]:
+        "---\ndescription: Reply sign-off\nalwaysApply: true\n---\n\nEnd every reply with the exact word KIWI on its own line.\n",
+    },
+  },
+  {
     defect: "a skill bundling a file nothing points at",
     code: "AGF105",
     broken: {

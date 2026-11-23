@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ALWAYS, appliesToPaths, emptyConfiguration, nodeId } from "../src/ir/index.ts";
-import { deadPatterns, unreachableDiagnostics } from "../src/resolver/index.ts";
+import { deadPatterns, ignoredRuleFileDiagnostics, unreachableDiagnostics } from "../src/resolver/index.ts";
 
 function configurationWith(patterns: string[], file = ".claude/rules/api.md") {
   const configuration = emptyConfiguration("/repo");
@@ -109,5 +109,44 @@ describe("unreachableDiagnostics", () => {
     });
 
     expect(unreachableDiagnostics(configuration, { files: ["src/index.ts"] })).toHaveLength(1);
+  });
+});
+
+describe("ignoredRuleFileDiagnostics", () => {
+  it("reports a .md file in .cursor/rules and names the .mdc it should be", () => {
+    const [found] = ignoredRuleFileDiagnostics([".cursor/rules/align.md", "src/index.ts"]);
+
+    expect(found.code).toBe("AGF303");
+    expect(found.severity).toBe("warning");
+    expect(found.message).toBe(
+      'Cursor rule ".cursor/rules/align.md" never applies: Cursor loads only .mdc files from .cursor/rules',
+    );
+    expect(found.location).toEqual({ file: ".cursor/rules/align.md", line: 1 });
+    expect(found.suggestion).toContain("Rename it to .cursor/rules/align.mdc");
+  });
+
+  it("looks wherever discovery reads Cursor rules: nested rule directories and subfolders", () => {
+    const found = ignoredRuleFileDiagnostics([
+      "packages/api/.cursor/rules/style.md",
+      ".cursor/rules/frontend/react.md",
+    ]);
+
+    expect(found.map((item) => item.location?.file)).toEqual([
+      "packages/api/.cursor/rules/style.md",
+      ".cursor/rules/frontend/react.md",
+    ]);
+  });
+
+  it("leaves .mdc rules, README.md, AGENTS.md and Markdown elsewhere alone", () => {
+    expect(
+      ignoredRuleFileDiagnostics([
+        ".cursor/rules/align.mdc",
+        ".cursor/rules/README.md",
+        ".cursor/rules/AGENTS.md",
+        ".cursor/notes.md",
+        ".claude/rules/api.md",
+        "docs/cursor/rules/guide.md",
+      ]),
+    ).toEqual([]);
   });
 });

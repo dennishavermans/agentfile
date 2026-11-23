@@ -179,3 +179,50 @@ export function unreachableDiagnostics(configuration: AgentConfiguration, option
 
   return diagnostics;
 }
+
+/**
+ * Rule files Cursor never loads.
+ *
+ * Cursor's rules system reads `.mdc` files from `.cursor/rules` and skips a
+ * `.md` file there, with or without frontmatter. Nothing reports it, so a rule
+ * saved under the wrong extension looks configured and does nothing.
+ *
+ * Measured on Cursor CLI 2026.11.22 with a codeword in an always-apply rule,
+ * twice per arm, and no tool call in any run, so a codeword could only come
+ * from loaded context: followed both times as `.mdc`, never as `.md` with the
+ * same frontmatter, never as plain Markdown. Cursor's rules documentation says
+ * the same.
+ *
+ * `README.md` and `AGENTS.md` are left alone. A README in the rules folder is
+ * documentation nobody expects to load, and an `AGENTS.md` is a different kind
+ * of file whose loading from that folder was not measured.
+ */
+const CURSOR_RULES_DIRECTORY = ".cursor/rules";
+const NOT_A_RULE = new Set(["readme.md", "agents.md"]);
+
+/** AGF303 findings for `.md` files in a `.cursor/rules` directory. */
+export function ignoredRuleFileDiagnostics(files: readonly string[]): Diagnostic[] {
+  return files
+    .filter(
+      (file) =>
+        file.endsWith(".md") &&
+        (file.startsWith(`${CURSOR_RULES_DIRECTORY}/`) || file.includes(`/${CURSOR_RULES_DIRECTORY}/`)) &&
+        !NOT_A_RULE.has(file.slice(file.lastIndexOf("/") + 1).toLowerCase()),
+    )
+    .map((file) => {
+      const renamed = `${file.slice(0, -".md".length)}.mdc`;
+      return diagnostic({
+        code: "AGF303",
+        message: `Cursor rule "${file}" never applies: Cursor loads only .mdc files from .cursor/rules`,
+        explanation:
+          "Cursor's rules system reads `.mdc` files in `.cursor/rules` and skips a `.md` file there, " +
+          "frontmatter or not, so this rule never reaches the agent and nothing says so. Measured on " +
+          "Cursor CLI 2026.11.22: an always-apply rule was followed every time as `.mdc` and never as `.md`.",
+        suggestion:
+          `Rename it to ${renamed}. Cursor then reads its frontmatter, and without alwaysApply, globs ` +
+          "or description the rule is manual-only. For plain Markdown guidance, use AGENTS.md instead.",
+        location: { file, line: 1 },
+        data: { kind: "Cursor rule", label: file, reason: "extension" },
+      });
+    });
+}
