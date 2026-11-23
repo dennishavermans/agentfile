@@ -7,7 +7,10 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
-## [Unreleased]
+## [2.9.0] — 2026-11-23
+
+A Cursor rule saved under the wrong extension looks configured and does
+nothing. This release reports it.
 
 ### Added
 
